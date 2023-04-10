@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+  <!-- Head -->
+  {{template "head"}}
+  <!-- End Head -->
+  <body id="js-home">
+    <!-- Header -->
+    <header role="header">
+      <!-- Navbar -->
+      <nav class="js-navbar-scroll navbar navbar-expand-lg navbar-transparent navbar-dark" style="background-color:#100414;">
+        <div class="container-fluid">
+          <a class="navbar-brand" href="/home">
+            <img src="assets/img/logo-white.png" alt="Stream UI Kit" style="width: 100px;">
+          </a>
+          <div class="collapse navbar-collapse" id="navbarTogglerDemo">
+            <form class="form-inline col-lg mr-auto my-2 my-lg-0" method="POST" action="./search">
+              <input name ="item" class="form-control w-75 mr-sm-2" type="search" placeholder="Search">
+              <button class="btn btn-primary my-2 my-sm-0" type="submit">Search</button> 
+            </form>
+            <ul class="navbar-nav ml-auto mt-2 mt-lg-0">
+              <li class="nav-item mr-4 mb-2 mb-lg-0">
+                <a href="/ranking?page=1&category=99" class="nav-link">
+                  <em class="fas fa-trophy u-font-size-90 mr-1"></em> Ranking
+                </a>
+              </li>  
+              <li class="nav-item mr-4 mb-2 mb-lg-0">
+                <a href="{{.AuthPath}}" onclick="removeSession()" class="nav-link">
+                  <em class="fas fa-sign-in-alt u-font-size-90 mr-1"></em> {{.AuthKind}}
+                </a>
+              </li>      
+              <li class="nav-item mr-4 mb-2 mb-lg-0">
+                <a class="nav-link" href="/watchlist?page=1">
+                  <em class="fas fa-heart u-font-size-90 mr-1"></em> Watchlist
+                </a>
+              </li>
+              <li class="nav-item mr-4 mb-2 mb-lg-0">
+                <a class="nav-link" data-toggle="modal" href="" onclick="sendOpinion()">
+                  <em class="fas fa-comment-dots u-font-size-90 mr-1"></em> Opinion
+                </a>
+              </li>
+            </ul>
+            <div>
+              <a class="btn btn-primary" data-toggle="modal" href="" onclick="downloadApp()">
+                <em class="fas fa-cloud-download-alt mr-1"></em> Mobile App
+              </a>
+            </div>
+          </div>
+        </div>
+      </nav>
+      <!-- End Navbar -->
+      <!-- Promo Block -->
+      <section class="u-promo-block" style="background-image: url(assets/img-temp/promo/img1.jpg);">
+        <!-- Promo Content -->
+        <div class="container text-white" style="background-color:#100414; margin-left: 2px;padding-left: 2px; margin-top:-100px; margin-bottom: 10px; font-size: 1.15vw;" >
+          <nav class="nav">
+            <a class="nav-link disabled"><strong>Category</strong></a>
+            <script>
+              var category_num = {{.Category}};
+              if( category_num === 99){
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=99" style ="color:#e71442">All</a>')
+              }else{
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=99" style ="color:#e6e7e9">All</a>')
+              }
+              if( category_num === 1){
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=1" style ="color:#e71442">Art</a>')
+              }else{
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=1" style ="color:#e6e7e9">Art</a>')
+              }
+              if( category_num === 2){
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=2" style ="color:#e71442">Book</a>')
+              }else{
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=2" style ="color:#e6e7e9">Book</a>')
+              }
+              if( category_num === 3){
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=3" style ="color:#e71442">Electronics</a>')
+              }else{
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=3" style ="color:#e6e7e9">Electronics</a>')
+              }
+              if( category_num === 4){
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=4" style ="color:#e71442">Fashion</a>')
+              }else{
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=4" style ="color:#e6e7e9">Fashion</a>')
+              }
+              if( category_num === 5){
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=5" style ="color:#e71442">Health</a>')
+              }else{
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=5" style ="color:#e6e7e9">Health</a>')
+              }
+              if( category_num === 6){
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=6" style ="color:#e71442">Movies</a>')
+              }else{
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=6" style ="color:#e6e7e9">Movies</a>')
+              }
+              if( category_num === 7){
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=7" style ="color:#e71442">Music</a>')
+              }else{
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=7" style ="color:#e6e7e9">Music</a>')
+              }
+              if( category_num === 8){
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=8" style ="color:#e71442">Sports</a>')
+              }else{
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=8" style ="color:#e6e7e9">Sports</a>')
+              }
+              if( category_num === 9){
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=9" style ="color:#e71442">Toy</a>')
+              }else{
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=9" style ="color:#e6e7e9">Toy</a>')
+              }
+              if( category_num === 98){
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=98" style ="color:#e71442">Others</a>')
+              }else{
+                document.write('<a class="nav-link active" href="?page=' + {{.Page}} + '&category=98" style ="color:#e6e7e9">Others</a>')
+              }
+            </script>
+          </nav>
+        </div>
+        <div class="col-12" style="text-align:center;">
+          <script>
+            document.write('<p class="text-left"><font color="white">Top '+{{.startNum}}+'-'+{{.endNum}}+ ' in Best Seller ' + {{.TotalNum}} + '</font></p>');
+          </script>
+          <div class="row" style="margin-bottom: 10px; margin-right: 10px; margin-left: 10px;">
+            {{range .Product}}
+            <div class="card col-xs-6 col-sm-6 col-md-4 col-lg-3 col-xl-3 " style="width: 12rem; margin-bottom: 10px;">
+              <img src={{.ImageURL}}  class="card-img-top" style="margin-top: 10px;" alt="product"> 
+              <div class="card-body" style="color:#59287a;">
+                <h5 class="card-title ">
+                  <a class="link-muted d-block text-center" href="#!" data-toggle="tooltip" data-placement="top">
+                    <div style="font-size: 1.5vw;">{{.Name}}</div>
+                  </a>
+                </h5>
+                <table class="table table-bordered" style="font-size: 1vw;">
+                  <tr><td>Price</td><td>{{.Price}}KY</td></tr>
+                </table>
+                <a class="btn btn-primary" id="purchase" href="#"  onclick="insertRankProductInfo({{.Name}},{{.ImageURL}},{{.Price}},{{.ID}},{{.Category}})" data-toggle="modal" data-target="#ConfirmModal" style="font-size: 0.9vw;" data-backdrop="true">
+                  <em class="fas fa-cart-plus"></em> <div style="font-size: 0.7vw;">Buy</div>
+                </a>
+                <a class="btn btn-primary" href="javascript:void(0)" style="font-size: 0.9vw;" onclick="addWatchlist({{.ID}},{{.Name}},{{.ImageURL}},{{.Price}});return false;">
+                  <em class="fas fa-heart"></em> <div style="font-size: 0.7vw;">Watch</div>
+                </a>
+              </div>
+            </div>
+            {{end}}
+            <div class="modal fade" id="ConfirmModal" tabindex="-1" role="dialog" aria-labelledby="ConfirmModalTitle" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content" style="shadow-lg;background-color: rgb(243, 231, 217);" width="60%" height="45%">
+                  <div class="modal-header">
+                    <h5 class="modal-title" id="ConfirmModalTitle" >Payment Methods</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                      <span aria-hidden="true">&times;</span>
+                    </button>
+                  </div>
+                <form style="margin-top: 10px;" role="form" method="POST" action="/payreqest" >
+                  <div class="modal-body">
+                    <div align="center">
+                      Your item is <strong id="rankteimmname"></strong>!
+                    </div>
+                    <div align="center">
+                      <img id="rankteimmurl" style="margin-top: 10px;" width="60%" height="45%" alt="item url"> 
+                    </div>
+                      <strong style="margin: 10px;">Pay with</strong>
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="marker" value="Stripe" onclick="formRankSwitch()" checked>
+                        <label class="form-check-label"> <em class="fab fa-cc-stripe"></em>Stripe</label>
+                      </div>
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="marker" value="DirectDebit" onclick="formRankSwitch()" checked>
+                        <label class="form-check-label"> <em class="far fa-credit-card"></em>DirectDebit</label>
+                      </div>
+                      <div class="card-body" id="StripeList">
+                        <div class="row">
+                          <div class="col-sm-12">
+                            <div class="form-group">
+                                <label for="name">E-Mail Address</label>
+                                <input name ="address" class="form-control" id="rankitem-email" type="email" placeholder="Enter your e-mail address">
+                            </div>
+                          </div>
+                        </div>
+                        <div class="row">
+                          <div class="col-sm-12">
+                              <div class="form-group">
+                                  <label for="name">Name</label>
+                                  <input name ="name" class="form-control" id="rankitem-name" type="text" placeholder="Enter your name">
+                              </div>
+                          </div>
+                        </div>
+                        <div class="row">
+                          <div class="col-sm-12">
+                              <div class="form-group">
+                                  <label for="ccnumber">Credit Card Number</label>
+                                  <div class="input-group">
+                                      <input name ="cardnum" id="rankitem-cardnum" class="form-control" type="text" placeholder="0000 0000 0000 0000">
+                                      <div class="input-group-append">
+                                          <span class="input-group-text">
+                                              <em class="mdi mdi-credit-card"></em>
+                                          </span>
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                        </div>
+                        <div class="row">
+                          <div class="form-group col-sm-4">
+                              <label for="searchccmonth">Month</label>
+                              <select name="month" class="form-control" id="searchccmonth">
+                                  <option>1</option>
+                                  <option>2</option>
+                                  <option>3</option>
+                                  <option>4</option>
+                                  <option>5</option>
+                                  <option>6</option>
+                                  <option>7</option>
+                                  <option>8</option>
+                                  <option>9</option>
+                                  <option>10</option>
+                                  <option>11</option>
+                                  <option>12</option>
+                              </select>
+                          </div>
+                          <div class="form-group col-sm-4">
+                              <label for="searchccyear">Year</label>
+                              <select name="year" class="form-control" id="searchccyear">
+                                <script>
+                                  var year = new Date().getFullYear();
+                                  var start_yaer = Number(year)
+                                  for (let i = 0; i <= 10; i++) {
+                                    var target_year = start_yaer + i
+                                    document.write( '<option>' + target_year + '</option>' );
+                                  }
+                                </script>  
+                              </select>
+                          </div>
+                          <div class="col-sm-4">
+                              <div class="form-group">
+                                  <label for="cvv">CVV/CVC</label>
+                                  <input name="cvc" id="rankitem-cvc" class="form-control" id="cvv" type="text" placeholder="123">
+                              </div>
+                          </div>
+                          <div class="form-group col-sm-4">
+                            <label for="rankitem-ccquantity">Quantity</label>
+                            <select name="quantity" class="form-control" id="rankitem-ccquantity" onChange="caclRankAmount()">
+                                <option>1</option>
+                                <option>2</option>
+                                <option>3</option>
+                                <option>4</option>
+                                <option>5</option>
+                            </select>
+                          </div>
+                          <fieldset disabled>
+                            <div class="form-group">
+                              <label for="disabledTextInput">Total</label>
+                              <input name="total" type="text" id="rankItemAmount" class="form-control" placeholder="" data-total="">
+                            </div>
+                          </fieldset> 
+                        </div>
+                      </div> 
+                      <div class="card-body" id="DirectDebitList">
+                        <div class="row">
+                          <div class="col-sm-12">
+                            <div class="form-group">
+                              <label for="name">User-ID</label>
+                              <input name="userid" class="form-control" id="rankitem-userid" type="text" placeholder="Enter your user-id">
+                            </div>
+                          </div>
+                          <div class="col-sm-12">
+                            <div class="form-group">
+                                <label for="name">Password</label>
+                                <input name="password" class="form-control" id="rankitem-password" type="text" placeholder="Enter your password">
+                            </div>
+                          </div>
+                          <div class="form-group col-sm-4" id="rankitem-stock" data-stock="">
+                            <label for="rankitem-ccquantityDebit">Quantity</label>
+                            <select name="quantity" class="form-control" id="rankitem-ccquantityDebit" onChange="caclRankingAmountDebit()">
+                                <option>1</option>
+                                <option>2</option>
+                                <option>3</option>
+                                <option>4</option>
+                                <option>5</option>
+                            </select>
+                          </div>
+                          <fieldset disabled>
+                            <div class="form-group" >
+                              <label for="disabledTextInput">Total</label>
+                              <input type="text" id="rankItemAmountDebit" class="form-control" placeholder="" data-total="">
+                            </div>
+                          </fieldset>
+                          <input id="rankitemproductid" name="productid" type="hidden" >
+                          <input id="rankitemproductname" name="productname" type="hidden" >
+                          <input id="rankitemprice" name="price" type="hidden" >
+                          <input id="itemurl" name="itemurl" type="hidden" >
+                          <input id="itemcategory" name="itemcategory" type="hidden" >
+                          <input id="rankingdealstock" name="dealstock" type="hidden" >
+                        </div>
+                      </div>                         
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                      <button type="submit" class="btn btn-primary">Buy</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+          <div class="row justify-content-between align-items-center" >
+            <div class="col-lg">
+              <nav aria-label="Bootstrap Pagination Example">
+                <ul class="pagination mb-6 justify-content-end">
+                  <script>
+                    var current_page  = {{.Page}};
+                    var previous_page = current_page-1;
+                    var next_page     = current_page+1;
+                    var total_num     = {{.TotalNum}};
+                    var category      = {{.Category}};
+                    var total_page    = parseInt( total_num/10 ) + 1;
+                    if ( total_num >0 && current_page<= total_page && current_page > 0 ) {
+                      if( current_page < 2){
+                        document.write( '<li class="page-item disabled" ><a class="page-link" href="#"><span class="mr-1 d-none d-sm-inline-block">&larr;</span> Previous</a></li>' )
+                      }else{
+                        document.write( '<li class="page-item "><a class="page-link" href="?page=' + previous_page + '&category=' + category + '"><span class="mr-1 d-none d-sm-inline-block">&larr;</span> Previous</a></li>' )
+                      }
+                      if( current_page <=4 ){
+                        var visible_page 
+                        if( total_num <= 10 ){
+                          visible_page = 1
+                        }else if(total_num<=20){
+                          visible_page = 2
+                        }else if(total_num<=30){
+                          visible_page = 3
+                        }else{
+                          visible_page = 4
+                        }
+                        for( var i = 1 ; i <= visible_page ; i++ ){
+                          if( i ===current_page ){
+                            document.write( '<li class="page-item active"><a class="page-link" href="?page=' + i + '&category=' + category + '">' + i +'</a></li>' )
+                          }else{
+                            document.write( '<li class="page-item"><a class="page-link" href="?page=' + i + '&category=' + category + '">' +i + '</a></li>' )
+                          }  
+                        }
+                        if( total_page > 4 ){
+                          document.write( '<li class="page-item"><a class="page-link" href="?page=' + 5 + '&category=' + category + '">' + 5 +'</a></li>' )
+                          document.write( '<li class="page-item disabled"><div class="page-link">･･･</a></li>' ) 
+                          document.write( '<li class="page-item"><a class="page-link" href="?page=' + total_page + '&category=' + category + '">' + total_page +'</a></li>' )
+                        } 
+                      }
+                      else{
+                        document.write( '<li class="page-item"><a class="page-link" href="?page=' + 1 + '&category=' + category  + '">' + 1 +'</a></li>' )
+                        document.write( '<li class="page-item disabled"><div class="page-link">･･･</a></li>' ) 
+                        if( current_page + 3 < total_page ){
+                          for( var i = current_page ; i <= current_page+2 ; i++ ){
+                            if( i === current_page ){
+                              document.write( '<li class="page-item active"><a class="page-link" href="?page=' + i + '&category=' + category + '">' + i +'</a></li>' )
+                            }else{
+                              document.write( '<li class="page-item"><a class="page-link" href="?page=' + i + '&category=' + category  + '">' + i +'</a></li>' )
+                            }
+                          }
+                          document.write( '<li class="page-item disabled"><div class="page-link">･･･</a></li>' ) 
+                          document.write( '<li class="page-item"><a class="page-link" href="?page=' + total_page + '&category=' + category +  '">' + total_page +'</a></li>' )
+                        }
+                        else{
+                          if( current_page + 3 === total_page ){
+                            document.write( '<li class="page-item active"><a class="page-link" href="?page=' + current_page + '&category=' + category +  '">' + current_page +'</a></li>' )
+                          }
+                          for( var i = total_page-2 ; i <= total_page ; i++ ){
+                            if( i ===current_page ){
+                              document.write( '<li class="page-item active"><a class="page-link" href="?page=' + i + '&category=' + category  + '">' + i +'</a></li>' )
+                            }else{
+                              document.write( '<li class="page-item"><a class="page-link" href="?page=' + i + '&category=' + category +  '">' + i +'</a></li>' )
+                            }
+                          }
+                        }
+                      }
+                      if( current_page === total_page){  
+                        document.write( '<li class="page-item disabled " ><a class="page-link" href="#">Next<span class="ml-1 d-none d-sm-inline-block">&rarr;</span></a></li>' )
+                      }else{
+                        document.write( '<li class="page-item "><a class="page-link" href="?page=' + next_page + '&category=' + category + '">Next<span class="ml-1 d-none d-sm-inline-block">&rarr;</span></a></li>' )
+                      }
+                    }
+                  </script>
+                </ul>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>    
+    </header>
+    <!-- End Header -->
+    <!-- End Promo Content -->
+    {{template "feedback"}}
+    </section>
+    {{template "common-script"}} 
+    {{template "formswitch-script"}}   
+    <script>
+      function insertRankProductInfo(name,url,value,id,category) {
+        document.getElementById("rankteimmname").innerHTML = name;
+        document.getElementById("rankteimmurl").src = url;
+        document.getElementById('rankItemAmount').total = value;
+        document.getElementById('rankItemAmount').placeholder = value + 'KY';
+        document.getElementById('rankItemAmountDebit').total = value;
+        document.getElementById('rankItemAmountDebit').placeholder = value + 'KY';
+        document.getElementById('rankitemprice').value = value;
+        document.getElementById('rankitemproductid').value = id;
+        document.getElementById('rankingdealstock').value = 5;
+        document.getElementById('rankitemproductname').value = name;
+        document.getElementById('itemurl').value = url;
+        document.getElementById('itemcategory').value = category;
+      };
+    </script>
+  </body>
+  <!-- End Body -->
+</html>
