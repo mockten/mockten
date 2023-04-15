@@ -17,5 +17,5 @@ RUN go build .
 # As runner
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
-COPY --from=builder  /go/setenv/searchitem.git .
-CMD ["./searchitem.git"]
+COPY --from=builder  /go/setenv/searchitem .
+CMD ["./searchitem"]

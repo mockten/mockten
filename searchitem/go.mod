@@ -1,4 +1,4 @@
-module github.com/mockten/mockten/searchitem.git
+module github.com/mockten/mockten/searchitem
 
 go 1.19
 

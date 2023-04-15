@@ -1,4 +1,4 @@
-module github.com/mockten/mockten/ecpay.git
+module github.com/mockten/mockten/ecpay
 
 go 1.19
 

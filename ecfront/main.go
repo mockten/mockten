@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	pb "pb/ecfront"
 	"strconv"
 	"strings"
 	"time"
@@ -76,7 +75,7 @@ type User struct {
 	State string `json: state`
 }
 
-//Const Setting
+// Const Setting
 const (
 	ErrHtml          = "err.html"
 	FailedConMsg     = "Failed to connect: %v"
@@ -270,7 +269,7 @@ func exportMetrics() {
 	}
 }
 
-//LoggingSettings Initialization
+// LoggingSettings Initialization
 func LoggingSettings(logFile string) {
 	logfile, _ := os.OpenFile(filepath.Clean(logFile), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 	multiLogFile := io.MultiWriter(os.Stdout, logfile)
@@ -278,7 +277,7 @@ func LoggingSettings(logFile string) {
 	log.SetOutput(multiLogFile)
 }
 
-//Session Check
+// Session Check
 func SessionCheck(ctx *gin.Context) (url string, path string) {
 	session := sessions.Default(ctx)
 	if v := session.Get("id_token"); v != nil {
@@ -287,7 +286,7 @@ func SessionCheck(ctx *gin.Context) (url string, path string) {
 	return LoginUrl, "Login"
 }
 
-//SearchItem main
+// SearchItem main
 func SearchItem(ctx *gin.Context, searchName string, category int32, filter int32, page int32) (ProductList []Product, TotalNum int32) {
 	if len(searchName) == 0 {
 		ctx.HTML(http.StatusOK, "home.html", gin.H{})
@@ -326,7 +325,7 @@ func SearchItem(ctx *gin.Context, searchName string, category int32, filter int3
 	return ProductList, r.TotalNum
 }
 
-//GCS Upload
+// GCS Upload
 func historyStack(ctx *gin.Context, kind string, productName string) {
 	var clientIp = "NaN"
 	var consumerId string
@@ -364,7 +363,7 @@ func historyStack(ctx *gin.Context, kind string, productName string) {
 
 }
 
-//GCS Upload
+// GCS Upload
 func gcsUpload(fileName string, FileContent string) {
 	filePath := fmt.Sprintf("raws/%v", fileName)
 	ctx := context.Background()
@@ -383,7 +382,7 @@ func gcsUpload(fileName string, FileContent string) {
 	}
 }
 
-//RankItem main
+// RankItem main
 func RankItem(ctx *gin.Context, category int32, page int32) (ProductList []RankProduct, TotalNum int32) {
 	RankHost := fmt.Sprintf("%v:%v", os.Getenv("RANKING_SERVICE_HOST"), 50053)
 	conn, err := grpc.Dial(RankHost, grpc.WithInsecure())
@@ -415,7 +414,7 @@ func RankItem(ctx *gin.Context, category int32, page int32) (ProductList []RankP
 	return ProductList, r.TotalNum
 }
 
-//WatchItem main
+// WatchItem main
 func AddWatchItem(ctx *gin.Context, consumerId string, page int32) (ProductList []WatchProduct, TotalNum int32) {
 	RedisHost := os.Getenv("REDIS_HOST")[8:]
 	//connect to redis
@@ -456,7 +455,7 @@ func AddWatchItem(ctx *gin.Context, consumerId string, page int32) (ProductList 
 	return ProductList, TotalNum
 }
 
-//RequestPayment main
+// RequestPayment main
 func RequestPayment(ctx *gin.Context, marker string, eachrequest map[string]*pb.EachRequest, Address string, Name string, CardNum string, Month string, Year string, Cvc string, UserId string, Password string, ItemName string, ItemURL string, ItemCategory int32, itemPrice int32) (Result string) {
 	Result = DefaultResult
 	PayHost := fmt.Sprintf("%v:%v", os.Getenv("ECPAY_SERVICE_HOST"), 50052)

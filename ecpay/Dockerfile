@@ -16,13 +16,13 @@ RUN apk add --no-cache ca-certificates
 RUN mkdir /lib64 &&\
     ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2 &&\
     mkdir /var/log/apl
-COPY --from=builder /go/src/ecpay/ecpay.git /ecpay.git
+COPY --from=builder /go/src/ecpay/ecpay /ecpay
 COPY --from=builder /go/src/ecpay/config.ini  /config.ini
 RUN adduser sys-user --disabled-password &&\
-    chown sys-user:sys-user /ecpay.git &&\
+    chown sys-user:sys-user /ecpay &&\
     chown sys-user:sys-user /var/log/apl &&\
     chown sys-user:sys-user /config.ini
 HEALTHCHECK --interval=5m --timeout=30s \
 CMD curl -f http://localhost:9100/metrics || exit 1
 USER sys-user
-ENTRYPOINT ["./ecpay.git"]
+ENTRYPOINT ["./ecpay"]

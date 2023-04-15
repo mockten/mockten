@@ -13,4 +13,4 @@ gcsfuse -o allow_other -o nonempty $GCS_BUCKET_NAME /mnt/gcs/$GCS_BUCKET_NAME
 ln -sfn /mnt/gcs/$GCS_BUCKET_NAME /apl/assets/img/
 
 #Run APL
-/apl/main
+/apl/ecfront

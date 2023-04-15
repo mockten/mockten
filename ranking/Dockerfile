@@ -17,11 +17,11 @@ RUN apk add --no-cache ca-certificates
 RUN mkdir /lib64 &&\
     ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2 &&\
     mkdir /var/log/apl
-COPY --from=builder /go/src/ranking/ranking.git /ranking.git
+COPY --from=builder /go/src/ranking/ranking /ranking
 RUN adduser sys-user --disabled-password &&\
-    chown sys-user:sys-user /ranking.git &&\
+    chown sys-user:sys-user /ranking &&\
     chown sys-user:sys-user /var/log/apl
 HEALTHCHECK --interval=5m --timeout=30s \
 CMD curl -f http://localhost:9100/metrics || exit 1
 USER sys-user
-ENTRYPOINT ["./ranking.git"]
+ENTRYPOINT ["./ranking"]

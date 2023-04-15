@@ -1,4 +1,4 @@
-module github.com/mockten/mockten/payexecution.git
+module github.com/mockten/mockten/payexecution
 
 go 1.19
 
