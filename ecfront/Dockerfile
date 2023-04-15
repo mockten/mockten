@@ -57,7 +57,7 @@ COPY --from=builder /go/src/ecfront/config.ini.prd /apl/config.ini
 RUN addgroup -g 1234 sys-group  &&\
     adduser sys-user --disabled-password &&\
     addgroup sys-user sys-group &&\
-    chown sys-user:sys-user /apl/main &&\
+    chown sys-user:sys-user /apl/ecfront &&\
     chown sys-user:sys-user /var/log/apl &&\
     chown sys-user:sys-user /apl/config.ini &&\
     chown sys-user:sys-user /apl/docker-entory.sh &&\
