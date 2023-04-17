@@ -1,4 +1,4 @@
-module github.com/mockten/mockten/ecfront.git
+module github.com/mockten/mockten/ecfront
 
 go 1.19
 

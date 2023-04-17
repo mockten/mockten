@@ -1,4 +1,4 @@
-module github.com/mockten/mockten/ranking.git
+module github.com/mockten/mockten/ranking
 
 go 1.19
 
