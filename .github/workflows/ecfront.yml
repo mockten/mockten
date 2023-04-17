@@ -13,8 +13,6 @@ defaults:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      GOROOT: "/opt/hostedtoolcache/go/1.18.10/x64"
     steps:
     - uses: actions/checkout@v3
 
@@ -22,8 +20,6 @@ jobs:
       uses: actions/setup-go@v3
       with:
         go-version: 1.18
-    - name: Set up protoc file
-      run: echo $GOROOT && mv interface/ $GOROOT/src/pb
 
     - name: Build
       run: go build -v .
