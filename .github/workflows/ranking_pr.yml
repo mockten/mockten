@@ -6,6 +6,9 @@ on:
       - opened
     paths:
       - 'ranking/**'
+  push:
+    paths:
+      - 'ranking/**'
 
 defaults:
   run:

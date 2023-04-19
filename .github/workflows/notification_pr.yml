@@ -6,6 +6,9 @@ on:
       - opened
     paths:
       - 'notification/**'
+  push:
+    paths:
+      - 'notification/**'
 
 defaults:
   run:

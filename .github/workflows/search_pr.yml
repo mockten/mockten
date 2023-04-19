@@ -6,6 +6,9 @@ on:
       - opened
     paths:
       - 'searchitem/**'
+  push:
+    paths:
+      - 'searchitem/**'
 
 defaults:
   run:
