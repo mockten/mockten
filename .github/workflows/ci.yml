@@ -1,0 +1,432 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+
+jobs:
+  build_ecfront:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: ecfront
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+
+    - name: Build
+      run: go build -v .
+
+   # - name: Test
+   #  run: go test -v .
+
+  build_snapshot_container_ecfront:
+    needs: [build_ecfront]
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: ecfront
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Build a docker image
+      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecfront_snapshot:${GITHUB_SHA::7} .
+
+  push_snapshot_container_ecfront:
+    needs: [build_snapshot_container_ecfront]
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: ecfront
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Build a docker image
+      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecfront_snapshot:${GITHUB_SHA::7} .
+    - name: Push the docker image
+      run: docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecfront_snapshot:${GITHUB_SHA::7}
+
+  build_ecpay:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: ecpay
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+
+    - name: Build
+      run: go build -v .
+
+    # - name: Test
+    #  run: go test -v .
+
+  build_snapshot_container_ecpay:
+    needs: [build_ecpay]
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: ecpay
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Build a docker image
+      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay_snapshot:${GITHUB_SHA::7} .
+
+  push_snapshot_container_ecpay:
+    needs: [build_snapshot_container_ecpay]
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: ecpay
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Build a docker image
+      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay_snapshot:${GITHUB_SHA::7} .
+    - name: Push the docker image
+      run: docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay_snapshot:${GITHUB_SHA::7}
+
+  build_notification:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: notification
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+
+    - name: Build
+      run: go build -v .
+
+    # - name: Test
+    #  run: go test -v .
+
+  build_snapshot_container_notification:
+    needs: [build_notification]
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: notification
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Build a docker image
+      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/notification_snapshot:${GITHUB_SHA::7} .
+
+  push_snapshot_container_notification:
+    needs: [build_snapshot_container_notification]
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: notification
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Build a docker image
+      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/notification_snapshot:${GITHUB_SHA::7} .
+    - name: Push the docker image
+      run: docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/notification_snapshot:${GITHUB_SHA::7}
+
+  build_payexecution:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: payexecution
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+
+    - name: Build
+      run: go build -v .
+
+    - name: Test
+      run: go test -v .
+
+  build_snapshot_container_payexecution:
+    needs: [build_payexecution]
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: payexecution
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Build a docker image
+      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/payexecution_snapshot:${GITHUB_SHA::7} .
+
+  push_snapshot_container_payexecution:
+    needs: [build_snapshot_container_payexecution]
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: payexecution
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Build a docker image
+      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/payexecution_snapshot:${GITHUB_SHA::7} .
+    - name: Push the docker image
+      run: docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/payexecution_snapshot:${GITHUB_SHA::7}
+    
+  build_ranking:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: ranking
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+
+    - name: Build
+      run: go build -v .
+
+    # - name: Test
+    #  run: go test -v .
+
+  build_snapshot_container_ranking:
+    needs: [build_ranking]
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: ranking
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Build a docker image
+      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/ranking_snapshot:${GITHUB_SHA::7} .
+
+  push_snapshot_container_ranking:
+    needs: [build_snapshot_container_ranking]
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: ranking
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Build a docker image
+      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/ranking_snapshot:${GITHUB_SHA::7} .
+    - name: Push the docker image
+      run: docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/ranking_snapshot:${GITHUB_SHA::7}
+
+
+  build_searchitem:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: searchitem
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+
+    - name: Build
+      run: go build -v .
+
+    # - name: Test
+    #  run: go test -v .
+
+  build_snapshot_container_searchitem:
+    needs: [build_searchitem]
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: searchitem
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Build a docker image
+      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/search_snapshot:${GITHUB_SHA::7} .
+
+  push_snapshot_container_searchitem:
+    needs: [build_snapshot_container_searchitem]
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: searchitem
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Build a docker image
+      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/search_snapshot:${GITHUB_SHA::7} .
+    - name: Push the docker image
+      run: docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/search_snapshot:${GITHUB_SHA::7}
