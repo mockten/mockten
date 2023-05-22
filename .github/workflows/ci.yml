@@ -29,32 +29,8 @@ jobs:
    # - name: Test
    #  run: go test -v .
 
-  build_snapshot_container_ecfront:
-    needs: [build_ecfront]
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: ecfront
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v1
-
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
-    - name: Build a docker image
-      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecfront_snapshot:${GITHUB_SHA::7} .
-
   push_snapshot_container_ecfront:
-    needs: [build_snapshot_container_ecfront]
+    needs: [build_ecfront]
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-22.04
     defaults:
@@ -75,10 +51,25 @@ jobs:
 
     - name: Configure docker to use the gcloud cli
       run: gcloud auth configure-docker --quiet
-    - name: Build a docker image
-      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecfront_snapshot:${GITHUB_SHA::7} .
-    - name: Push the docker image
-      run: docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecfront_snapshot:${GITHUB_SHA::7}
+
+    - name: Get latest version
+      id: get-latest-version
+      run: |
+        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecfront --format='get(tags)' --limit=1)
+        echo "::set-output name=latest_version::$LATEST_VERSION"
+
+    - name: Increment patch version
+      id: increment-patch-version
+      run: |
+        export PATCH_VERSION=$((${{ steps.get-latest-version.outputs.latest_version }} + 1))
+        echo "::set-output name=patch_version::$PATCH_VERSION"
+
+    - name: Build and push container
+      run: |
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecfront:v0.0.${{ steps.increment-patch-version.outputs.patch_version }}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
 
   build_ecpay:
     runs-on: ubuntu-22.04
@@ -99,32 +90,9 @@ jobs:
     # - name: Test
     #  run: go test -v .
 
-  build_snapshot_container_ecpay:
-    needs: [build_ecpay]
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: ecpay
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v1
-
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
-    - name: Build a docker image
-      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay_snapshot:${GITHUB_SHA::7} .
 
   push_snapshot_container_ecpay:
-    needs: [build_snapshot_container_ecpay]
+    needs: [build_ecpay]
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-22.04
     defaults:
@@ -145,10 +113,25 @@ jobs:
 
     - name: Configure docker to use the gcloud cli
       run: gcloud auth configure-docker --quiet
-    - name: Build a docker image
-      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay_snapshot:${GITHUB_SHA::7} .
-    - name: Push the docker image
-      run: docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay_snapshot:${GITHUB_SHA::7}
+
+    - name: Get latest version
+      id: get-latest-version
+      run: |
+        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay --format='get(tags)' --limit=1)
+        echo "::set-output name=latest_version::$LATEST_VERSION"
+
+    - name: Increment patch version
+      id: increment-patch-version
+      run: |
+        export PATCH_VERSION=$((${{ steps.get-latest-version.outputs.latest_version }} + 1))
+        echo "::set-output name=patch_version::$PATCH_VERSION"
+
+    - name: Build and push container
+      run: |
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay:v0.0.${{ steps.increment-patch-version.outputs.patch_version }}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
 
   build_notification:
     runs-on: ubuntu-22.04
@@ -169,32 +152,9 @@ jobs:
     # - name: Test
     #  run: go test -v .
 
-  build_snapshot_container_notification:
-    needs: [build_notification]
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: notification
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v1
-
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
-    - name: Build a docker image
-      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/notification_snapshot:${GITHUB_SHA::7} .
 
   push_snapshot_container_notification:
-    needs: [build_snapshot_container_notification]
+    needs: [build_notification]
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-22.04
     defaults:
@@ -215,10 +175,24 @@ jobs:
 
     - name: Configure docker to use the gcloud cli
       run: gcloud auth configure-docker --quiet
-    - name: Build a docker image
-      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/notification_snapshot:${GITHUB_SHA::7} .
-    - name: Push the docker image
-      run: docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/notification_snapshot:${GITHUB_SHA::7}
+
+    - name: Get latest version
+      id: get-latest-version
+      run: |
+        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/notification --format='get(tags)' --limit=1)
+        echo "::set-output name=latest_version::$LATEST_VERSION"
+
+    - name: Increment patch version
+      id: increment-patch-version
+      run: |
+        export PATCH_VERSION=$((${{ steps.get-latest-version.outputs.latest_version }} + 1))
+        echo "::set-output name=patch_version::$PATCH_VERSION"
+
+    - name: Build and push container
+      run: |
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/notification:v0.0.${{ steps.increment-patch-version.outputs.patch_version }}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
 
   build_payexecution:
     runs-on: ubuntu-22.04
@@ -239,32 +213,8 @@ jobs:
     - name: Test
       run: go test -v .
 
-  build_snapshot_container_payexecution:
-    needs: [build_payexecution]
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: payexecution
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v1
-
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
-    - name: Build a docker image
-      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/payexecution_snapshot:${GITHUB_SHA::7} .
-
   push_snapshot_container_payexecution:
-    needs: [build_snapshot_container_payexecution]
+    needs: [build_payexecution]
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-22.04
     defaults:
@@ -285,11 +235,25 @@ jobs:
 
     - name: Configure docker to use the gcloud cli
       run: gcloud auth configure-docker --quiet
-    - name: Build a docker image
-      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/payexecution_snapshot:${GITHUB_SHA::7} .
-    - name: Push the docker image
-      run: docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/payexecution_snapshot:${GITHUB_SHA::7}
-    
+
+    - name: Get latest version
+      id: get-latest-version
+      run: |
+        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/payexecution --format='get(tags)' --limit=1)
+        echo "::set-output name=latest_version::$LATEST_VERSION"
+
+    - name: Increment patch version
+      id: increment-patch-version
+      run: |
+        export PATCH_VERSION=$((${{ steps.get-latest-version.outputs.latest_version }} + 1))
+        echo "::set-output name=patch_version::$PATCH_VERSION"
+
+    - name: Build and push container
+      run: |
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/payexecution:v0.0.${{ steps.increment-patch-version.outputs.patch_version }}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
   build_ranking:
     runs-on: ubuntu-22.04
     defaults:
@@ -309,32 +273,8 @@ jobs:
     # - name: Test
     #  run: go test -v .
 
-  build_snapshot_container_ranking:
-    needs: [build_ranking]
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: ranking
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v1
-
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
-    - name: Build a docker image
-      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/ranking_snapshot:${GITHUB_SHA::7} .
-
   push_snapshot_container_ranking:
-    needs: [build_snapshot_container_ranking]
+    needs: [build_ranking]
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-22.04
     defaults:
@@ -355,10 +295,24 @@ jobs:
 
     - name: Configure docker to use the gcloud cli
       run: gcloud auth configure-docker --quiet
-    - name: Build a docker image
-      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/ranking_snapshot:${GITHUB_SHA::7} .
-    - name: Push the docker image
-      run: docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/ranking_snapshot:${GITHUB_SHA::7}
+
+    - name: Get latest version
+      id: get-latest-version
+      run: |
+        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/ranking --format='get(tags)' --limit=1)
+        echo "::set-output name=latest_version::$LATEST_VERSION"
+
+    - name: Increment patch version
+      id: increment-patch-version
+      run: |
+        export PATCH_VERSION=$((${{ steps.get-latest-version.outputs.latest_version }} + 1))
+        echo "::set-output name=patch_version::$PATCH_VERSION"
+
+    - name: Build and push container
+      run: |
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/ranking:v0.0.${{ steps.increment-patch-version.outputs.patch_version }}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
 
 
   build_searchitem:
@@ -380,32 +334,8 @@ jobs:
     # - name: Test
     #  run: go test -v .
 
-  build_snapshot_container_searchitem:
-    needs: [build_searchitem]
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: searchitem
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v1
-
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
-    - name: Build a docker image
-      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/search_snapshot:${GITHUB_SHA::7} .
-
   push_snapshot_container_searchitem:
-    needs: [build_snapshot_container_searchitem]
+    needs: [build_searchitem]
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-22.04
     defaults:
@@ -426,7 +356,21 @@ jobs:
 
     - name: Configure docker to use the gcloud cli
       run: gcloud auth configure-docker --quiet
-    - name: Build a docker image
-      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/search_snapshot:${GITHUB_SHA::7} .
-    - name: Push the docker image
-      run: docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/search_snapshot:${GITHUB_SHA::7}
+
+    - name: Get latest version
+      id: get-latest-version
+      run: |
+        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/searchitem --format='get(tags)' --limit=1)
+        echo "::set-output name=latest_version::$LATEST_VERSION"
+
+    - name: Increment patch version
+      id: increment-patch-version
+      run: |
+        export PATCH_VERSION=$((${{ steps.get-latest-version.outputs.latest_version }} + 1))
+        echo "::set-output name=patch_version::$PATCH_VERSION"
+
+    - name: Build and push container
+      run: |
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/searchitem:v0.0.${{ steps.increment-patch-version.outputs.patch_version }}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
