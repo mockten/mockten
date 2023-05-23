@@ -13,7 +13,7 @@ RUN apk add --no-cache ca-certificates
 RUN mkdir /lib64 &&\
     ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2 &&\
     mkdir /var/log/apl
-COPY --from=builder /go/src/notification/notification.git /notification
+COPY --from=builder /go/src/notification/notification /notification
 COPY --from=builder /go/src/notification/config.ini  /
 RUN adduser sys-user --disabled-password &&\
     chown sys-user:sys-user /notification &&\

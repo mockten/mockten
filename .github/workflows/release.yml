@@ -1,0 +1,167 @@
+name: RELEASE
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  release-ecfront:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: ecfront
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Push the docker image
+      run: |
+        export SNAPSHOT_VERSION=$(curl -s https://gcr.io/v2/${{ secrets.GCP_PROJECT_ID }}/ecfront/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
+        export IMAGE_TAG="gcr.io/go-protforio/ecfront:release-v${SNAPSHOT_VERSION}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
+  release-ecpay:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: ecpay
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Push the docker image
+      run: |
+        export SNAPSHOT_VERSION=$(curl -s https://gcr.io/v2/${{ secrets.GCP_PROJECT_ID }}/ecpay/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
+        export IMAGE_TAG="gcr.io/go-protforio/ecpay:release-v${SNAPSHOT_VERSION}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
+  release-notification:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: notification
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Push the docker image
+      run: |
+        export SNAPSHOT_VERSION=$(curl -s https://gcr.io/v2/${{ secrets.GCP_PROJECT_ID }}/notification/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
+        export IMAGE_TAG="gcr.io/go-protforio/notification:release-v${SNAPSHOT_VERSION}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
+  release-payexecution:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: payexecution
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Push the docker image
+      run: |
+        export SNAPSHOT_VERSION=$(curl -s https://gcr.io/v2/${{ secrets.GCP_PROJECT_ID }}/payexecution/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
+        export IMAGE_TAG="gcr.io/go-protforio/payexecution:release-v${SNAPSHOT_VERSION}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
+  release-ranking:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: ranking
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Push the docker image
+      run: |
+        export SNAPSHOT_VERSION=$(curl -s https://gcr.io/v2/${{ secrets.GCP_PROJECT_ID }}/ranking/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
+        export IMAGE_TAG="gcr.io/go-protforio/ranking:release-v${SNAPSHOT_VERSION}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
+  release-searchitem:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: searchitem
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+    - name: Push the docker image
+      run: |
+        export SNAPSHOT_VERSION=$(curl -s https://gcr.io/v2/${{ secrets.GCP_PROJECT_ID }}/searchitem/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
+        export IMAGE_TAG="gcr.io/go-protforio/searchitem:release-v${SNAPSHOT_VERSION}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
