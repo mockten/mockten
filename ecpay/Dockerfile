@@ -11,8 +11,9 @@ WORKDIR /go/src/ecpay
 COPY . .
 RUN go build .
 
-FROM alpine:3.15.0
-RUN apk add --no-cache ca-certificates
+FROM alpine:3.18.2
+RUN apk add --no-cache ca-certificates &&\
+    apk add gcompat
 RUN mkdir /lib64 &&\
     ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2 &&\
     mkdir /var/log/apl
