@@ -1,83 +1,92 @@
 <!DOCTYPE html>
-<html lang="en" class="no-js">
-  <!-- Head -->
-  {{template "head"}}
-  <!-- End Head -->
-  <body id="js-home">
-    <!-- Header -->
-    <header role="header">
-      <!-- Navbar -->
-      <nav class="js-navbar-scroll navbar fixed-top navbar-expand-lg navbar-transparent navbar-dark ">
-        <div class="container-fluid">
-          <a class="navbar-brand" href="/home">
-            <img src="assets/img/logo-white.png" alt="Stream UI Kit" style="width: 100px;">
-          </a>
-    
-          <button class="navbar-toggler" type="button"
-                  data-toggle="collapse"
-                  data-target="#navbarTogglerDemo"
-    
-                  aria-controls="navbarTogglerDemo"
-                  aria-expanded="false"
-                  aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
+<html class="no-js" lang="en">
+ <!-- Head -->
+ {{template "head"}}
+ <!-- End Head -->
+ <body id="js-home">
+  <!-- Header -->
+  <header role="header">
+   <!-- Navbar -->
+   <nav class="js-navbar-scroll navbar fixed-top navbar-expand-lg navbar-transparent navbar-dark">
+    <div class="container-fluid">
+     <a class="navbar-brand" href="/home">
+      <img alt="Stream UI Kit" src="assets/img/logo-white.png" style="width: 100px;"/>
+     </a>
+     <button aria-controls="navbarTogglerDemo" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler" data-target="#navbarTogglerDemo" data-toggle="collapse" type="button">
+      <span class="navbar-toggler-icon">
+      </span>
+     </button>
+     <div class="collapse navbar-collapse" id="navbarTogglerDemo">
+      <ul class="navbar-nav ml-auto mt-2 mt-lg-0">
+       <li class="nav-item mr-4 mb-2 mb-lg-0">
+        <a class="nav-link" href="/ranking?page=1&amp;category=99">
+         <em class="fas fa-trophy u-font-size-90 mr-1">
+         </em>
+         Ranking
+        </a>
+       </li>
+       <li class="nav-item mr-4 mb-2 mb-lg-0">
+        <a class="nav-link" href="{{.AuthPath}}" onclick="removeSession()">
+         <em class="fas fa-sign-in-alt u-font-size-90 mr-1">
+         </em>
+         {{.AuthKind}}
+        </a>
+       </li>
+       <li class="nav-item mr-4 mb-2 mb-lg-0">
+        <a class="nav-link" href="/watchlist?page=1">
+         <em class="fas fa-heart u-font-size-90 mr-1">
+         </em>
+         Watchlist
+        </a>
+       </li>
+       <li class="nav-item mr-4 mb-2 mb-lg-0">
+        <a class="nav-link" data-toggle="modal" href="" onclick="sendOpinion()">
+         <em class="fas fa-comment-dots u-font-size-90 mr-1">
+         </em>
+         Opinion
+        </a>
+       </li>
+      </ul>
+      <div>
+       <a class="btn btn-primary" data-toggle="modal" href="" onclick="downloadApp()">
+        <em class="fas fa-cloud-download-alt mr-1">
+        </em>
+        Mobile App
+       </a>
+      </div>
+     </div>
+    </div>
+   </nav>
+   <!-- End Navbar -->
+   <!-- Promo Block -->
+   <section class="js-parallax u-promo-block" style="background-image: url(assets/img-temp/promo/img1.jpg);">
+    <!-- Promo Content -->
+    <div class="container text-white u-ver-center u-content-space">
+     <div class="row justify-content-center">
+      <div class="col-12">
+       <div class="text-center">
+        <p class="h1 text-uppercase u-letter-spacing-sm mb-0" style="font-size: 4vw;">
+         Oops! Something went wrong...🙇
+        </p>
+        <h1 class="display-2 display-md-1 u-font-accent font-weight-light">
+        </h1>
+        <form class="form-inline my-2 my-lg-0 justify-content-center">
+         <a href="/home">
+          <button class="btn btn-outline-secondary my-2 my-sm-0" type="button">
+           Go Home
           </button>
-          <div class="collapse navbar-collapse" id="navbarTogglerDemo">
-            <ul class="navbar-nav ml-auto mt-2 mt-lg-0">
-              <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a href="/ranking?page=1&category=99" class="nav-link">    
-                  <em class="fas fa-trophy u-font-size-90 mr-1"></em> Ranking
-                </a>
-              </li>
-              <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a href="{{.AuthPath}}" onclick="removeSession()" class="nav-link">
-                  <em class="fas fa-sign-in-alt u-font-size-90 mr-1"></em> {{.AuthKind}}
-                </a>
-              </li>          
-              <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link" href="/watchlist?page=1">
-                  <em class="fas fa-heart u-font-size-90 mr-1"></em> Watchlist
-                </a>
-              </li>
-              <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link" data-toggle="modal" href="" onclick="sendOpinion()">
-                  <em class="fas fa-comment-dots u-font-size-90 mr-1"></em> Opinion
-                </a>
-              </li>
-            </ul>
-            <div>
-              <a class="btn btn-primary" data-toggle="modal" href="" onclick="downloadApp()">
-                <em class="fas fa-cloud-download-alt mr-1"></em> Mobile App
-              </a>
-            </div>
-          </div>
-        </div>  
-      </nav>
-      <!-- End Navbar -->
-      <!-- Promo Block -->
-      <section class="js-parallax u-promo-block" style="background-image: url(assets/img-temp/promo/img1.jpg);">
-        <!-- Promo Content -->
-        <div class="container text-white u-ver-center u-content-space">
-          <div class="row justify-content-center">
-            <div class="col-12">
-              <div class="text-center">
-                <p class="h1 text-uppercase u-letter-spacing-sm mb-0" style="font-size: 4vw;">Oops! Something went wrong...🙇</p>
-                <h1 class="display-2 display-md-1 u-font-accent font-weight-light"></h1>
-                <form class="form-inline my-2 my-lg-0 justify-content-center">
-                  <a href="/home">
-                  <button class="btn btn-outline-secondary my-2 my-sm-0" type="button">Go Home</button>
-                </a>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
-    </header>
-    <!-- End Header -->
-    <!-- End Promo Content -->
-    {{template "feedback"}}
-    </section>      
-    {{template "common-script"}}
-  </body>
-  <!-- End Body -->
+         </a>
+        </form>
+       </div>
+      </div>
+     </div>
+    </div>
+   </section>
+  </header>
+  <!-- End Header -->
+  <!-- End Promo Content -->
+  {{template "feedback"}}
+  {{template "common-script"}}
+ </body>
+ <!-- End Body -->
 </html>
