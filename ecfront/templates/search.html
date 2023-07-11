@@ -1,61 +1,77 @@
 <!DOCTYPE html>
-<html lang="en" class="no-js">
-  <!-- Head -->
-  {{template "head"}}
-  <!-- End Head -->
-  <body id="js-home">
-    <!-- Header -->
-    <header role="header">
-      <!-- Navbar -->
-      <nav class="js-navbar-scroll navbar navbar-expand-lg navbar-transparent navbar-dark" style="background-color:#100414;">
-        <div class="container-fluid">
-          <a class="navbar-brand" href="/home">
-            <img src="assets/img/logo-white.png" alt="Stream UI Kit" style="width: 100px;">
-          </a>
-          <div class="collapse navbar-collapse" id="navbarTogglerDemo">
-            <form class="form-inline col-lg mr-auto my-2 my-lg-0" method="POST" action="./search">
-              <input name ="item" class="form-control w-75 mr-sm-2" type="search" placeholder="Search">
-              <button class="btn btn-primary my-2 my-sm-0" type="submit">Search</button> 
-            </form>
-            <ul class="navbar-nav ml-auto mt-2 mt-lg-0">
-              <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a href="/ranking?page=1&category=99" class="nav-link">
-                  <em class="fas fa-trophy u-font-size-90 mr-1"></em> Ranking
-                </a>
-              </li>  
-              <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a href="{{.AuthPath}}" onclick="removeSession()" class="nav-link">
-                  <em class="fas fa-sign-in-alt u-font-size-90 mr-1"></em> {{.AuthKind}}
-                </a>
-              </li>      
-              <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link" href="/watchlist?page=1" >
-                  <em class="fas fa-heart u-font-size-90 mr-1"></em> Watchlist
-                </a>
-              </li>
-              <li class="nav-item mr-4 mb-2 mb-lg-0">
-                <a class="nav-link" data-toggle="modal" href="" onclick="sendOpinion()">
-                  <em class="fas fa-comment-dots u-font-size-90 mr-1"></em> Opinion
-                </a>
-              </li>
-            </ul>
-            <div>
-              <a class="btn btn-primary" data-toggle="modal" href="" onclick="downloadApp()">
-                <em class="fas fa-cloud-download-alt mr-1"></em> Mobile App
-              </a>
-            </div>
-          </div>
-        </div>
-      </nav>
-      <!-- End Navbar -->
-      <!-- Promo Block -->
-      <section class="u-promo-block" style="background-image: url(assets/img-temp/promo/img1.jpg);">
-        <!-- Promo Content -->
-        <div class="container text-white" style="background-color:#100414; margin-left: 2px;padding-left: 2px; margin-top:-100px; margin-bottom: 10px; font-size: 1.15vw;" >
-          <nav class="nav">
-            <a class="nav-link disabled"><strong>Category</strong></a>
-            <script>
-              var category_num = {{.Category}};
+<html class="no-js" lang="en">
+ <!-- Head -->
+ {{template "head"}}
+ <!-- End Head -->
+ <body id="js-home">
+  <!-- Header -->
+  <header role="header">
+   <!-- Navbar -->
+   <nav class="js-navbar-scroll navbar navbar-expand-lg navbar-transparent navbar-dark" style="background-color:#100414;">
+    <div class="container-fluid">
+     <a class="navbar-brand" href="/home">
+      <img alt="Stream UI Kit" src="assets/img/logo-white.png" style="width: 100px;"/>
+     </a>
+     <div class="collapse navbar-collapse" id="navbarTogglerDemo">
+      <form action="./search" class="form-inline col-lg mr-auto my-2 my-lg-0" method="POST">
+       <input class="form-control w-75 mr-sm-2" name="item" placeholder="Search" type="search"/>
+       <button class="btn btn-primary my-2 my-sm-0" type="submit">
+        Search
+       </button>
+      </form>
+      <ul class="navbar-nav ml-auto mt-2 mt-lg-0">
+       <li class="nav-item mr-4 mb-2 mb-lg-0">
+        <a class="nav-link" href="/ranking?page=1&amp;category=99">
+         <em class="fas fa-trophy u-font-size-90 mr-1">
+         </em>
+         Ranking
+        </a>
+       </li>
+       <li class="nav-item mr-4 mb-2 mb-lg-0">
+        <a class="nav-link" href="{{.AuthPath}}" onclick="removeSession()">
+         <em class="fas fa-sign-in-alt u-font-size-90 mr-1">
+         </em>
+         {{.AuthKind}}
+        </a>
+       </li>
+       <li class="nav-item mr-4 mb-2 mb-lg-0">
+        <a class="nav-link" href="/watchlist?page=1">
+         <em class="fas fa-heart u-font-size-90 mr-1">
+         </em>
+         Watchlist
+        </a>
+       </li>
+       <li class="nav-item mr-4 mb-2 mb-lg-0">
+        <a class="nav-link" data-toggle="modal" href="" onclick="sendOpinion()">
+         <em class="fas fa-comment-dots u-font-size-90 mr-1">
+         </em>
+         Opinion
+        </a>
+       </li>
+      </ul>
+      <div>
+       <a class="btn btn-primary" data-toggle="modal" href="" onclick="downloadApp()">
+        <em class="fas fa-cloud-download-alt mr-1">
+        </em>
+        Mobile App
+       </a>
+      </div>
+     </div>
+    </div>
+   </nav>
+   <!-- End Navbar -->
+   <!-- Promo Block -->
+   <section class="u-promo-block" style="background-image: url(assets/img-temp/promo/img1.jpg);">
+    <!-- Promo Content -->
+    <div class="container text-white" style="background-color:#100414; margin-left: 2px;padding-left: 2px; margin-top:-100px; margin-bottom: 10px; font-size: 1.15vw;">
+     <nav class="nav">
+      <a class="nav-link disabled">
+       <strong>
+        Category
+       </strong>
+      </a>
+      <script>
+       var category_num = {{.Category}};
               if( category_num === 99){
                 document.write('<a class="nav-link active" href="?name=' +{{.ProductName}} + '&page=' + {{.Page}} + '&category=99&filter=' + {{.Filter}} + '" style ="color:#e71442">All</a>')
               }else{
@@ -111,24 +127,34 @@
               }else{
                 document.write('<a class="nav-link active" href="?name=' +{{.ProductName}} + '&page=' + {{.Page}} + '&category=98&filter=' + {{.Filter}} + '" style ="color:#e6e7e9">Others</a>')
               }
-            </script>
-            <div class="btn-group dropright" >
-              <button type="button" style="background-color:#9e55ce;color:white;" class="btn btn-dark btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                Sort by
-              </button>
-              <div class="dropdown-menu" x-placement="right-start" style="position: absolute; transform: translate3d(111px, 0px, 0px); top: 0px; left: 0px; will-change: transform;">
-                <a class="dropdown-item" href="?name={{.ProductName}}&page={{.Page}}&category={{.Category}}&filter=1">Price: Low to High</a>
-                <a class="dropdown-item" href="?name={{.ProductName}}&page={{.Page}}&category={{.Category}}&filter=2">Price: High to Low</a>
-                <a class="dropdown-item" href="?name={{.ProductName}}&page={{.Page}}&category={{.Category}}&filter=3">Avg. Customer Review</a>
-                <a class="dropdown-item" href="?name={{.ProductName}}&page={{.Page}}&category={{.Category}}&filter=4">Newest Arrivals</a>
-                <a class="dropdown-item disabled" href="?name={{.ProductName}}&page={{.Page}}&category={{.Category}}&filter=5" style="pointer-events: none;">Featured</a>
-              </div>
-            </div>
-          </nav>
-        </div>
-        <div class="col-12" style="text-align:center;">
-          <script>
-            var filter_num = {{.Filter}};
+      </script>
+      <div class="btn-group dropright">
+       <button aria-expanded="false" aria-haspopup="true" class="btn btn-dark btn-sm dropdown-toggle" data-toggle="dropdown" style="background-color:#9e55ce;color:white;" type="button">
+        Sort by
+       </button>
+       <div class="dropdown-menu" style="position: absolute; transform: translate3d(111px, 0px, 0px); top: 0px; left: 0px; will-change: transform;" x-placement="right-start">
+        <a class="dropdown-item" href="?name={{.ProductName}}&amp;page={{.Page}}&amp;category={{.Category}}&amp;filter=1">
+         Price: Low to High
+        </a>
+        <a class="dropdown-item" href="?name={{.ProductName}}&amp;page={{.Page}}&amp;category={{.Category}}&amp;filter=2">
+         Price: High to Low
+        </a>
+        <a class="dropdown-item" href="?name={{.ProductName}}&amp;page={{.Page}}&amp;category={{.Category}}&amp;filter=3">
+         Avg. Customer Review
+        </a>
+        <a class="dropdown-item" href="?name={{.ProductName}}&amp;page={{.Page}}&amp;category={{.Category}}&amp;filter=4">
+         Newest Arrivals
+        </a>
+        <a class="dropdown-item disabled" href="?name={{.ProductName}}&amp;page={{.Page}}&amp;category={{.Category}}&amp;filter=5" style="pointer-events: none;">
+         Featured
+        </a>
+       </div>
+      </div>
+     </nav>
+    </div>
+    <div class="col-12" style="text-align:center;">
+     <script>
+      var filter_num = {{.Filter}};
             var filter_name;
             if(filter_num === 1){
               filter_name="Price: Low to High";
@@ -146,197 +172,311 @@
               filter_name="Featured";
             }
             document.write('<p class="text-left"><font color="white">'+{{.startNum}}+'-'+{{.endNum}}+ ' of ' + {{.TotalNum}} + ' results for <strong>' +{{.ProductName}} +'</strong> (' + filter_name + ')</font></p>');
-          </script>
-          <div class="row" style="margin-bottom: 10px; margin-right: 10px; margin-left: 10px;">
-            {{range .Product}}
-            <div class="card col-xs-6 col-sm-6 col-md-4 col-lg-3 col-xl-3 " style="width: 12rem; margin-bottom: 10px;">
-              <img src={{.ImageURL}}  class="card-img-top" style="margin-top: 10px;" alt="product"> 
-              <div class="card-body" style="color:#59287a;">
-                <h5 class="card-title ">
-                  <a class="link-muted d-block text-center" href="#!" title={{.Comment}} data-toggle="tooltip" data-placement="top">
-                    <div style="font-size: 1.5vw;">{{.Name}}</div>
-                  </a>
-                </h5>
-                <table class="table table-bordered" style="font-size: 1vw;">
-                  <tr><td>Price</td><td>{{.Price}}KY</td></tr>
-                  <tr><td>Stock</td><td>{{.Stocks}}</td></tr>
-                </table>
-                <a class="btn btn-primary" id="purchase" href="#"  onclick="insertProductInfo({{.Name}},{{.ImageURL}},{{.Price}},{{.ID}},{{.Stocks}},{{.Category}})" data-toggle="modal" data-target="#ConfirmModal" style="font-size: 0.9vw;" data-backdrop="true">
-                  <em class="fas fa-cart-plus"></em> <div style="font-size: 0.7vw;">Buy</div>
-                </a>
-                <a class="btn btn-primary" href="javascript:void(0)" style="font-size: 0.9vw;" onclick="addWatchlist({{.ID}},{{.Name}},{{.ImageURL}},{{.Price}});return false;">
-                  <em class="fas fa-heart"></em> <div style="font-size: 0.7vw;">Watch</div>
-                </a>
+     </script>
+     <div class="row" style="margin-bottom: 10px; margin-right: 10px; margin-left: 10px;">
+      {{range .Product}}
+      <div class="card col-xs-6 col-sm-6 col-md-4 col-lg-3 col-xl-3" style="width: 12rem; margin-bottom: 10px;">
+       <img alt="product" class="card-img-top" src="{{.ImageURL}}" style="margin-top: 10px;"/>
+       <div class="card-body" style="color:#59287a;">
+        <h5 class="card-title">
+         <a class="link-muted d-block text-center" data-placement="top" data-toggle="tooltip" href="#!" title="{{.Comment}}">
+          <div style="font-size: 1.5vw;">
+           {{.Name}}
+          </div>
+         </a>
+        </h5>
+        <table class="table table-bordered" style="font-size: 1vw;">
+         <tr>
+          <td>
+           Price
+          </td>
+          <td>
+           {{.Price}}KY
+          </td>
+         </tr>
+         <tr>
+          <td>
+           Stock
+          </td>
+          <td>
+           {{.Stocks}}
+          </td>
+         </tr>
+        </table>
+        <a class="btn btn-primary" data-backdrop="true" data-target="#ConfirmModal" data-toggle="modal" href="#" id="purchase" onclick="insertProductInfo({{.Name}},{{.ImageURL}},{{.Price}},{{.ID}},{{.Stocks}},{{.Category}})" style="font-size: 0.9vw;">
+         <em class="fas fa-cart-plus">
+         </em>
+         <div style="font-size: 0.7vw;">
+          Buy
+         </div>
+        </a>
+        <a class="btn btn-primary" href="javascript:void(0)" onclick="addWatchlist({{.ID}},{{.Name}},{{.ImageURL}},{{.Price}});return false;" style="font-size: 0.9vw;">
+         <em class="fas fa-heart">
+         </em>
+         <div style="font-size: 0.7vw;">
+          Watch
+         </div>
+        </a>
+       </div>
+      </div>
+      {{end}}
+      <div aria-hidden="true" aria-labelledby="ConfirmModalTitle" class="modal fade" id="ConfirmModal" role="dialog" tabindex="-1">
+       <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content" height="45%" style="shadow-lg;background-color: rgb(243, 231, 217);" width="60%">
+         <div class="modal-header">
+          <h5 class="modal-title" id="ConfirmModalTitle">
+           Payment Methods
+          </h5>
+          <button aria-label="Close" class="close" data-dismiss="modal" type="button">
+           <span aria-hidden="true">
+            ×
+           </span>
+          </button>
+         </div>
+         <form action="/payreqest" method="POST" role="form" style="margin-top: 10px;">
+          <div class="modal-body">
+           <div align="center">
+            Your item is
+            <strong id="serachitemname">
+            </strong>
+            !
+           </div>
+           <div align="center">
+            <img alt="item url" height="45%" id="serachitemurl" style="margin-top: 10px;" width="60%"/>
+           </div>
+           <strong style="margin: 10px;">
+            Pay with
+           </strong>
+           <div class="form-check form-check-inline">
+            <input checked="" class="form-check-input" name="marker" onclick="formSwitch()" type="radio" value="Stripe"/>
+            <label class="form-check-label">
+             <em class="fab fa-cc-stripe">
+             </em>
+             Stripe
+            </label>
+           </div>
+           <div class="form-check form-check-inline">
+            <input checked="" class="form-check-input" name="marker" onclick="formSwitch()" type="radio" value="DirectDebit"/>
+            <label class="form-check-label">
+             <em class="far fa-credit-card">
+             </em>
+             DirectDebit
+            </label>
+           </div>
+           <div class="card-body" id="StripeList">
+            <div class="row">
+             <div class="col-sm-12">
+              <div class="form-group">
+               <label for="name">
+                E-Mail Address
+               </label>
+               <input class="form-control" id="searchitem-email" name="address" placeholder="Enter your e-mail address" type="email"/>
               </div>
+             </div>
             </div>
-            {{end}}
-            <div class="modal fade" id="ConfirmModal" tabindex="-1" role="dialog" aria-labelledby="ConfirmModalTitle" aria-hidden="true">
-              <div class="modal-dialog modal-dialog-centered" role="document">
-                <div class="modal-content" style="shadow-lg;background-color: rgb(243, 231, 217);" width="60%" height="45%">
-                  <div class="modal-header">
-                    <h5 class="modal-title" id="ConfirmModalTitle" >Payment Methods</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                      <span aria-hidden="true">&times;</span>
-                    </button>
-                  </div>
-                <form style="margin-top: 10px;" role="form" method="POST" action="/payreqest" >
-                  <div class="modal-body">
-                    <div align="center">
-                      Your item is <strong id="serachitemname"></strong>!
-                    </div>
-                    <div align="center">
-                      <img id="serachitemurl" style="margin-top: 10px;" width="60%" height="45%" alt="item url"> 
-                    </div>
-                      <strong style="margin: 10px;">Pay with</strong>
-                      <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="marker" value="Stripe" onclick="formSwitch()" checked>
-                        <label class="form-check-label"> <em class="fab fa-cc-stripe"></em>Stripe</label>
-                      </div>
-                      <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="marker" value="DirectDebit" onclick="formSwitch()" checked>
-                        <label class="form-check-label"> <em class="far fa-credit-card"></em>DirectDebit</label>
-                      </div>
-                      <div class="card-body" id="StripeList">
-                        <div class="row">
-                          <div class="col-sm-12">
-                            <div class="form-group">
-                                <label for="name">E-Mail Address</label>
-                                <input name ="address" class="form-control" id="searchitem-email" type="email" placeholder="Enter your e-mail address">
-                            </div>
-                          </div>
-                        </div>
-                        <div class="row">
-                          <div class="col-sm-12">
-                              <div class="form-group">
-                                  <label for="name">Name</label>
-                                  <input name ="name" class="form-control" id="searchitem-name" type="text" placeholder="Enter your name">
-                              </div>
-                          </div>
-                        </div>
-                        <div class="row">
-                          <div class="col-sm-12">
-                              <div class="form-group">
-                                  <label for="ccnumber">Credit Card Number</label>
-                                  <div class="input-group">
-                                      <input name ="cardnum" id="searchitem-cardnum" class="form-control" type="text" placeholder="0000 0000 0000 0000">
-                                      <div class="input-group-append">
-                                          <span class="input-group-text">
-                                              <em class="mdi mdi-credit-card"></em>
-                                          </span>
-                                      </div>
-                                  </div>
-                              </div>
-                          </div>
-                        </div>
-                        <div class="row">
-                          <div class="form-group col-sm-4">
-                              <label for="searchccmonth">Month</label>
-                              <select name="month" class="form-control" id="searchccmonth">
-                                  <option>1</option>
-                                  <option>2</option>
-                                  <option>3</option>
-                                  <option>4</option>
-                                  <option>5</option>
-                                  <option>6</option>
-                                  <option>7</option>
-                                  <option>8</option>
-                                  <option>9</option>
-                                  <option>10</option>
-                                  <option>11</option>
-                                  <option>12</option>
-                              </select>
-                          </div>
-                          <div class="form-group col-sm-4">
-                              <label for="searchccyear">Year</label>
-                              <select name="year" class="form-control" id="searchccyear">
-                                <script>
-                                  var year = new Date().getFullYear();
+            <div class="row">
+             <div class="col-sm-12">
+              <div class="form-group">
+               <label for="name">
+                Name
+               </label>
+               <input class="form-control" id="searchitem-name" name="name" placeholder="Enter your name" type="text"/>
+              </div>
+             </div>
+            </div>
+            <div class="row">
+             <div class="col-sm-12">
+              <div class="form-group">
+               <label for="ccnumber">
+                Credit Card Number
+               </label>
+               <div class="input-group">
+                <input class="form-control" id="searchitem-cardnum" name="cardnum" placeholder="0000 0000 0000 0000" type="text"/>
+                <div class="input-group-append">
+                 <span class="input-group-text">
+                  <em class="mdi mdi-credit-card">
+                  </em>
+                 </span>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+            <div class="row">
+             <div class="form-group col-sm-4">
+              <label for="searchccmonth">
+               Month
+              </label>
+              <select class="form-control" id="searchccmonth" name="month">
+               <option>
+                1
+               </option>
+               <option>
+                2
+               </option>
+               <option>
+                3
+               </option>
+               <option>
+                4
+               </option>
+               <option>
+                5
+               </option>
+               <option>
+                6
+               </option>
+               <option>
+                7
+               </option>
+               <option>
+                8
+               </option>
+               <option>
+                9
+               </option>
+               <option>
+                10
+               </option>
+               <option>
+                11
+               </option>
+               <option>
+                12
+               </option>
+              </select>
+             </div>
+             <div class="form-group col-sm-4">
+              <label for="searchccyear">
+               Year
+              </label>
+              <select class="form-control" id="searchccyear" name="year">
+               <script>
+                var year = new Date().getFullYear();
                                   var start_yaer = Number(year)
                                   for (let i = 0; i <= 10; i++) {
                                     var target_year = start_yaer + i
                                     document.write( '<option>' + target_year + '</option>' );
                                   }
-                                </script>  
-                              </select>
-                          </div>
-                          <div class="col-sm-4">
-                              <div class="form-group">
-                                  <label for="cvv">CVV/CVC</label>
-                                  <input name="cvc" id="searchitem-cvc" class="form-control" id="cvv" type="text" placeholder="123">
-                              </div>
-                          </div>
-                          <div class="form-group col-sm-4">
-                            <label for="searchitem-ccquantity">Quantity</label>
-                            <select name="quantity" class="form-control" id="searchitem-ccquantity" onChange="caclAmount()">
-                                <option>1</option>
-                                <option>2</option>
-                                <option>3</option>
-                                <option>4</option>
-                                <option>5</option>
-                            </select>
-                          </div>
-                          <fieldset disabled>
-                            <div class="form-group">
-                              <label for="disabledTextInput">Total</label>
-                              <input name="total" type="text" id="searchItemAmount" class="form-control" placeholder="" data-total="">
-                            </div>
-                          </fieldset> 
-                        </div>
-                      </div> 
-                      <div class="card-body" id="DirectDebitList">
-                        <div class="row">
-                          <div class="col-sm-12">
-                            <div class="form-group">
-                              <label for="name">User-ID</label>
-                              <input name="userid" class="form-control" id="searchitem-userid" type="text" placeholder="Enter your user-id">
-                            </div>
-                          </div>
-                          <div class="col-sm-12">
-                            <div class="form-group">
-                                <label for="name">Password</label>
-                                <input name="password" class="form-control" id="searchitem-password" type="text" placeholder="Enter your password">
-                            </div>
-                          </div>
-                          <div class="form-group col-sm-4" id="searchitem-stock" data-stock="">
-                            <label for="searchitem-ccquantityDebit">Quantity</label>
-                            <select name="quantity" class="form-control" id="searchitem-ccquantityDebit" onChange="caclAmountDebit()">
-                                <option>1</option>
-                                <option>2</option>
-                                <option>3</option>
-                                <option>4</option>
-                                <option>5</option>
-                            </select>
-                          </div>
-                          <fieldset disabled>
-                            <div class="form-group" >
-                              <label for="disabledTextInput">Total</label>
-                              <input type="text" id="searchItemAmountDebit" class="form-control" placeholder="" data-total="">
-                            </div>
-                          </fieldset>
-                          <input id="searchitemproductid" name="productid" type="hidden" >
-                          <input id="searchitemproductname" name="productname" type="hidden" >
-                          <input id="searchitemprice" name="price" type="hidden" >
-                          <input id="searchdealstock" name="dealstock" type="hidden" >
-                          <input id="itemurl" name="itemurl" type="hidden" >
-                          <input id="itemcategory" name="itemcategory" type="hidden" >
-                        </div>
-                      </div>                         
-                    </div>
-                    <div class="modal-footer">
-                      <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                      <button type="submit" class="btn btn-primary" id='buy' >Buy</button>
-                    </div>
-                  </div>
-                </form>
+               </script>
+              </select>
+             </div>
+             <div class="col-sm-4">
+              <div class="form-group">
+               <label for="cvv">
+                CVV/CVC
+               </label>
+               <input class="form-control" id="cvv" name="cvc" placeholder="123" type="text"/>
               </div>
+             </div>
+             <div class="form-group col-sm-4">
+              <label for="searchitem-ccquantity">
+               Quantity
+              </label>
+              <select class="form-control" id="searchitem-ccquantity" name="quantity" onchange="caclAmount()">
+               <option>
+                1
+               </option>
+               <option>
+                2
+               </option>
+               <option>
+                3
+               </option>
+               <option>
+                4
+               </option>
+               <option>
+                5
+               </option>
+              </select>
+             </div>
+             <fieldset disabled="">
+              <div class="form-group">
+               <label for="disabledTextInput">
+                Total
+               </label>
+               <input class="form-control" data-total="" id="searchItemAmount" name="total" placeholder="" type="text"/>
+              </div>
+             </fieldset>
             </div>
+           </div>
+           <div class="card-body" id="DirectDebitList">
+            <div class="row">
+             <div class="col-sm-12">
+              <div class="form-group">
+               <label for="name">
+                User-ID
+               </label>
+               <input class="form-control" id="searchitem-userid" name="userid" placeholder="Enter your user-id" type="text"/>
+              </div>
+             </div>
+             <div class="col-sm-12">
+              <div class="form-group">
+               <label for="name">
+                Password
+               </label>
+               <input class="form-control" id="searchitem-password" name="password" placeholder="Enter your password" type="text"/>
+              </div>
+             </div>
+             <div class="form-group col-sm-4" data-stock="" id="searchitem-stock">
+              <label for="searchitem-ccquantityDebit">
+               Quantity
+              </label>
+              <select class="form-control" id="searchitem-ccquantityDebit" name="quantity" onchange="caclAmountDebit()">
+               <option>
+                1
+               </option>
+               <option>
+                2
+               </option>
+               <option>
+                3
+               </option>
+               <option>
+                4
+               </option>
+               <option>
+                5
+               </option>
+              </select>
+             </div>
+             <fieldset disabled="">
+              <div class="form-group">
+               <label for="disabledTextInput">
+                Total
+               </label>
+               <input class="form-control" data-total="" id="searchItemAmountDebit" placeholder="" type="text"/>
+              </div>
+             </fieldset>
+             <input id="searchitemproductid" name="productid" type="hidden"/>
+             <input id="searchitemproductname" name="productname" type="hidden"/>
+             <input id="searchitemprice" name="price" type="hidden"/>
+             <input id="searchdealstock" name="dealstock" type="hidden"/>
+             <input id="itemurl" name="itemurl" type="hidden"/>
+             <input id="itemcategory" name="itemcategory" type="hidden"/>
+            </div>
+           </div>
           </div>
-          <div class="row justify-content-between align-items-center" >
-            <div class="col-lg">
-              <nav aria-label="Bootstrap Pagination Example">
-                <ul class="pagination mb-6 justify-content-end">
-                  <script>
-                    var product_name  = {{.ProductName}}
+          <div class="modal-footer">
+           <button class="btn btn-secondary" data-dismiss="modal" type="button">
+            Close
+           </button>
+           <button class="btn btn-primary" id="buy" type="submit">
+            Buy
+           </button>
+          </div>
+         </form>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="row justify-content-between align-items-center">
+      <div class="col-lg">
+       <nav aria-label="Bootstrap Pagination Example">
+        <ul class="pagination mb-6 justify-content-end">
+         <script>
+          var product_name  = {{.ProductName}}
                     var current_page  = {{.Page}};
                     var previous_page = current_page-1;
                     var next_page     = current_page+1;
@@ -407,23 +547,21 @@
                         document.write( '<li class="page-item "><a class="page-link" href="?name=' + product_name + '&page=' + next_page + '&category=' + category + '&filter=' + filter + '">Next<span class="ml-1 d-none d-sm-inline-block">&rarr;</span></a></li>' )
                       }
                     }
-                  </script>
-                </ul>
-              </nav>
-            </div>
-          </div>
-        </div>
+         </script>
+        </ul>
+       </nav>
       </div>
-    </div>    
-    </header>
-    <!-- End Header -->
-    <!-- End Promo Content -->
-    {{template "feedback"}}
-    </section>
-    {{template "common-script"}} 
-    {{template "formswitch-script"}}   
-    <script>
-      function insertProductInfo(name,url,value,id,stock,category) {
+     </div>
+    </div>
+   </section>
+  </header>
+  <!-- End Header -->
+  <!-- End Promo Content -->
+  {{template "feedback"}}
+  {{template "common-script"}} 
+    {{template "formswitch-script"}}
+  <script>
+   function insertProductInfo(name,url,value,id,stock,category) {
         document.getElementById("serachitemname").innerHTML = name;
         document.getElementById("serachitemurl").src = url;
         document.getElementById('searchItemAmount').total = value;
@@ -438,7 +576,7 @@
         document.getElementById('itemurl').value = url;
         document.getElementById('itemcategory').value = category;
       };
-    </script>
-  </body>
-  <!-- End Body -->
+  </script>
+ </body>
+ <!-- End Body -->
 </html>
