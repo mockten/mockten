@@ -13,10 +13,9 @@ RUN go build .
 
 FROM alpine:3.18.2
 RUN apk add --no-cache ca-certificates &&\
-    apk add gcompat
-RUN mkdir /lib64 &&\
-    ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2 &&\
+    apk add gcompat &&\
     mkdir /var/log/apl
+# RUN ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2 &&\
 COPY --from=builder /go/src/ecpay/ecpay /ecpay
 COPY --from=builder /go/src/ecpay/config.ini  /config.ini
 RUN adduser sys-user --disabled-password &&\
