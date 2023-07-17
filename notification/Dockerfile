@@ -22,4 +22,4 @@ RUN adduser sys-user --disabled-password &&\
 HEALTHCHECK --interval=5m --timeout=30s \
 CMD curl -f http://localhost:9100/metrics || exit 1
 USER sys-user
-ENTRYPOINT ["sh", "-c", "while true; do sleep 1000; done"]
+ENTRYPOINT ["./notification"]
