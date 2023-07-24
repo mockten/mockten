@@ -154,13 +154,6 @@
      </a>
     </li>
    </ul>
-   <div>
-    <a class="btn btn-primary" data-toggle="modal" href="" onclick="downloadApp()">
-     <em class="fas fa-cloud-download-alt mr-1">
-     </em>
-     Mobile App
-    </a>
-   </div>
   </div>
  </div>
 </nav>
@@ -178,6 +171,7 @@
      Search
     </button>
    </form>
+<div style="height: 50px;"></div>
    <ul class="navbar-nav ml-auto mt-2 mt-lg-0">
     <li class="nav-item mr-4 mb-2 mb-lg-0">
      <a class="nav-link" href="/ranking?page=1&amp;category=99">
@@ -208,13 +202,6 @@
      </a>
     </li>
    </ul>
-   <div>
-    <a class="btn btn-primary" data-toggle="modal" href="" onclick="downloadApp()">
-     <em class="fas fa-cloud-download-alt mr-1">
-     </em>
-     Mobile App
-    </a>
-   </div>
   </div>
  </div>
 </nav>
@@ -311,27 +298,6 @@
  function removeSession(){
   document.cookie = "mysession=; max-age=0";
 }
-</script>
-<script>
- function downloadApp() {
-    Swal.fire({
-      title: 'Mockten App',
-        icon: 'info',
-        text: 'Download for free your Mockten mobile application Mockten App',  
-        showCloseButton: true,
-        showCancelButton: true,
-        focusConfirm: false,
-        imageUrl: 'assets/img/go-portforio-apl-file/mobapp.jpg',
-        imageWidth: 400,
-        imageHeight: 200,
-        confirmButtonText:
-          '<em class="fab fa-android"></em> <a href="assets/app-release.apk" style ="color:#e6e7e9">Android</a>',
-        confirmButtonAriaLabel: 'Thumbs up, great!',
-        cancelButtonText:
-        '<em class="fab fa-apple"></em> iOS',
-        cancelButtonAriaLabel: 'Thumbs down'
-    })   
-  }
 </script>
 <!-- End Promo Block -->
 <!-- JAVASCRIPTS (Load javascripts at bottom, this will reduce page load time) -->
