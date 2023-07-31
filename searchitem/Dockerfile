@@ -15,7 +15,8 @@ COPY . .
 RUN go build .
 
 # As runner
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates
+FROM alpine:3.18.2
+RUN apk --no-cache add ca-certificates &&\
+    apk add gcompat
 COPY --from=builder  /go/setenv/searchitem .
 CMD ["./searchitem"]
