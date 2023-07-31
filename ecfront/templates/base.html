@@ -1,31 +1,29 @@
 {{define "head"}}
 <head>
-    <title>Mockten</title>
-    <!-- Meta -->
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta http-equiv="x-ua-compatible" content="ie=edge">
-    <meta name="keywords" content="Bootstrap Theme, Freebies, UI Kit, MIT license">
-    <meta name="description" content="Mockten Website">
-    <meta name="author" content="htmlstream.com">
-
-    <!-- Favicon -->
-    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
-
-    <!-- Web Fonts -->
-    <link href="https://fonts.googleapis.com/css?family=Playfair+Display:400,700%7COpen+Sans:300,400,700" rel="stylesheet">
-    <!-- Bootstrap Styles -->
-    <link rel="stylesheet" type="text/css" href="assets/vendors/bootstrap/css/bootstrap.min.css">
-
-    <!-- Components Vendor Styles -->
-    <link rel="stylesheet" type="text/css" href="assets/vendors/font-awesome/css/fontawesome-all.min.css">
-
-    <!-- Theme Styles -->
-    <link rel="stylesheet" type="text/css" href="assets/css/styles.css">
-    <link href='https://fonts.googleapis.com/css?family=Varela+Round' rel='stylesheet' type='text/css'>
-    <!-- Demo Custome Code (demo page only) -->
-    <style type="text/css">
-      /* Button Spaces*/
+ <title>
+  Mockten
+ </title>
+ <!-- Meta -->
+ <meta charset="utf-8"/>
+ <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport"/>
+ <meta content="ie=edge" http-equiv="x-ua-compatible"/>
+ <meta content="Bootstrap Theme, Freebies, UI Kit, MIT license" name="keywords"/>
+ <meta content="Mockten Website" name="description"/>
+ <meta content="htmlstream.com" name="author"/>
+ <!-- Favicon -->
+ <link href="favicon.ico" rel="shortcut icon" type="image/x-icon"/>
+ <!-- Web Fonts -->
+ <link href="https://fonts.googleapis.com/css?family=Playfair+Display:400,700%7COpen+Sans:300,400,700" rel="stylesheet"/>
+ <!-- Bootstrap Styles -->
+ <link href="assets/vendors/bootstrap/css/bootstrap.min.css" rel="stylesheet" type="text/css"/>
+ <!-- Components Vendor Styles -->
+ <link href="assets/vendors/font-awesome/css/fontawesome-all.min.css" rel="stylesheet" type="text/css"/>
+ <!-- Theme Styles -->
+ <link href="assets/css/styles.css" rel="stylesheet" type="text/css"/>
+ <link href="https://fonts.googleapis.com/css?family=Varela+Round" rel="stylesheet" type="text/css"/>
+ <!-- Demo Custome Code (demo page only) -->
+ <style type="text/css">
+  /* Button Spaces*/
       .demo-btn-space .btn,
       .demo-progress-space .progress {
         margin-bottom: 10px;
@@ -69,121 +67,161 @@
         line-height: 1;
         font-size: 90px;
       }
-    </style>
-    <!-- End Demo Custome Code (demo page only) -->
-  </head>
+ </style>
+ <!-- End Demo Custome Code (demo page only) -->
+</head>
 {{end}}
 {{define "category"}}
-<div class="container text-white" style=" background-color:#100414; margin-left: 2px;padding-left: 2px; margin-top:-100px; margin-bottom: 10px; font-size: 1.15vw;" >
-    <nav class="nav">
-      <a class="nav-link disabled"><strong>Category</strong></a>
-      <a class="nav-link active" href="#!" style ="color:#e6e7e9">Art</a>
-      <a class="nav-link active" href="#!" style ="color:#e6e7e9">Book</a>
-      <a class="nav-link active" href="#!" style ="color:#e6e7e9">Electronics</a>
-      <a class="nav-link active" href="#!" style ="color:#e6e7e9">Fashion</a>
-      <a class="nav-link active" href="#!" style ="color:#e6e7e9">Health</a>
-      <a class="nav-link active" href="#!" style ="color:#e6e7e9">Movies</a>
-      <a class="nav-link active" href="#!" style ="color:#e6e7e9">Music</a>
-      <a class="nav-link active" href="#!" style ="color:#e6e7e9">Sports</a>
-      <a class="nav-link active" href="#!" style ="color:#e6e7e9">Toy</a>
-      <a class="nav-link active" href="#!" style ="color:#e6e7e9">Others</a>
-    </nav>
-  </div>
+<div class="container text-white" style=" background-color:#100414; margin-left: 2px;padding-left: 2px; margin-top:-100px; margin-bottom: 10px; font-size: 1.15vw;">
+ <nav class="nav">
+  <a class="nav-link disabled">
+   <strong>
+    Category
+   </strong>
+  </a>
+  <a class="nav-link active" href="#!" style="color:#e6e7e9">
+   Art
+  </a>
+  <a class="nav-link active" href="#!" style="color:#e6e7e9">
+   Book
+  </a>
+  <a class="nav-link active" href="#!" style="color:#e6e7e9">
+   Electronics
+  </a>
+  <a class="nav-link active" href="#!" style="color:#e6e7e9">
+   Fashion
+  </a>
+  <a class="nav-link active" href="#!" style="color:#e6e7e9">
+   Health
+  </a>
+  <a class="nav-link active" href="#!" style="color:#e6e7e9">
+   Movies
+  </a>
+  <a class="nav-link active" href="#!" style="color:#e6e7e9">
+   Music
+  </a>
+  <a class="nav-link active" href="#!" style="color:#e6e7e9">
+   Sports
+  </a>
+  <a class="nav-link active" href="#!" style="color:#e6e7e9">
+   Toy
+  </a>
+  <a class="nav-link active" href="#!" style="color:#e6e7e9">
+   Others
+  </a>
+ </nav>
+</div>
 {{end}}
 
 {{define "navbar-home"}}
-<nav class="js-navbar-scroll navbar fixed-top navbar-expand-lg navbar-transparent navbar-dark ">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="/home">
-        <img src="assets/img/logo-white.png" alt="Stream UI Kit" style="width: 100px;">
-      </a>
-
-      <button class="navbar-toggler" type="button"
-              data-toggle="collapse"
-              data-target="#navbarTogglerDemo"
-
-              aria-controls="navbarTogglerDemo"
-              aria-expanded="false"
-              aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="navbarTogglerDemo">
-        <ul class="navbar-nav ml-auto mt-2 mt-lg-0">
-          <li class="nav-item mr-4 mb-2 mb-lg-0">
-            <a href="/ranking?page=1&category=99" class="nav-link">    
-              <em class="fas fa-trophy u-font-size-90 mr-1"></em> Ranking
-            </a>
-          </li>
-          <li class="nav-item mr-4 mb-2 mb-lg-0">
-            <a href="{{.AuthPath}}" class="nav-link">
-              <em class="fas fa-sign-in-alt u-font-size-90 mr-1"></em> {{.AuthKind}}
-            </a>
-          </li>          
-          <li class="nav-item mr-4 mb-2 mb-lg-0">
-            <a class="nav-link" href="#">
-              <em class="fas fa-heart u-font-size-90 mr-1"></em> Watchlist
-            </a>
-          </li>
-          <li class="nav-item mr-4 mb-2 mb-lg-0">
-            <a class="nav-link" data-toggle="modal" href="" onclick="sendOpinion()">
-              <em class="fas fa-comment-dots u-font-size-90 mr-1"></em> Opinion
-            </a>
-          </li>
-        </ul>
-        <div>
-          <a class="btn btn-primary" data-toggle="modal" href="" onclick="downloadApp()">
-            <em class="fas fa-cloud-download-alt mr-1"></em> Mobile App
-          </a>
-        </div>
-      </div>
-    </div>  
-  </nav>
+<nav class="js-navbar-scroll navbar fixed-top navbar-expand-lg navbar-transparent navbar-dark">
+ <div class="container-fluid">
+  <a class="navbar-brand" href="/home">
+   <img alt="Stream UI Kit" src="assets/img/logo-white.png" style="width: 100px;"/>
+  </a>
+  <button aria-controls="navbarTogglerDemo" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler" data-target="#navbarTogglerDemo" data-toggle="collapse" type="button">
+   <span class="navbar-toggler-icon">
+   </span>
+  </button>
+  <div class="collapse navbar-collapse" id="navbarTogglerDemo">
+   <ul class="navbar-nav ml-auto mt-2 mt-lg-0">
+    <li class="nav-item mr-4 mb-2 mb-lg-0">
+     <a class="nav-link" href="/ranking?page=1&amp;category=99">
+      <em class="fas fa-trophy u-font-size-90 mr-1">
+      </em>
+      Ranking
+     </a>
+    </li>
+    <li class="nav-item mr-4 mb-2 mb-lg-0">
+     <a class="nav-link" href="{{.AuthPath}}">
+      <em class="fas fa-sign-in-alt u-font-size-90 mr-1">
+      </em>
+      {{.AuthKind}}
+     </a>
+    </li>
+    <li class="nav-item mr-4 mb-2 mb-lg-0">
+     <a class="nav-link" href="#">
+      <em class="fas fa-heart u-font-size-90 mr-1">
+      </em>
+      Watchlist
+     </a>
+    </li>
+    <li class="nav-item mr-4 mb-2 mb-lg-0">
+     <a class="nav-link" data-toggle="modal" href="" onclick="sendOpinion()">
+      <em class="fas fa-comment-dots u-font-size-90 mr-1">
+      </em>
+      Opinion
+     </a>
+    </li>
+   </ul>
+   <div>
+    <a class="btn btn-primary" data-toggle="modal" href="" onclick="downloadApp()">
+     <em class="fas fa-cloud-download-alt mr-1">
+     </em>
+     Mobile App
+    </a>
+   </div>
+  </div>
+ </div>
+</nav>
 {{end}}
 {{define "navbar"}}
 <nav class="js-navbar-scroll navbar navbar-expand-lg navbar-transparent navbar-dark" style="background-color:#100414;">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="/home">
-        <img src="assets/img/logo-white.png" alt="Stream UI Kit" style="width: 100px;">
-      </a>
-      <div class="collapse navbar-collapse" id="navbarTogglerDemo">
-        <form class="form-inline col-lg mr-auto my-2 my-lg-0" method="POST" action="./search">
-          <input name ="item" class="form-control w-75 mr-sm-2" type="search" placeholder="Search">
-          <button class="btn btn-primary my-2 my-sm-0" type="submit">Search</button> 
-        </form>
-        <ul class="navbar-nav ml-auto mt-2 mt-lg-0">
-          <li class="nav-item mr-4 mb-2 mb-lg-0">
-            <a href="/ranking?page=1&category=99" class="nav-link">
-              <em class="fas fa-trophy u-font-size-90 mr-1"></em> Ranking
-            </a>
-          </li>  
-          <li class="nav-item mr-4 mb-2 mb-lg-0">
-            <a href="{{.AuthPath}}" onclick="removeSession()" class="nav-link">
-              <em class="fas fa-sign-in-alt u-font-size-90 mr-1"></em> {{.AuthKind}}
-            </a>
-          </li>      
-          <li class="nav-item mr-4 mb-2 mb-lg-0">
-            <a class="nav-link" href="#">
-              <em class="fas fa-heart u-font-size-90 mr-1"></em> Watchlist
-            </a>
-          </li>
-          <li class="nav-item mr-4 mb-2 mb-lg-0">
-            <a class="nav-link" data-toggle="modal" href="" onclick="sendOpinion()">
-              <em class="fas fa-comment-dots u-font-size-90 mr-1"></em> Opinion
-            </a>
-          </li>
-        </ul>
-        <div>
-          <a class="btn btn-primary" data-toggle="modal" href="" onclick="downloadApp()">
-            <em class="fas fa-cloud-download-alt mr-1"></em> Mobile App
-          </a>
-        </div>
-      </div>
-    </div>
-  </nav>
+ <div class="container-fluid">
+  <a class="navbar-brand" href="/home">
+   <img alt="Stream UI Kit" src="assets/img/logo-white.png" style="width: 100px;"/>
+  </a>
+  <div class="collapse navbar-collapse" id="navbarTogglerDemo">
+   <form action="./search" class="form-inline col-lg mr-auto my-2 my-lg-0" method="POST">
+    <input class="form-control w-75 mr-sm-2" name="item" placeholder="Search" type="search"/>
+    <button class="btn btn-primary my-2 my-sm-0" type="submit">
+     Search
+    </button>
+   </form>
+   <ul class="navbar-nav ml-auto mt-2 mt-lg-0">
+    <li class="nav-item mr-4 mb-2 mb-lg-0">
+     <a class="nav-link" href="/ranking?page=1&amp;category=99">
+      <em class="fas fa-trophy u-font-size-90 mr-1">
+      </em>
+      Ranking
+     </a>
+    </li>
+    <li class="nav-item mr-4 mb-2 mb-lg-0">
+     <a class="nav-link" href="{{.AuthPath}}" onclick="removeSession()">
+      <em class="fas fa-sign-in-alt u-font-size-90 mr-1">
+      </em>
+      {{.AuthKind}}
+     </a>
+    </li>
+    <li class="nav-item mr-4 mb-2 mb-lg-0">
+     <a class="nav-link" href="#">
+      <em class="fas fa-heart u-font-size-90 mr-1">
+      </em>
+      Watchlist
+     </a>
+    </li>
+    <li class="nav-item mr-4 mb-2 mb-lg-0">
+     <a class="nav-link" data-toggle="modal" href="" onclick="sendOpinion()">
+      <em class="fas fa-comment-dots u-font-size-90 mr-1">
+      </em>
+      Opinion
+     </a>
+    </li>
+   </ul>
+   <div>
+    <a class="btn btn-primary" data-toggle="modal" href="" onclick="downloadApp()">
+     <em class="fas fa-cloud-download-alt mr-1">
+     </em>
+     Mobile App
+    </a>
+   </div>
+  </div>
+ </div>
+</nav>
 {{end}}
 {{define "common-script"}}
 <script>
-  function addWatchlist(id,name,image_url,price){
+ function addWatchlist(id,name,image_url,price){
       //get the input value
       $.ajax({
           //the url to send the data to
@@ -206,7 +244,7 @@
   }
 </script>
 <script>
-  function RemoveWatchlist(id,name,image_url,price){
+ function RemoveWatchlist(id,name,image_url,price){
       //get the input value
       $.ajax({
           //the url to send the data to
@@ -227,7 +265,7 @@
   }
 </script>
 <script>
-    function sendOpinion() {
+ function sendOpinion() {
       var function_response = "NG"
       Swal.fire({
         title: "Send us feedback",
@@ -268,14 +306,14 @@
           }
     });
     }
-</script>   
+</script>
 <script>
-  function removeSession(){
+ function removeSession(){
   document.cookie = "mysession=; max-age=0";
 }
 </script>
 <script>
-  function downloadApp() {
+ function downloadApp() {
     Swal.fire({
       title: 'Mockten App',
         icon: 'info',
@@ -294,31 +332,37 @@
         cancelButtonAriaLabel: 'Thumbs down'
     })   
   }
-</script>       
+</script>
 <!-- End Promo Block -->
 <!-- JAVASCRIPTS (Load javascripts at bottom, this will reduce page load time) -->
 <!-- Global Vendor -->
-<script src="assets/vendors/jquery.min.js"></script>
-<script src="assets/vendors/jquery.migrate.min.js"></script>
-<script src="assets/vendors/popper.min.js"></script>
-<script src="assets/vendors/bootstrap/js/bootstrap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@8" integrity="sha384-Cs/dzAkV4HPqJZfWfbDK10kaEU0G6f7ZpJKFfr2oSUNO5NuEM5Wl8gAh3w/Qz4+z"></script>
-<script src="https://unpkg.com/axios/dist/axios.min.js" integrity="sha384-+NRdXivfZOkeos9sVbI4eTjBbSpQirDT5tE3uF/gKVNoXQhIjP3+de6yIEVGeTCG"></script>
-
+<script src="assets/vendors/jquery.min.js">
+</script>
+<script src="assets/vendors/jquery.migrate.min.js">
+</script>
+<script src="assets/vendors/popper.min.js">
+</script>
+<script src="assets/vendors/bootstrap/js/bootstrap.min.js">
+</script>
+<script integrity="sha384-Cs/dzAkV4HPqJZfWfbDK10kaEU0G6f7ZpJKFfr2oSUNO5NuEM5Wl8gAh3w/Qz4+z" src="https://cdn.jsdelivr.net/npm/sweetalert2@8">
+</script>
+<script integrity="sha384-+NRdXivfZOkeos9sVbI4eTjBbSpQirDT5tE3uF/gKVNoXQhIjP3+de6yIEVGeTCG" src="https://unpkg.com/axios/dist/axios.min.js">
+</script>
 <!-- Components Vendor  -->
-<script src="assets/vendors/magnific-popup/jquery.magnific-popup.min.js"></script>
-<script src="assets/vendors/jquery.parallax.js"></script>
-
+<script src="assets/vendors/magnific-popup/jquery.magnific-popup.min.js">
+</script>
+<script src="assets/vendors/jquery.parallax.js">
+</script>
 <!-- Theme Settings and Calls -->
-<script src="assets/js/global.js"></script>
-
+<script src="assets/js/global.js">
+</script>
 <!-- Theme Components and Settings -->
-<script src="assets/js/vendors/parallax.js"></script>
+<script src="assets/js/vendors/parallax.js">
+</script>
 <!-- END JAVASCRIPTS -->
-
 <!-- Demo Code Only -->
 <script>
-  // Font Toggle
+ // Font Toggle
   $(document).on('ready', function () {
     $('.js-font-change-btn').click(function() {
       $('.js-font-change-btn__icon').toggleClass('fa-toggle-on');
@@ -330,35 +374,45 @@
   // End Font Toggle
 </script>
 <!-- Github and Google Plus Buttons -->
-<script async defer src="https://buttons.github.io/buttons.js" integrity="sha384-d/WOAdsOERBidcPgDhlQnF3P5ysDudOzGEoUyss/TdGGh8RhLWRE4kB5ajSpgfA1"></script>
-<script src="https://apis.google.com/js/platform.js" integrity="sha384-zE+D+GYvDS47f/KdDLoGO94ZKztc8y9Dsaf+SrAThPktHTDZwKu1EepcJjGr/p9x" async defer ></script>
+<script async="" defer="" integrity="sha384-d/WOAdsOERBidcPgDhlQnF3P5ysDudOzGEoUyss/TdGGh8RhLWRE4kB5ajSpgfA1" src="https://buttons.github.io/buttons.js">
+</script>
+<script async="" defer="" integrity="sha384-zE+D+GYvDS47f/KdDLoGO94ZKztc8y9Dsaf+SrAThPktHTDZwKu1EepcJjGr/p9x" src="https://apis.google.com/js/platform.js">
+</script>
 <!-- End Github and Google Plus Buttons -->
 {{end}}
 
 {{define "feedback"}}
-<div class="modal fade" id="opinion" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="exampleModalLabel">Send us feedback</h5>
-          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-          </button>
-        </div>
-        <div class="form-group">
-          <textarea class="form-control" id="message-text" rows=4 maxlength="200"></textarea>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-          <button type="button" class="btn btn-primary" onclick="sendOpinion()">Send</button>
-        </div>
-      </div>
-    </div>
+<div aria-hidden="true" aria-labelledby="exampleModalLabel" class="modal fade" id="opinion" role="dialog" tabindex="-1">
+ <div class="modal-dialog" role="document">
+  <div class="modal-content">
+   <div class="modal-header">
+    <h5 class="modal-title" id="exampleModalLabel">
+     Send us feedback
+    </h5>
+    <button aria-label="Close" class="close" data-dismiss="modal" type="button">
+     <span aria-hidden="true">
+      ×
+     </span>
+    </button>
+   </div>
+   <div class="form-group">
+    <textarea class="form-control" id="message-text" maxlength="200" rows="4"></textarea>
+   </div>
+   <div class="modal-footer">
+    <button class="btn btn-secondary" data-dismiss="modal" type="button">
+     Close
+    </button>
+    <button class="btn btn-primary" onclick="sendOpinion()" type="button">
+     Send
+    </button>
+   </div>
   </div>
+ </div>
+</div>
 {{end}}
 {{define "confirm-script"}}
-  <script>
-    function confirmPurchase() {
+<script>
+ function confirmPurchase() {
       Swal.fire({
         title: "Confirmation",
         text: 'Pay with',  
@@ -381,11 +435,11 @@
           });
       });
     }
-  </script>         
+</script>
 {{end}}
 {{define "formswitch-script"}}
 <script>
-  function formSwitch() {
+ function formSwitch() {
       marker = document.getElementsByName('marker')
       if (marker[0].checked) {
           document.getElementById('StripeList').style.display = "";
@@ -413,7 +467,7 @@
   window.addEventListener('load', formSwitch());
 </script>
 <script>
-  function caclAmount() {
+ function caclAmount() {
     var amount = Number( document.getElementById('searchitem-ccquantity').value );
     var price  = Number( document.getElementById('searchItemAmount').total );
     document.getElementById('searchItemAmount').placeholder = String( amount * price   ) + 'KY';
@@ -421,7 +475,7 @@
   window.addEventListener('load', caclAmount());
 </script>
 <script>
-  function formRankSwitch() {
+ function formRankSwitch() {
       marker = document.getElementsByName('marker')
       if (marker[0].checked) {
           document.getElementById('StripeList').style.display = "";
@@ -449,7 +503,7 @@
   window.addEventListener('load', formRankSwitch());
 </script>
 <script>
-  function caclAmountDebit() {
+ function caclAmountDebit() {
     var amount = Number( document.getElementById('searchitem-ccquantityDebit').value );
     var price  = Number( document.getElementById('searchItemAmountDebit').total );
     document.getElementById('searchItemAmountDebit').placeholder = String( amount * price   ) + 'KY';
@@ -457,7 +511,7 @@
   window.addEventListener('load', caclAmountDebit());
 </script>
 <script>
-  function caclRankingAmountDebit() {
+ function caclRankingAmountDebit() {
     var amount = Number( document.getElementById('rankitem-ccquantityDebit').value );
     var price  = Number( document.getElementById('rankItemAmountDebit').total );
     document.getElementById('rankItemAmountDebit').placeholder = String( amount * price   ) + 'KY';
@@ -465,7 +519,7 @@
   window.addEventListener('load', caclRankingAmountDebit());
 </script>
 <script>
-  function caclWatchAmountDebit() {
+ function caclWatchAmountDebit() {
     var amount = Number( document.getElementById('watchitem-ccquantityDebit"').value );
     var price  = Number( document.getElementById('watchItemAmountDebit').total );
     document.getElementById('watchItemAmountDebit').placeholder = String( amount * price   ) + 'KY';
@@ -473,7 +527,7 @@
   window.addEventListener('load', caclWatchAmountDebit());
 </script>
 <script>
-  function caclRankAmount() {
+ function caclRankAmount() {
     var amount = Number( document.getElementById('rankitem-ccquantity').value );
     var price  = Number( document.getElementById('rankItemAmount').total );
     document.getElementById('rankItemAmount').placeholder = String( amount * price   ) + 'KY';
@@ -482,33 +536,53 @@
 </script>
 {{end}}
 {{define "pagination"}}
-<div class="row justify-content-between align-items-center" >
-    <div class="col-lg">
-      <nav aria-label="Bootstrap Pagination Example">
-        <ul class="pagination mb-6 justify-content-end">
-          <li class="page-item" >
-            <a class="page-link" href="#"><span class="mr-1 d-none d-sm-inline-block">&larr;</span> Previous</a>
-          </li>
-          <li class="page-item active">
-            <a class="page-link" href="#">1</a>
-          </li>
-          <li class="page-item">
-            <a class="page-link" href="#">2</a>
-          </li>
-          <li class="page-item">
-            <a class="page-link" href="#">3</a>
-          </li>
-          <li class="page-item">
-            <a class="page-link" href="#">4</a>
-          </li>
-          <li class="page-item">
-            <a class="page-link" href="#">5</a>
-          </li>
-          <li class="page-item">
-            <a class="page-link" href="#">Next<span class="ml-1 d-none d-sm-inline-block">&rarr;</span></a>
-          </li>
-        </ul>
-      </nav>
-    </div>
-  </div>
+<div class="row justify-content-between align-items-center">
+ <div class="col-lg">
+  <nav aria-label="Bootstrap Pagination Example">
+   <ul class="pagination mb-6 justify-content-end">
+    <li class="page-item">
+     <a class="page-link" href="#">
+      <span class="mr-1 d-none d-sm-inline-block">
+       ←
+      </span>
+      Previous
+     </a>
+    </li>
+    <li class="page-item active">
+     <a class="page-link" href="#">
+      1
+     </a>
+    </li>
+    <li class="page-item">
+     <a class="page-link" href="#">
+      2
+     </a>
+    </li>
+    <li class="page-item">
+     <a class="page-link" href="#">
+      3
+     </a>
+    </li>
+    <li class="page-item">
+     <a class="page-link" href="#">
+      4
+     </a>
+    </li>
+    <li class="page-item">
+     <a class="page-link" href="#">
+      5
+     </a>
+    </li>
+    <li class="page-item">
+     <a class="page-link" href="#">
+      Next
+      <span class="ml-1 d-none d-sm-inline-block">
+       →
+      </span>
+     </a>
+    </li>
+   </ul>
+  </nav>
+ </div>
+</div>
 {{end}}
