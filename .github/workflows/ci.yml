@@ -31,7 +31,7 @@ jobs:
 
   push_snapshot_container_ecfront:
     needs: [build_ecfront]
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
     defaults:
       run:
@@ -93,7 +93,7 @@ jobs:
 
   push_snapshot_container_ecpay:
     needs: [build_ecpay]
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
     defaults:
       run:
@@ -155,7 +155,7 @@ jobs:
 
   push_snapshot_container_notification:
     needs: [build_notification]
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push'  || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
     defaults:
       run:
@@ -215,7 +215,7 @@ jobs:
 
   push_snapshot_container_payexecution:
     needs: [build_payexecution]
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push'  || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
     defaults:
       run:
@@ -275,7 +275,7 @@ jobs:
 
   push_snapshot_container_ranking:
     needs: [build_ranking]
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
     defaults:
       run:
@@ -336,7 +336,7 @@ jobs:
 
   push_snapshot_container_searchitem:
     needs: [build_searchitem]
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
     defaults:
       run:
