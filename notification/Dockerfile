@@ -9,7 +9,7 @@ RUN test -f notification.go || echo "notification.go not found"
 RUN go build .
 
 
-FROM alpine:3.18.2
+FROM alpine:3.18.3
 RUN apk add --no-cache ca-certificates &&\
     apk add gcompat &&\
     mkdir /var/log/apl
