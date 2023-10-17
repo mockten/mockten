@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"testing"
-	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -89,24 +88,12 @@ func main() {
 	cli.StartWorker()
 	defer cli.StopWorker()
 	log.Println(fmt.Printf("[WORKER] worker start: concurrency=%v\n", concurrency))
-	
+
 	celJob = &celeryJob{celeryManager: newCelery(taskName, notifyTaskName, cli, notifyClient)}
 
 	// go-redis init
 	pj = &paymentjob{redisManager: newRedis(redisServerName, "", 0)}
 
-	ctx = context.Background()
-	ctxLocal, cancel := context.WithTimeout(ctx, 5*time.Hour)
-	defer cancel()
-	ctx = ctxLocal
-	for i := 0; i < 10; i++ {
-		pong, err := redisClient.Ping(ctx).Result()
-		log.Println(i, pong, err)
-		if err == nil {
-			log.Println("connection!!")
-			break
-		}
-	}
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
