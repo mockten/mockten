@@ -374,3 +374,43 @@ jobs:
         export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/searchitem:v0.0.${{ steps.increment-patch-version.outputs.patch_version }}"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
+
+  push_snapshot_container_staticfile:
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: static-file
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+
+    - name: Get latest version
+      id: get-latest-version
+      run: |
+        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/static-file --format='get(tags)' --limit=1)
+        echo "::set-output name=latest_version::$LATEST_VERSION"
+
+    - name: Increment patch version
+      id: increment-patch-version
+      run: |
+        export PATCH_VERSION=$((${{ steps.get-latest-version.outputs.latest_version }} + 1))
+        echo "::set-output name=patch_version::$PATCH_VERSION"
+
+    - name: Build and push container
+      run: |
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/static-file:v0.0.${{ steps.increment-patch-version.outputs.patch_version }}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
