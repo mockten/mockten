@@ -36,6 +36,9 @@ jobs:
     defaults:
       run:
         working-directory: ecfront
+    env:
+      MAJOR_VERSION: 0
+      MINOR_VERSION: 0
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
@@ -61,12 +64,18 @@ jobs:
     - name: Increment patch version
       id: increment-patch-version
       run: |
-        export PATCH_VERSION=$((${{ steps.get-latest-version.outputs.latest_version }} + 1))
+        version=${{ steps.get-latest-version.outputs.latest_version }}
+        if [ -z "$version" ]; then
+          echo "Error: No version number provided."
+          exit 1
+        fi
+        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
+        export PATCH_VERSION=$(($patch_version_exist + 1))
         echo "::set-output name=patch_version::$PATCH_VERSION"
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecfront:v0.0.${{ steps.increment-patch-version.outputs.patch_version }}"
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecfront:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -98,6 +107,9 @@ jobs:
     defaults:
       run:
         working-directory: ecpay
+    env:
+      MAJOR_VERSION: 0
+      MINOR_VERSION: 0
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
@@ -123,12 +135,18 @@ jobs:
     - name: Increment patch version
       id: increment-patch-version
       run: |
-        export PATCH_VERSION=$((${{ steps.get-latest-version.outputs.latest_version }} + 1))
+        version=${{ steps.get-latest-version.outputs.latest_version }}
+        if [ -z "$version" ]; then
+          echo "Error: No version number provided."
+          exit 1
+        fi
+        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
+        export PATCH_VERSION=$(($patch_version_exist + 1))
         echo "::set-output name=patch_version::$PATCH_VERSION"
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay:v0.0.${{ steps.increment-patch-version.outputs.patch_version }}"
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -160,6 +178,9 @@ jobs:
     defaults:
       run:
         working-directory: notification
+    env:
+      MAJOR_VERSION: 0
+      MINOR_VERSION: 0
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
@@ -185,12 +206,18 @@ jobs:
     - name: Increment patch version
       id: increment-patch-version
       run: |
-        export PATCH_VERSION=$((${{ steps.get-latest-version.outputs.latest_version }} + 1))
+        version=${{ steps.get-latest-version.outputs.latest_version }}
+        if [ -z "$version" ]; then
+          echo "Error: No version number provided."
+          exit 1
+        fi
+        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
+        export PATCH_VERSION=$(($patch_version_exist + 1))
         echo "::set-output name=patch_version::$PATCH_VERSION"
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/notification:v0.0.${{ steps.increment-patch-version.outputs.patch_version }}"
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/notification:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -220,6 +247,9 @@ jobs:
     defaults:
       run:
         working-directory: payexecution
+    env:
+      MAJOR_VERSION: 0
+      MINOR_VERSION: 0
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
@@ -245,12 +275,18 @@ jobs:
     - name: Increment patch version
       id: increment-patch-version
       run: |
-        export PATCH_VERSION=$((${{ steps.get-latest-version.outputs.latest_version }} + 1))
+        version=${{ steps.get-latest-version.outputs.latest_version }}
+        if [ -z "$version" ]; then
+          echo "Error: No version number provided."
+          exit 1
+        fi
+        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
+        export PATCH_VERSION=$(($patch_version_exist + 1))
         echo "::set-output name=patch_version::$PATCH_VERSION"
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/payexecution:v0.0.${{ steps.increment-patch-version.outputs.patch_version }}"
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/payexecution:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -280,6 +316,10 @@ jobs:
     defaults:
       run:
         working-directory: ranking
+    env:
+      MAJOR_VERSION: 0
+      MINOR_VERSION: 0
+
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
@@ -305,12 +345,18 @@ jobs:
     - name: Increment patch version
       id: increment-patch-version
       run: |
-        export PATCH_VERSION=$((${{ steps.get-latest-version.outputs.latest_version }} + 1))
+        version=${{ steps.get-latest-version.outputs.latest_version }}
+        if [ -z "$version" ]; then
+          echo "Error: No version number provided."
+          exit 1
+        fi
+        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
+        export PATCH_VERSION=$(($patch_version_exist + 1))
         echo "::set-output name=patch_version::$PATCH_VERSION"
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/ranking:v0.0.${{ steps.increment-patch-version.outputs.patch_version }}"
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/ranking:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -341,6 +387,9 @@ jobs:
     defaults:
       run:
         working-directory: searchitem
+    env:
+      MAJOR_VERSION: 0
+      MINOR_VERSION: 0
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
@@ -366,12 +415,18 @@ jobs:
     - name: Increment patch version
       id: increment-patch-version
       run: |
-        export PATCH_VERSION=$((${{ steps.get-latest-version.outputs.latest_version }} + 1))
+        version=${{ steps.get-latest-version.outputs.latest_version }}
+        if [ -z "$version" ]; then
+          echo "Error: No version number provided."
+          exit 1
+        fi
+        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
+        export PATCH_VERSION=$(($patch_version_exist + 1))
         echo "::set-output name=patch_version::$PATCH_VERSION"
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/searchitem:v0.0.${{ steps.increment-patch-version.outputs.patch_version }}"
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/searchitem:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -381,6 +436,10 @@ jobs:
     defaults:
       run:
         working-directory: static-file
+    env:
+      MAJOR_VERSION: 0
+      MINOR_VERSION: 0
+
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
@@ -406,11 +465,17 @@ jobs:
     - name: Increment patch version
       id: increment-patch-version
       run: |
-        export PATCH_VERSION=$((${{ steps.get-latest-version.outputs.latest_version }} + 1))
+        version=${{ steps.get-latest-version.outputs.latest_version }}
+        if [ -z "$version" ]; then
+          echo "Error: No version number provided."
+          exit 1
+        fi
+        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
+        export PATCH_VERSION=$(($patch_version_exist + 1))
         echo "::set-output name=patch_version::$PATCH_VERSION"
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/static-file:v0.0.${{ steps.increment-patch-version.outputs.patch_version }}"
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/static-file:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
