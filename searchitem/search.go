@@ -16,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
@@ -23,39 +24,32 @@ const (
 	port = ":50051"
 )
 
-/**
-*initialize
- */
+var (
+	searchReqCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "search_req_total",
+		Help: "Total number of requests that have come to search-item",
+	})
+
+	searchResCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "search_res_total",
+		Help: "Total number of response that send from serch-item",
+	})
+
+	logger *zap.Logger
+	db     *sql.DB
+)
+
 type server struct {
 	pb.UnimplementedSearchItemsServer
 }
 
-type CreateLog struct {
-	Timestamp string
-	Level     string
-	Thread    string
-	Logger    string
-	Message   string
-	Context   string
-}
-
-// Implement SearchItemServer
+// Implement SearchItemServer using protocol buffer
 func (s *server) SearchItem(ctx context.Context, in *pb.GetSearchItem) (*pb.SearchResponse, error) {
 	// logging request log
-	log.Printf(getRequestLog(in.GetProductName(), in.GetSellerName(), in.GetExhibitionDate(), in.GetUpdateDate()))
+	logger.Info(getRequestLog(in.GetProductName(), in.GetSellerName(), in.GetExhibitionDate(), in.GetUpdateDate()))
 
-	// prometheus-exporter server
+	// increment counter
 	searchReqCount.Inc()
-	countReqs()
-
-	// Connect DB
-	db, err := connectDB()
-	if err != nil {
-		return nil, err
-	}
-
-	// close
-	defer db.Close()
 
 	productNameForSearch := in.GetProductName()
 	sellerNameForSearch := in.GetSellerName()
@@ -67,6 +61,7 @@ func (s *server) SearchItem(ctx context.Context, in *pb.GetSearchItem) (*pb.Sear
 
 	//Get SellerIDs
 	sellerIDs := make([]string, 0)
+	var err error
 	if len(sellerNameForSearch) > 0 {
 		sellerIDs, err = getSellerID(sellerNameForSearch, db)
 		if err != nil {
@@ -79,63 +74,72 @@ func (s *server) SearchItem(ctx context.Context, in *pb.GetSearchItem) (*pb.Sear
 
 	items, productErr := getProductInfo(db, searchSQL)
 	if productErr != nil {
-		log.Printf("Search ERROR : %s\n ", productErr)
+		logger.Error("Search ERROR", zap.Error(productErr))
 		return nil, productErr
 	}
 
 	total, totalErr := getTotalInfo(db, countSQL)
 	if totalErr != nil {
-		log.Printf("Search total ERROR : %s\n ", totalErr)
+		logger.Error("Search total ERROR", zap.Error(totalErr))
 		return nil, totalErr
 	}
 
-	log.Printf("Items : %v || Total :  %v \n", items, total)
+	logger.Info("Items&Total", zap.Any("Items", items), zap.Any("Total", total))
+
+	// increment counter
 	searchResCount.Inc()
-	countSends()
 	return &pb.SearchResponse{TotalNum: total, Response: items}, nil
 }
 
 func main() {
-	// exec node-export service
+	// set-up logging environment using zap
+	var err error
+
+	environment := os.Getenv("MOCKTEN_ENV")
+
+	if environment == "development" || environment == "" {
+		config := zap.NewDevelopmentConfig()
+		config.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+		logger, err = config.Build()
+	} else {
+		config := zap.NewProductionConfig()
+		config.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
+		logger, err = config.Build()
+	}
+
+	if err != nil {
+		log.Print("failed to set-up zap log in searchitem. \n")
+		panic(err)
+	}
+
+	logger.Debug("this is development environment.")
+	logger.Info("success set-up logging function.")
+
+	defer logger.Sync()
+
+	// Connect DB
+	db, err = connectDB()
+	if err != nil {
+		panic(err)
+	}
+
+	defer db.Close()
+
+	// expose /metrics endpoint for observer(by default Prometheus).
 	go exportMetrics()
 
+	// start application
 	lis, err := net.Listen("tcp", port)
 	if err != nil {
-		log.Printf("failed to listen: %v", err)
+		logger.Error("failed to set-up port listen with gRPC.")
 	}
 	grpcserver := grpc.NewServer()
 	pb.RegisterSearchItemsServer(grpcserver, &server{})
 	if err := grpcserver.Serve(lis); err != nil {
-		log.Printf("failed to serve: %v", err)
+		logger.Error("failed to set-up application server.")
+		panic(err)
 	}
 }
-
-var (
-	grpcReqs = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "rcv_req_grpc_searchitem",
-			Help: "How many gRPC requests processed.",
-		},
-		[]string{"code", "method"},
-	)
-	grpcSends = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "snd_resp_grpc_searchitem",
-			Help: "How many gRPC sends processed.",
-		},
-		[]string{"code", "method"},
-	)
-
-	searchReqCount = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "search_req_total",
-		Help: "Total number of requests that have come to search-item",
-	})
-
-	searchResCount = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "search_res_total",
-		Help: "Total number of response that send from serch-item",
-	})
-)
 
 // connect DB(mysql)
 func connectDB() (*sql.DB, error) {
@@ -147,7 +151,7 @@ func connectDB() (*sql.DB, error) {
 	mySQLHost := fmt.Sprintf("%s:%s@tcp(%s)/%s", user, pass, sdb, table)
 	db, err := sql.Open("mysql", mySQLHost)
 	if err = db.Ping(); err != nil {
-		log.Printf("db.Ping(): %s\n", err)
+		logger.Error("failed to connecto database", zap.Error(err))
 		return nil, err
 	}
 
@@ -159,7 +163,7 @@ func getSellerID(sellerName string, db *sql.DB) ([]string, error) {
 	searchSellerQuery := "SELECT seller_id FROM SELLER_INFO WHERE seller_name LIKE '%" + sellerName + "%';"
 	sellerRows, err := db.Query(searchSellerQuery)
 	if err != nil {
-		log.Printf("DB Seller Query Error: %v | Seller Query is: %v ", err, searchSellerQuery)
+		logger.Error("DB Seller Query Error", zap.Error(err))
 		return nil, err
 	}
 	defer sellerRows.Close()
@@ -167,7 +171,7 @@ func getSellerID(sellerName string, db *sql.DB) ([]string, error) {
 	var sellerID string
 	for sellerRows.Next() {
 		if err := sellerRows.Scan(&sellerID); err != nil {
-			log.Printf("Search Seller Scan Error: %v", err)
+			logger.Error("Search Seller Scan Error", zap.Error(err))
 			return nil, err
 		}
 		sellerIDs = append(sellerIDs, sellerID)
@@ -219,8 +223,8 @@ func createSearchSQL(productNameForSearch string,
 	baseSQL = baseSQL + ";"
 	baseCountSQL = baseCountSQL + ";"
 
-	log.Printf("basesQL : " + baseSQL)
-	log.Printf("baseCountSQL : " + baseCountSQL)
+	logger.Debug("basesQL : " + baseSQL)
+	logger.Debug("baseCountSQL : " + baseCountSQL)
 
 	return baseSQL, baseCountSQL
 }
@@ -246,7 +250,7 @@ func getProductInfo(db *sql.DB, searchSQL string) ([]*pb.ResponseResult, error) 
 	items := make([]*pb.ResponseResult, 0)
 	rows, err := db.Query(searchSQL)
 	if err != nil {
-		log.Printf("Search Product Query Error: %v", err)
+		logger.Error("Search Product Query Error", zap.Error(err))
 		return nil, err
 	}
 	defer rows.Close()
@@ -254,11 +258,11 @@ func getProductInfo(db *sql.DB, searchSQL string) ([]*pb.ResponseResult, error) 
 	for rows.Next() {
 		var responseResult *pb.ResponseResult = &pb.ResponseResult{}
 		if err := rows.Scan(&responseResult.ProductId, &responseResult.ProductName, &responseResult.SellerName, &responseResult.Stocks, &responseResult.Price, &responseResult.ImageUrl, &responseResult.Comment, &responseResult.Category); err != nil {
-			log.Printf("Search Scan Error: %v | Query is: %v", err, searchSQL)
+			logger.Error("Search Scan Error", zap.Error(err))
 			return items, err
 		}
 		items = append(items, responseResult)
-		log.Printf("items is : %v", items)
+		logger.Info("Product info", zap.Any("items", items))
 	}
 
 	return items, nil
@@ -269,14 +273,14 @@ func getTotalInfo(db *sql.DB, countSQL string) (int32, error) {
 
 	rows, err := db.Query(countSQL)
 	if err != nil {
-		log.Printf("Count Query Error: %v | Query is: %v", err, countSQL)
+		logger.Error("Count Query Error", zap.Error(err))
 		return 0, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		if err := rows.Scan(&total); err != nil {
-			log.Printf("Count Scan Error: %v | Query is: %v", err, countSQL)
+			logger.Error("Count Scan Error", zap.Error(err))
 			return 0, err
 		}
 	}
@@ -284,24 +288,10 @@ func getTotalInfo(db *sql.DB, countSQL string) (int32, error) {
 	return total, nil
 }
 
-// initiallize
-func init() {
-	prometheus.MustRegister(grpcReqs)
-}
-
 // for goroutin
 func exportMetrics() {
 	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(":9100", nil)
-}
-
-// count
-func countReqs() {
-	grpcReqs.WithLabelValues("0", "OK").Add(1)
-}
-
-func countSends() {
-	grpcSends.WithLabelValues("0", "OK").Add(1)
 }
 
 func getRequestLog(productName string, sellerName string, exhibitionDate string, updateDate string) string {
