@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-
 	"strconv"
 
 	meilisearch "github.com/meilisearch/meilisearch-go"
@@ -105,7 +104,7 @@ func main() {
 	}
 
 	if err != nil {
-		log.Print("failed to set-up zap log in searchitem. \n")
+		log.Println("failed to set-up zap log in searchitem. \n")
 		panic(err)
 	}
 
