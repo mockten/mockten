@@ -518,10 +518,9 @@ jobs:
         version=${{ steps.get-latest-version.outputs.latest_version }}
         if [ -z "$version" ]; then
           echo "Error: No version number provided."
-          exit 1
         fi
         patch_version_exist=$(echo $version | awk -F. '{print $NF}')
-        export PATCH_VERSION=$(($patch_version_exist + 1))
+        export PATCH_VERSION=1
         echo "::set-output name=patch_version::$PATCH_VERSION"
 
     - name: Build and push container
