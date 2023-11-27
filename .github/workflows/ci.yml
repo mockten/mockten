@@ -480,12 +480,12 @@ jobs:
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
-  push_snapshot_container_logstash:
+  push_snapshot_container_mongo:
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
     defaults:
       run:
-        working-directory: logstash
+        working-directory: mongo
     env:
       MAJOR_VERSION: 0
       MINOR_VERSION: 0
@@ -509,7 +509,7 @@ jobs:
     - name: Get latest version
       id: get-latest-version
       run: |
-        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/logstash --format='get(tags)' --limit=1)
+        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/mongo --format='get(tags)' --limit=1)
         echo "::set-output name=latest_version::$LATEST_VERSION"
 
     - name: Increment patch version
@@ -518,15 +518,14 @@ jobs:
         version=${{ steps.get-latest-version.outputs.latest_version }}
         if [ -z "$version" ]; then
           echo "Error: No version number provided."
-          exit 1
         fi
-        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
+        patch_version_exist=0
         export PATCH_VERSION=$(($patch_version_exist + 1))
         echo "::set-output name=patch_version::$PATCH_VERSION"
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/logstash:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mongo:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -577,5 +576,73 @@ jobs:
     - name: Build and push container
       run: |
         export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/meilisearch:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
+  build_j2j:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: j2j
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.21
+
+    - name: Build
+      run: go build -v .
+
+    # - name: Test
+    #  run: go test -v .
+
+  push_snapshot_container_j2j:
+    needs: [build_j2j]
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: j2j
+    env:
+      MAJOR_VERSION: 0
+      MINOR_VERSION: 0
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+
+    - name: Get latest version
+      id: get-latest-version
+      run: |
+        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/j2j --format='get(tags)' --limit=1)
+        echo "::set-output name=latest_version::$LATEST_VERSION"
+
+    - name: Increment patch version
+      id: increment-patch-version
+      run: |
+        version=${{ steps.get-latest-version.outputs.latest_version }}
+        if [ -z "$version" ]; then
+          echo "Error: No version number provided."
+        fi
+        patch_version_exist=0
+        export PATCH_VERSION=$(($patch_version_exist + 1))
+        echo "::set-output name=patch_version::$PATCH_VERSION"
+
+    - name: Build and push container
+      run: |
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/j2j:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
