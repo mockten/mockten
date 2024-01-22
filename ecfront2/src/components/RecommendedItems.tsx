@@ -3,14 +3,17 @@ import axios from 'axios';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid';
 import FavoriteIcon from './item/FavoriteIcon';
-import AddShoppingCartIcon from './item/AddShoppingCartIcon'
-import PaymentIcon from './item/PaymentIcon'
+import AddShoppingCartIcon from './item/AddShoppingCartIcon';
+import PaymentIcon from './item/PaymentIcon';
 import { Button, CardActionArea, CardActions } from '@mui/material';
-
-
 
 type ItemSummary = {
     id: string;
@@ -36,15 +39,45 @@ const testitems: ItemSummary[] = [
 
 // コンポーネントのプロップの型定義
 interface RecommendedItemsProps {
-    itemId: string; // item_idをプロップとして受け取る
+    itemId: string; 
 }
+
+interface PaymentIconProps {
+  onClick: () => void; 
+}
+
+const PaymentPopup = ({ open, onClose }) => {
+  return (
+    <Dialog open={open} onClose={onClose}>
+      <DialogTitle>Credit Card Information</DialogTitle>
+      <DialogContent>
+        <TextField autoFocus margin="dense" id="cardNumber" label="Card Number" type="text" fullWidth />
+        <TextField margin="dense" id="expiryDate" label="MM/YY" type="text" fullWidth />
+        <TextField margin="dense" id="cvv" label="CVV" type="text" fullWidth />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>Pay</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
 
 const RecommendedItems: React.FC<RecommendedItemsProps> = ({ itemId }) => {
     const [items, setItems] = useState<ItemSummary[]>([]);
     const [item, setItem] = useState(null);
-    const [page, setPage] = useState(1); // current page of page nation.
+    const [page, setPage] = useState(1);
     const [isCopied, setIsCopied] = useState(false);
-    
+    const [isPaymentPopupOpen, setPaymentPopupOpen] = useState(false);
+
+    const handlePaymentClick = () => {
+      setPaymentPopupOpen(true);
+    };
+
+    const handleClosePaymentPopup = () => {
+      setPaymentPopupOpen(false);
+    };
+
     const handleItemCardClick = () => {
       fetch(`/item/${itemId}`)
         .then((response) => response.json())
@@ -74,9 +107,8 @@ const RecommendedItems: React.FC<RecommendedItemsProps> = ({ itemId }) => {
       fetchData();
     }, [itemId, page]);
 
-
-
     return (
+      <>
         <Grid container spacing={3}>
             {items.map((item) => (
                 <Grid item xs={12} sm={6} md={4} key={item.id}>
@@ -104,16 +136,16 @@ const RecommendedItems: React.FC<RecommendedItemsProps> = ({ itemId }) => {
                         <p>Copied URL!</p>
                       )}
                       <FavoriteIcon />
-                      <PaymentIcon />
+                      <PaymentIcon onClick={handlePaymentClick} />
                       <AddShoppingCartIcon />
                     </CardActions>
                   </Card>
                 </Grid>
             ))}
         </Grid>
+        <PaymentPopup open={isPaymentPopupOpen} onClose={handleClosePaymentPopup} />
+      </>
     );
 };
-  
 
 export default RecommendedItems;
-
