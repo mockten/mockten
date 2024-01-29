@@ -13,12 +13,17 @@
       <img alt="Stream UI Kit" src="assets/img/logo-white.png" style="width: 100px;"/>
      </a>
      <div class="collapse navbar-collapse" id="navbarTogglerDemo">
-      <form action="./search" class="form-inline col-lg mr-auto my-2 my-lg-0" method="POST">
-       <input class="form-control w-75 mr-sm-2" name="item" placeholder="Search" type="search"/>
-       <button class="btn btn-primary my-2 my-sm-0" type="submit">
+<form action="./search" class="form-inline col-lg mr-auto my-2 my-lg-0" method="POST">
+    <div class="col-7 col-sm-6 col-md-8 col-lg-9 p-0">
+        <input class="form-control w-100 mr-sm-2" name="item" placeholder="Search" type="search"/>
+    </div>
+    <div class="col-5 col-sm-6 col-md-4 col-lg-3 p-0">
+        <button class="btn btn-primary w-100 my-2 my-sm-0" type="submit" style="min-width: 80px;">
         Search
-       </button>
-      </form>
+        </button>
+    </div>
+</form>
+
       <ul class="navbar-nav ml-auto mt-2 mt-lg-0">
        <li class="nav-item mr-4 mb-2 mb-lg-0">
         <a class="nav-link" href="/ranking?page=1&amp;category=99">
@@ -49,13 +54,6 @@
         </a>
        </li>
       </ul>
-      <div>
-       <a class="btn btn-primary" data-toggle="modal" href="" onclick="downloadApp()">
-        <em class="fas fa-cloud-download-alt mr-1">
-        </em>
-        Mobile App
-       </a>
-      </div>
      </div>
     </div>
    </nav>
