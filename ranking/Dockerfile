@@ -12,7 +12,7 @@ RUN ls /go/src
 COPY . .
 RUN go build .
 
-FROM alpine:3.18.4
+FROM alpine:3.18.6
 RUN apk add --no-cache ca-certificates &&\
     apk add gcompat &&\
     mkdir /var/log/apl
