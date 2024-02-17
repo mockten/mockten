@@ -1,4 +1,4 @@
-import React, { FC } from 'react';
+import { FC } from 'react';
 import RecommendedItems from '../components/RecommendedItems';
 import DashboardBottomNavigation from '../components/DashboardBottomNavigation';
 import Appbar from '../components/Appbar';

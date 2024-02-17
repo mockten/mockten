@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -6,9 +6,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Button from '@mui/material/Button';
 import FormControl from '@mui/material/FormControl';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import Radio from '@mui/material/Radio';
 import IconButton from '@mui/material/IconButton';
-import RadioGroup from '@mui/material/RadioGroup';
 import Checkbox from '@mui/material/Checkbox';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
@@ -19,7 +17,14 @@ import Box from '@mui/material/Box';
 import TuneSharpIcon from '@mui/icons-material/TuneSharp';
 
 // ダイアログ内のフォームアイテムの初期値を設定
-const defaultFilterValues = {
+type FilterValues = {
+  sex: string;
+  jobTitles: string[];
+  liveAt: string;
+  ageGroup: string[];
+};
+
+const defaultFilterValues: FilterValues = {
   sex: '',
   jobTitles: [],
   liveAt: '',
@@ -39,16 +44,14 @@ function AppbarTuneIcon() {
     setOpen(false);
   };
 
-  const handleSexChange = (event) => {
-    setFilters({ ...filters, sex: event.target.value });
-  };
 
-  const handleJobTitleChange = (event) => {
+  const handleJobTitleChange = (event: any) => {
     const jobTitles = [...filters.jobTitles];
+    const anyJobTitles = [...filters.jobTitles] as any;
     if (event.target.checked) {
-      jobTitles.push(event.target.name);
+      anyJobTitles.push(event.target.name);
     } else {
-      const index = jobTitles.indexOf(event.target.name);
+      const index = anyJobTitles.indexOf(event.target.name);
       if (index > -1) {
         jobTitles.splice(index, 1);
       }
@@ -56,16 +59,17 @@ function AppbarTuneIcon() {
     setFilters({ ...filters, jobTitles: jobTitles });
   };
 
-  const handleLiveAtChange = (event) => {
+  const handleLiveAtChange = (event: any) => {
     setFilters({ ...filters, liveAt: event.target.value });
   };
 
-  const handleAgeGroupChange = (event) => {
+  const handleAgeGroupChange = (event: any) => {
     const ageGroup = [...filters.ageGroup];
+    const anyAgeGroup = [...filters.ageGroup] as any;
     if (event.target.checked) {
-      ageGroup.push(event.target.name);
+      anyAgeGroup.push(event.target.name);
     } else {
-      const index = ageGroup.indexOf(event.target.name);
+      const index = anyAgeGroup.indexOf(event.target.name);
       if (index > -1) {
         ageGroup.splice(index, 1);
       }
@@ -93,7 +97,7 @@ function AppbarTuneIcon() {
             >
         <TuneSharpIcon />
       </IconButton>
-      <Dialog open={open} onClose={handleClose} fullWidth="true" maxWidth="md">
+      <Dialog open={open} onClose={handleClose} fullWidth={true} maxWidth="md">
         <DialogTitle>カテゴリー</DialogTitle>
         <DialogContent>
           <Box display="flex" justifyContent="space-around" flex="1 0 auto">

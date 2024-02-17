@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import IconButton from '@mui/material/IconButton';
 import AddShoppingCart from '@mui/icons-material/AddShoppingCart';
 
 function AddShoppingCartIcon() {
-  const [open, setOpen] = useState(false);
+  const [, setOpen] = useState(false);
 
 
   const handleIconClick = () => {

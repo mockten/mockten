@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -37,16 +37,12 @@ const testitems: ItemSummary[] = [
     { id: '550e8400-e29b-41d4-a716-446655440009', name: 'Sample Item 10', imageUrl: '/images/img1.jpg', favorite: false, category: 'Splunk Service合同会社 TechnicalSuccess'},
 ];
 
-// コンポーネントのプロップの型定義
-interface RecommendedItemsProps {
-    itemId: string; 
-}
+type PaymentPopupProps = {
+  open: boolean;
+  onClose: () => void;
+};
 
-interface PaymentIconProps {
-  onClick: () => void; 
-}
-
-const PaymentPopup = ({ open, onClose }) => {
+const PaymentPopup: React.FC<PaymentPopupProps> = ({ open, onClose }) => {
   return (
     <Dialog open={open} onClose={onClose}>
       <DialogTitle>Credit Card Information</DialogTitle>
@@ -63,29 +59,25 @@ const PaymentPopup = ({ open, onClose }) => {
   );
 };
 
-const RecommendedItems: React.FC<RecommendedItemsProps> = ({ itemId }) => {
+function RecommendedItems() {
     const [items, setItems] = useState<ItemSummary[]>([]);
-    const [item, setItem] = useState(null);
-    const [page, setPage] = useState(1);
+    const [, setItem] = useState(null);
     const [isCopied, setIsCopied] = useState(false);
     const [isPaymentPopupOpen, setPaymentPopupOpen] = useState(false);
-
-    const handlePaymentClick = () => {
-      setPaymentPopupOpen(true);
-    };
+    const [page] = useState(1); // ページネーションの現在のページ
 
     const handleClosePaymentPopup = () => {
       setPaymentPopupOpen(false);
     };
 
     const handleItemCardClick = () => {
-      fetch(`/item/${itemId}`)
+      fetch(`/item/001`)
         .then((response) => response.json())
         .then((item) => setItem(item));
     };
 
     const handleShareButtonClick = () => {
-      const url = `https://mockten.net/item/${itemId}`;
+      const url = `https://mockten.net/item/001`;
       navigator.clipboard.writeText(url);
       setIsCopied(true);
     };
@@ -94,18 +86,19 @@ const RecommendedItems: React.FC<RecommendedItemsProps> = ({ itemId }) => {
       const fetchData = async () => {
         try {
           const response = await axios.post('/service/recousers/', {
-            id: itemId,
             page: page,
           });
           setItems(response.data);
         } catch (error) {
           console.error('Error fetching recommended users:', error);
+          // debug for local environment
           setItems(testitems);
         }
       };
   
       fetchData();
-    }, [itemId, page]);
+    }, [page]);
+
 
     return (
       <>
@@ -136,7 +129,7 @@ const RecommendedItems: React.FC<RecommendedItemsProps> = ({ itemId }) => {
                         <p>Copied URL!</p>
                       )}
                       <FavoriteIcon />
-                      <PaymentIcon onClick={handlePaymentClick} />
+                      <PaymentIcon />
                       <AddShoppingCartIcon />
                     </CardActions>
                   </Card>

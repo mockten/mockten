@@ -60,10 +60,16 @@ const CheckoutForm = () => {
   );
 };
 
-const PaymentPopup = ({ open, setOpen }) => { 
+type PaymentPopupProps = {
+  open: boolean;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+};
+
+const PaymentPopup: React.FC<PaymentPopupProps>  = ({ setOpen }) => { 
   const handleClose = () => {
     setOpen(false);
   };
+
   return (
     <Dialog open={true} onClose={handleClose} maxWidth="md" fullWidth>
       <DialogTitle>Payment</DialogTitle>
@@ -78,6 +84,7 @@ const PaymentPopup = ({ open, setOpen }) => {
     </Dialog>
   );
 };
+
 
 const PaymentIcon: React.FC = () => {
   const [open, setOpen] = useState(false);
