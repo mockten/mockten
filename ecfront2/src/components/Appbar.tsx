@@ -1,5 +1,4 @@
 import * as React from 'react';
-import axios from 'axios';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
@@ -19,7 +18,6 @@ import AppbarShoppingCartIcon from './AppbarShoppingCartIcon';
 
 export default function PrimarySearchAppBar() {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const [isTuneDialogOpen, setTuneDialogOpen] = React.useState(false);
   const [mobileMoreAnchorEl, setMobileMoreAnchorEl] =
     React.useState<null | HTMLElement>(null);
 
@@ -34,30 +32,7 @@ export default function PrimarySearchAppBar() {
     setAnchorEl(null);
   };
 
-  const handleMessageIconOpen = (apiEndpoint: string) => {
-    axios.get(`http://my-backend-url/service/${apiEndpoint}`)
-      .then(response => {
-        console.log(response.data);
-      })
-      .catch(error => {
-        console.error('There was an error fetching the data!', error);
-      });  
-  };
 
-  const handleFavoritesIconOpen = (apiEndpoint: string) => {
-    axios.get(`http://my-backend-url/service/${apiEndpoint}`)
-      .then(response => {
-        console.log(response.data);
-      })
-      .catch(error => {
-        console.error('There was an error fetching the data!', error);
-      });  
-  };
-
-
-  const handleOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setMobileMoreAnchorEl(event.currentTarget);
-  };
 
   const handleMobileMenuClose = () => {
     setMobileMoreAnchorEl(null);

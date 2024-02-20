@@ -1,18 +1,14 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import IconButton from '@mui/material/IconButton';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import Badge from '@mui/material/Badge';
 
 function AppbarShoppingCartIcon() {
-  const [open, setOpen] = useState(false);
+  const [, setOpen] = useState(false);
 
 
   const handleIconClick = () => {
     setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
   };
 
   return (
