@@ -1,7 +1,0 @@
-[api]
-error_msg = Oops! Something went wrong...🙇
-insufficient_msg = Sorry! Stock Insufficient🥺
-success_msg = Thanks! Your order has been complete😁
-redirect_url = http://localhost:8080/auth
-home_url = http://localhost:8080/home
-gcs_sa_path = ../mockten-env/k8s/common/gcs.json

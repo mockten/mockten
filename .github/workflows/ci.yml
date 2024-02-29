@@ -10,40 +10,25 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  notify-slack-pr:
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' }}
-    steps:
-    - name: Notify Slack
-      run: |
-        curl -X POST -H 'Content-type: application/json' --data '{"text":"Pull Request: '${GITHUB_REPOSITORY}' # '${github.event.pull_request.number}'"}' ${{ secrets.SLACK_WEBHOOK }}
-        
-  notify-slack-push:
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' }}
-    steps:
-    - name: Notify Slack
-      run: |
-        curl -X POST -H 'Content-type: application/json' --data '{"text":"Pull Requestがマージされました: '${GITHUB_REPOSITORY}' # '${github.event.pull_request.number}'"}' ${{ secrets.SLACK_WEBHOOK }}
   build_ecfront:
     runs-on: ubuntu-22.04
-    if: contains(github.event.head_commit.modified, 'ecfront/')
+    if: contains(github.event.head_commit.modified, 'ecfront2/')
     defaults:
       run:
-        working-directory: ecfront
+        working-directory: ecfront2
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+  
+      - name: Set up Go
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+  
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.18
-
-    - name: Build
-      run: go build -v .
-
-   # - name: Test
-   #  run: go test -v .
+      - name: Build TypeScript
+        run: npm run build
 
   push_snapshot_container_ecfront:
     needs: [build_ecfront]
@@ -51,7 +36,7 @@ jobs:
     runs-on: ubuntu-22.04
     defaults:
       run:
-        working-directory: ecfront
+        working-directory: ecfront2
     env:
       MAJOR_VERSION: 0
       MINOR_VERSION: 0
@@ -71,27 +56,9 @@ jobs:
     - name: Configure docker to use the gcloud cli
       run: gcloud auth configure-docker --quiet
 
-    - name: Get latest version
-      id: get-latest-version
-      run: |
-        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecfront --format='get(tags)' --limit=1)
-        echo "::set-output name=latest_version::$LATEST_VERSION"
-
-    - name: Increment patch version
-      id: increment-patch-version
-      run: |
-        version=${{ steps.get-latest-version.outputs.latest_version }}
-        if [ -z "$version" ]; then
-          echo "Error: No version number provided."
-          exit 1
-        fi
-        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
-        export PATCH_VERSION=$(($patch_version_exist + 1))
-        echo "::set-output name=patch_version::$PATCH_VERSION"
-
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecfront:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/ecfront:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -108,7 +75,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.18
+        go-version: 1.21
 
     - name: Build
       run: go build -v .
@@ -143,27 +110,32 @@ jobs:
     - name: Configure docker to use the gcloud cli
       run: gcloud auth configure-docker --quiet
 
-    - name: Get latest version
-      id: get-latest-version
-      run: |
-        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay --format='get(tags)' --limit=1)
-        echo "::set-output name=latest_version::$LATEST_VERSION"
+    # - name: Get latest version
+    #   id: get-latest-version
+    #   run: |
+    #     export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay --format='get(tags)' --limit=1)
+    #     echo "::set-output name=latest_version::$LATEST_VERSION"
 
-    - name: Increment patch version
-      id: increment-patch-version
-      run: |
-        version=${{ steps.get-latest-version.outputs.latest_version }}
-        if [ -z "$version" ]; then
-          echo "Error: No version number provided."
-          exit 1
-        fi
-        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
-        export PATCH_VERSION=$(($patch_version_exist + 1))
-        echo "::set-output name=patch_version::$PATCH_VERSION"
+    # - name: Increment patch version
+    #   id: increment-patch-version
+    #   run: |
+    #     version=${{ steps.get-latest-version.outputs.latest_version }}
+    #     if [ -z "$version" ]; then
+    #       echo "Error: No version number provided."
+    #       exit 1
+    #     fi
+    #     patch_version_exist=$(echo $version | awk -F. '{print $NF}')
+    #     export PATCH_VERSION=$(($patch_version_exist + 1))
+    #     echo "::set-output name=patch_version::$PATCH_VERSION"
 
+    # - name: Build and push container
+    #   run: |
+    #     export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
+    #     docker build -t $IMAGE_TAG .
+    #     docker push $IMAGE_TAG
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/ecpay:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -215,27 +187,9 @@ jobs:
     - name: Configure docker to use the gcloud cli
       run: gcloud auth configure-docker --quiet
 
-    - name: Get latest version
-      id: get-latest-version
-      run: |
-        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/notification --format='get(tags)' --limit=1)
-        echo "::set-output name=latest_version::$LATEST_VERSION"
-
-    - name: Increment patch version
-      id: increment-patch-version
-      run: |
-        version=${{ steps.get-latest-version.outputs.latest_version }}
-        if [ -z "$version" ]; then
-          echo "Error: No version number provided."
-          exit 1
-        fi
-        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
-        export PATCH_VERSION=$(($patch_version_exist + 1))
-        echo "::set-output name=patch_version::$PATCH_VERSION"
-
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/notification:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/notification:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -285,27 +239,9 @@ jobs:
     - name: Configure docker to use the gcloud cli
       run: gcloud auth configure-docker --quiet
 
-    - name: Get latest version
-      id: get-latest-version
-      run: |
-        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/payexecution --format='get(tags)' --limit=1)
-        echo "::set-output name=latest_version::$LATEST_VERSION"
-
-    - name: Increment patch version
-      id: increment-patch-version
-      run: |
-        version=${{ steps.get-latest-version.outputs.latest_version }}
-        if [ -z "$version" ]; then
-          echo "Error: No version number provided."
-          exit 1
-        fi
-        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
-        export PATCH_VERSION=$(($patch_version_exist + 1))
-        echo "::set-output name=patch_version::$PATCH_VERSION"
-
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/payexecution:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/payexecution:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -356,27 +292,9 @@ jobs:
     - name: Configure docker to use the gcloud cli
       run: gcloud auth configure-docker --quiet
 
-    - name: Get latest version
-      id: get-latest-version
-      run: |
-        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/ranking --format='get(tags)' --limit=1)
-        echo "::set-output name=latest_version::$LATEST_VERSION"
-
-    - name: Increment patch version
-      id: increment-patch-version
-      run: |
-        version=${{ steps.get-latest-version.outputs.latest_version }}
-        if [ -z "$version" ]; then
-          echo "Error: No version number provided."
-          exit 1
-        fi
-        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
-        export PATCH_VERSION=$(($patch_version_exist + 1))
-        echo "::set-output name=patch_version::$PATCH_VERSION"
-
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/ranking:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/ranking:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -427,176 +345,8 @@ jobs:
     - name: Configure docker to use the gcloud cli
       run: gcloud auth configure-docker --quiet
 
-    - name: Get latest version
-      id: get-latest-version
-      run: |
-        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/searchitem --format='get(tags)' --limit=1)
-        echo "::set-output name=latest_version::$LATEST_VERSION"
-
-    - name: Increment patch version
-      id: increment-patch-version
-      run: |
-        version=${{ steps.get-latest-version.outputs.latest_version }}
-        if [ -z "$version" ]; then
-          echo "Error: No version number provided."
-          exit 1
-        fi
-        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
-        export PATCH_VERSION=$(($patch_version_exist + 1))
-        echo "::set-output name=patch_version::$PATCH_VERSION"
-
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/searchitem:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
-
-  push_snapshot_container_staticfile:
-    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.modified, 'static-file/')}}
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: static-file
-    env:
-      MAJOR_VERSION: 0
-      MINOR_VERSION: 0
-
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v1
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
-
-    - name: Get latest version
-      id: get-latest-version
-      run: |
-        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/static-file --format='get(tags)' --limit=1)
-        echo "::set-output name=latest_version::$LATEST_VERSION"
-
-    - name: Increment patch version
-      id: increment-patch-version
-      run: |
-        version=${{ steps.get-latest-version.outputs.latest_version }}
-        if [ -z "$version" ]; then
-          echo "Error: No version number provided."
-          exit 1
-        fi
-        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
-        export PATCH_VERSION=$(($patch_version_exist + 1))
-        echo "::set-output name=patch_version::$PATCH_VERSION"
-
-    - name: Build and push container
-      run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/static-file:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
-
-  push_snapshot_container_mongo:
-    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch'|| contains(github.event.head_commit.modified, 'mongo/')}}
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: mongo
-    env:
-      MAJOR_VERSION: 0
-      MINOR_VERSION: 0
-
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v1
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
-
-    - name: Get latest version
-      id: get-latest-version
-      run: |
-        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/mongo --format='get(tags)' --limit=1)
-        echo "::set-output name=latest_version::$LATEST_VERSION"
-
-    - name: Increment patch version
-      id: increment-patch-version
-      run: |
-        version=${{ steps.get-latest-version.outputs.latest_version }}
-        if [ -z "$version" ]; then
-          echo "Error: No version number provided."
-          exit 1
-        fi
-        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
-        export PATCH_VERSION=$(($patch_version_exist + 1))
-        echo "::set-output name=patch_version::$PATCH_VERSION"
-
-    - name: Build and push container
-      run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mongo:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
-
-  push_snapshot_container_meilisearch:
-    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.modified, 'meilisearch/')}}
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: meilisearch
-    env:
-      MAJOR_VERSION: 0
-      MINOR_VERSION: 0
-
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v1
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
-
-    - name: Get latest version
-      id: get-latest-version
-      run: |
-        export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/meilisearch --format='get(tags)' --limit=1)
-        echo "::set-output name=latest_version::$LATEST_VERSION"
-
-    - name: Increment patch version
-      id: increment-patch-version
-      run: |
-        version=${{ steps.get-latest-version.outputs.latest_version }}
-        if [ -z "$version" ]; then
-          echo "Error: No version number provided."
-          exit 1
-        fi
-        patch_version_exist=$(echo $version | awk -F. '{print $NF}')
-        export PATCH_VERSION=$(($patch_version_exist + 1))
-        echo "::set-output name=patch_version::$PATCH_VERSION"
-
-    - name: Build and push container
-      run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/meilisearch:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/searchitem:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG

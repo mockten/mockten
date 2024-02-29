@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -121,8 +120,10 @@ func main() {
 	defer logger.Sync()
 
 	// set-up MongoDB client
-	mongoHost := os.Getenv("DEV_MONGO_SVC_SERVICE_HOST")
-	mongoPort := os.Getenv("DEV_MONGO_SVC_SERVICE_PORT")
+	mongoHost := os.Getenv("MONGO_SVC_SERVICE_HOST")
+	mongoPort := os.Getenv("MONGO_SVC_SERVICE_PORT")
+	mongoPass := os.Getenv("MONGO_INITDB_ROOT_PASSWORD")
+	mongoUser := os.Getenv("MONGO_INITDB_ROOT_USERNAME")
 
 	if mongoHost == "" {
 		logger.Error("does not exist remote mongo host.")
@@ -132,11 +133,19 @@ func main() {
 		logger.Error("does not exist remote mongo port.")
 		mongoPort = "27017"
 	}
+	if mongoPass == "" {
+		logger.Error("does not exist remote mongo password.")
+		mongoPass = "bar"
+	}
+	if mongoUser == "" {
+		logger.Error("does not exist remote mongo username.")
+		mongoUser = "bar"
+	}
 
-	remoteMongoHost := "mongodb://" + mongoHost + ":" + mongoPort
+	remoteMongoHost := "mongodb://" + mongoUser + ":" + mongoPass + "@" + mongoHost + ":" + mongoPort
 	client, err := mongo.NewClient(options.Client().ApplyURI(remoteMongoHost))
 	if err != nil {
-		logger.Error("does not exist remote mongo port.")
+		logger.Error("does not exist remote mongo host.")
 		panic(err)
 	}
 
@@ -149,9 +158,49 @@ func main() {
 	}
 	defer client.Disconnect(ctx)
 
-	collection := client.Database("product_info").Collection("products")
+	mongoUserDb := os.Getenv("MONGO_USER_DB_NAME")
+	mongoUserCollection := os.Getenv("MONGO_USER_COLLECTION_NAME")
+	if mongoHost == "" {
+		logger.Error("does not exist MONGO_USER_DB_NAME.")
+		mongoUserDb = "product_info"
+	}
+	if mongoPort == "" {
+		logger.Error("does not exist MONGO_USER_COLLECTION_NAME.")
+		mongoUserCollection = "products"
+	}
+
+	collection := client.Database(mongoUserDb).Collection(mongoUserCollection)
 
 	ticker := time.NewTicker(300 * time.Second)
+	// TODO
+	cur, err := collection.Find(context.Background(), bson.D{{}})
+	if err != nil {
+		logger.Error("0: unexpected error occur when find data from mongodb.", zap.Error(err))
+	}
+	defer cur.Close(context.Background())
+	var results []bson.M
+
+	if err = cur.All(context.Background(), &results); err != nil {
+		logger.Error("0: failed to get data from mongo.", zap.Error(err))
+	}
+
+	jsonData, err := json.Marshal(results)
+	if err != nil {
+		logger.Error("0: failed to write data to search component.", zap.Error(err))
+	}
+
+	if _, err := os.Stat("/data/index"); os.IsNotExist(err) {
+		if err := os.MkdirAll("/data/index", 0755); err != nil {
+			logger.Error("0: failed to create data path ", zap.Error(err))
+			return
+		}
+	}
+
+	err = os.WriteFile(jsonMountPoint, jsonData, 0644)
+	if err != nil {
+		logger.Error("0: failed to write json data to ", zap.Error(err))
+	}
+
 	quit := make(chan struct{})
 	go func() {
 		for {
@@ -174,7 +223,7 @@ func main() {
 					panic(err)
 				}
 
-				ioutil.WriteFile(jsonMountPoint, jsonData, 0644)
+				os.WriteFile(jsonMountPoint, jsonData, 0644)
 
 			case <-quit:
 				ticker.Stop()
@@ -184,9 +233,15 @@ func main() {
 	}()
 
 	// set-up meilisearch to register products json(documents) to index.
+	meiliBackend := os.Getenv("MEILI_SVC")
+	if mongoHost == "" {
+		logger.Error("does not exist MEILI_SVC.")
+		meiliBackend = "127.0.0.1"
+	}
+
 	meiliclient = meilisearch.NewClient(meilisearch.ClientConfig{
 		// expect meilisearch sidecar container
-		Host:   "http://127.0.0.1:7700",
+		Host:   "http://" + meiliBackend + ":7700",
 		APIKey: os.Getenv("MEILISEARCH_MASTERKEY"),
 	})
 
