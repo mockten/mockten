@@ -12,7 +12,7 @@ on:
 jobs:
   build_ecfront:
     runs-on: ubuntu-22.04
-    if: contains(github.event.head_commit.modified, 'ecfront2/')
+    # if: contains(github.event.head_commit.modified, 'ecfront2/')
     defaults:
       run:
         working-directory: ecfront2
@@ -65,7 +65,7 @@ jobs:
 
   build_ecpay:
     runs-on: ubuntu-22.04
-    if: contains(github.event.head_commit.modified, 'ecpay/')
+    # if: contains(github.event.head_commit.modified, 'ecpay/')
     defaults:
       run:
         working-directory: ecpay
@@ -142,7 +142,7 @@ jobs:
 
   build_notification:
     runs-on: ubuntu-22.04
-    if: contains(github.event.head_commit.modified, 'notification/')
+    # if: contains(github.event.head_commit.modified, 'notification/')
     defaults:
       run:
         working-directory: notification
@@ -195,7 +195,7 @@ jobs:
 
   build_payexecution:
     runs-on: ubuntu-22.04
-    if: contains(github.event.head_commit.modified, 'payexecution/')
+    # if: contains(github.event.head_commit.modified, 'payexecution/')
     defaults:
       run:
         working-directory: payexecution
@@ -247,7 +247,7 @@ jobs:
 
   build_ranking:
     runs-on: ubuntu-22.04
-    if: contains(github.event.head_commit.modified, 'ranking/')
+    # if: contains(github.event.head_commit.modified, 'ranking/')
     defaults:
       run:
         working-directory: ranking
@@ -301,7 +301,7 @@ jobs:
 
   build_searchitem:
     runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.modified, 'searchitem/')
+    # if: contains(github.event.head_commit.modified, 'searchitem/')
     defaults:
       run:
         working-directory: searchitem
