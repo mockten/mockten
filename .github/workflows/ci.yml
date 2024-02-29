@@ -10,22 +10,6 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  notify-slack-pr:
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' }}
-    steps:
-    - name: Notify Slack
-      run: |
-        curl -X POST -H 'Content-type: application/json' --data '{"text":"Pull Request: '${GITHUB_REPOSITORY}' # '${github.event.pull_request.number}'"}' ${{ secrets.SLACK_WEBHOOK }}
-        
-  notify-slack-push:
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' }}
-    steps:
-    - name: Notify Slack
-      run: |
-        curl -X POST -H 'Content-type: application/json' --data '{"text":"Pull Requestがマージされました: '${GITHUB_REPOSITORY}' # '${github.event.pull_request.number}'"}' ${{ secrets.SLACK_WEBHOOK }}
-
   build_ecfront:
     runs-on: ubuntu-22.04
     if: contains(github.event.head_commit.modified, 'ecfront2/')
