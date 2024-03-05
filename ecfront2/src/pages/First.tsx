@@ -14,7 +14,7 @@ function App(): JSX.Element {
 
   return (
     <div>
-      <h1>Welcome to My Search App!</h1>
+      <h1>Welcome to Mockten!</h1>
       <SearchBox
         value={searchQuery}
         onChange={(event) => setSearchQuery(event.target.value)}
