@@ -4,29 +4,36 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"net"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/gin-gonic/gin"
 	meilisearch "github.com/meilisearch/meilisearch-go"
-	pb "github.com/mockten/mockten_interfaces/searchitem"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 )
 
 const (
 	port           = ":50051"
 	jsonMountPoint = "/data/index/products.json"
 )
+
+type Item struct {
+	UserID   int    `json:"user_id"`
+	NickName string `json:"nick_name"`
+	Sex      string `json:"sex"`
+	Title    string `json:"title"`
+	Company  string `json:"company"`
+	Like     int    `json:"like"`
+	ImageURL string `json:"image_url"`
+}
 
 var (
 	searchReqCount = promauto.NewCounter(prometheus.CounterOpts{
@@ -43,45 +50,38 @@ var (
 	meiliclient *meilisearch.Client
 )
 
-type server struct {
-	pb.UnimplementedSearchItemsServer
-}
+// Implement SearchItemServer using REST API
+func searchHandler(c *gin.Context) {
+	query := c.Query("q")
+	page := c.Query("p")
+	token := c.Query("t")
 
-// Implement SearchItemServer using protocol buffer
-func (s *server) SearchItem(ctx context.Context, in *pb.GetSearchItem) (*pb.SearchResponse, error) {
-	productNameForSearch := in.GetProductName()
-	sellerNameForSearch := in.GetSellerName()
-	exhibitionDateForSearch := in.GetExhibitionDate()
-	updateDateForSearch := in.GetUpdateDate()
-	categoryForSearch := strconv.Itoa(int(in.GetCategory()))
-	rankingFilterForSearch := in.GetRankingFilter()
-	pageForSearch := in.GetPage() //int32
+	if query == "" || token == "" || page == "" {
+		logger.Error("Search Query parameter is missing.")
+		c.JSON(http.StatusNoContent, gin.H{"message": "There is no users"})
+		return
+	}
 
 	// logging request log
-	logger.Info("Request log", zap.String("productname", productNameForSearch),
-		zap.String("sellername", sellerNameForSearch),
-		zap.String("exhibitiondate", exhibitionDateForSearch),
-		zap.String("updatedate", updateDateForSearch),
-		zap.String("category", categoryForSearch),
-		zap.Int32("ranking", rankingFilterForSearch),
-		zap.Int32("page", pageForSearch))
+	logger.Debug("Request log", zap.String("query", query), zap.String("page", page), zap.String("token", token))
 
 	// increment counter
 	searchReqCount.Inc()
-	products := make([]*pb.ResponseResult, 0)
 
-	searchRes, err := meiliclient.Index("products").Search(productNameForSearch,
+	searchRes, err := meiliclient.Index("products").Search(query,
 		&meilisearch.SearchRequest{
 			Limit: 25,
 		})
 	if err != nil {
 		logger.Error("failed to search in some reasons.", zap.Error(err))
-		return &pb.SearchResponse{TotalNum: 0, Response: products}, err
+		c.JSON(http.StatusNoContent, gin.H{"message": "There is no items"})
+		return
 	}
 
+	var items []Item
 	for _, val := range searchRes.Hits {
-		if s, ok := val.(*pb.ResponseResult); ok {
-			products = append(products, s)
+		if s, ok := val.(Item); ok {
+			items = append(items, s)
 		} else {
 			logger.Error("Value is not of type pb.ResponseResult")
 		}
@@ -90,7 +90,10 @@ func (s *server) SearchItem(ctx context.Context, in *pb.GetSearchItem) (*pb.Sear
 	// increment counter
 	searchResCount.Inc()
 
-	return &pb.SearchResponse{TotalNum: int32(len(products)), Response: products}, nil
+	c.JSON(http.StatusOK, gin.H{
+		"items": items,
+		"total": page,
+	})
 }
 
 func main() {
@@ -255,10 +258,10 @@ func main() {
 	}
 
 	// decode JSON to struct which is defeined this file.
-	var products []*pb.ResponseResult
-	json.Unmarshal(byteValue, &products)
+	var item []Item
+	json.Unmarshal(byteValue, &item)
 
-	task, err := index.AddDocuments(products)
+	task, err := index.AddDocuments(item)
 	if err != nil {
 		logger.Error("failed to add document to meilesearch task.", zap.Error(err))
 		panic(err)
@@ -270,16 +273,10 @@ func main() {
 	go exportMetrics()
 
 	// start application
-	lis, err := net.Listen("tcp", port)
-	if err != nil {
-		logger.Error("failed to set-up port listen with gRPC.")
-	}
-	grpcserver := grpc.NewServer()
-	pb.RegisterSearchItemsServer(grpcserver, &server{})
-	if err := grpcserver.Serve(lis); err != nil {
-		logger.Error("failed to set-up application server.")
-		panic(err)
-	}
+	router := gin.Default()
+	router.GET("v1/search", searchHandler)
+	router.Run(port)
+
 }
 
 // for goroutin
