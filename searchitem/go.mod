@@ -5,7 +5,6 @@ go 1.21
 require (
 	github.com/gin-gonic/gin v1.9.0
 	github.com/meilisearch/meilisearch-go v0.26.0
-	github.com/mockten/mockten_interfaces v0.0.0-20230410100840-8f135ee4b165
 	github.com/prometheus/client_golang v1.14.0
 	go.mongodb.org/mongo-driver v1.13.0
 	go.uber.org/zap v1.26.0
