@@ -195,8 +195,6 @@ github.com/matttproud/golang_protobuf_extensions v1.0.1 h1:4hp9jkHxhMHkqkrB3Ix0j
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/meilisearch/meilisearch-go v0.26.0 h1:6IdFC9S53gEp7FMkt99swIFyEZE+4TwJAgen3eQdw40=
 github.com/meilisearch/meilisearch-go v0.26.0/go.mod h1:SxuSqDcPBIykjWz1PX+KzsYzArNLSCadQodWs8extS0=
-github.com/mockten/mockten_interfaces v0.0.0-20230410100840-8f135ee4b165 h1:eswcnVfKsBSE/JiYbtw3Oozn5ihHAJWTKWVZ7uCx0xs=
-github.com/mockten/mockten_interfaces v0.0.0-20230410100840-8f135ee4b165/go.mod h1:Wij3ylW0gQc+4qZtriBPNBADsjVY9DTf27MaJHX7XcU=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd h1:TRLaZ9cD/w8PVh93nsPXa1VrQ6jlwL5oN8l14QlcNfg=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=

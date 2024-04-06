@@ -1,5 +1,7 @@
 export function sendSearchQuery(query: string): void {
-    const apiUrl = 'https://example.com/api';
+    const apiUrl = process.env.REACT_APP_SEARCH_API;
+    // const apiUrl = 'https://exampl.com/api';
+    console.log(apiUrl);
 
     fetch(`${apiUrl}/endpoint?${query}`)
     .then(response => {
