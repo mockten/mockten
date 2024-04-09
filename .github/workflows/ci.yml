@@ -28,7 +28,7 @@ jobs:
         run: npm ci
 
       - name: Build TypeScript
-        run: npm run build
+        run: npm run build:dev
 
   push_snapshot_container_ecfront:
     needs: [build_ecfront]
