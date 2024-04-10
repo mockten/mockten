@@ -1,18 +1,20 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
-import First from './pages/First';
+import FirstPage from './pages/FirstPage';
 import Login from './pages/Login';
 import UserDetail from './pages/UserDetail';
+import SellerDashboard from './pages/SellerDashboard';
 import './App.css';
 
 const App: React.FC = () => {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<First />} />
-        <Route path="/rc" element={<Dashboard />} />
+        <Route path="/" element={<FirstPage />} />
+        <Route path="/d" element={<Dashboard />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/seller" element={<SellerDashboard />} />
         <Route path="/user/:id" element={<UserDetail />} />
       </Routes>
     </Router>
