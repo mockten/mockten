@@ -352,7 +352,6 @@ jobs:
         docker push $IMAGE_TAG
 
   push_snapshot_container_mongodb:
-    needs: [build_ecfront]
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
     defaults:
