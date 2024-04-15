@@ -1,52 +1,151 @@
 package main
 
 import (
-    "encoding/json"
-    "net/http"
-    "strings"
+	"encoding/json"
+	"net/http"
+	"strconv"
+	"strings"
 )
 
 type Product struct {
-    ID        string `json:"id"`
-    Name      string `json:"name"`
-    ImageURL  string `json:"imageUrl"`
-    Favorite  bool   `json:"favorite"`
-    Category  string `json:"category"`
+	ProductID   string   `json:"product_id"`
+	ProductName string   `json:"product_name"`
+	SellerName  string   `json:"seller_name"`
+	Stocks      int      `json:"stocks"`
+	Category    []int    `json:"category"`
+	Rank        int      `json:"rank"`
+	MainImage   string   `json:"main_image"`
+	ImagePath   []string `json:"image_path"`
+	Summary     string   `json:"summary"`
+	RegistDay   string   `json:"regist_day"`
+	LastUpdate  string   `json:"last_update"`
+}
+
+type ResponseItem struct {
+	ProductID   string `json:"product_id"`
+	ProductName string `json:"product_name"`
+	SellerName  string `json:"seller_name"`
+	Category    int    `json:"category"`
+	Price       int    `json:"price"`
+	Ranking     int    `json:"ranking"`
+	Stocks      int    `json:"stocks"`
+	MainURL     string `json:"main_url"`
+}
+
+type SearchResponse struct {
+	Items []ResponseItem `json:"items"`
+	Page  int            `json:"page"`
 }
 
 var products = []Product{
-    {ID: "550e8400-e29b-41d4-a716-446655440000", Name: "Sample Item 1", ImageURL: "/images/img1.jpg", Favorite: true, Category: "四谷物産 課長"},
-    {ID: "550e8400-e29b-41d4-a716-446655440001", Name: "Sample Item 2", ImageURL: "/images/img2.jpg", Favorite: false, Category: "Yahoo! Japan 第四営業部部長"},
-    {ID: "550e8400-e29b-41d4-a716-446655440002", Name: "Sample Item 3", ImageURL: "/images/img3.jpg", Favorite: false, Category: "Splunk Service合同会社 CustomerSuccessManager"},
-    {ID: "550e8400-e29b-41d4-a716-446655440003", Name: "Sample Item 4", ImageURL: "/images/img4.jpg", Favorite: false, Category: "東京大学 学生"},
-    {ID: "550e8400-e29b-41d4-a716-446655440004", Name: "Sample Item 5", ImageURL: "/images/img5.jpg", Favorite: false, Category: "NEC Corporation SI営業部 主任"},
-    {ID: "550e8400-e29b-41d4-a716-446655440005", Name: "Sample Item 6", ImageURL: "/images/img6.jpg", Favorite: false, Category: "material-Design 主任"},
-    {ID: "550e8400-e29b-41d4-a716-446655440006", Name: "Sample Item 7", ImageURL: "/images/img1.jpg", Favorite: false, Category: "Splunk Service合同会社 TechnicalSuccess"},
-    {ID: "550e8400-e29b-41d4-a716-446655440007", Name: "Sample Item 8", ImageURL: "/images/img1.jpg", Favorite: false, Category: "Splunk Service合同会社 TechnicalSuccess"},
-    {ID: "550e8400-e29b-41d4-a716-446655440008", Name: "Sample Item 9", ImageURL: "/images/img1.jpg", Favorite: false, Category: "Splunk Service合同会社 TechnicalSuccess"},
-    {ID: "550e8400-e29b-41d4-a716-446655440009", Name: "Sample Item 10", ImageURL: "/images/img1.jpg", Favorite: false, Category: "Splunk Service合同会社 TechnicalSuccess"},
+	{
+		ProductID:   "p1001",
+		ProductName: "Product1",
+		SellerName:  "Seller A",
+		Stocks:      50,
+		Category:    []int{1, 3},
+		Rank:        5,
+		MainImage:   "/images/img1.jpg",
+		ImagePath:   []string{"/images/img1.jpg"},
+		Summary:     "This is product 1",
+		RegistDay:   "2023-01-01",
+		LastUpdate:  "2023-01-05",
+	},
+	{
+		ProductID:   "p1002",
+		ProductName: "Product2",
+		SellerName:  "Seller B",
+		Stocks:      20,
+		Category:    []int{2, 4},
+		Rank:        4,
+		MainImage:   "/images/img2.jpg",
+		ImagePath:   []string{"/images/img2.jpg"},
+		Summary:     "This is product 2",
+		RegistDay:   "2023-02-01",
+		LastUpdate:  "2023-02-05",
+	},
+	{
+		ProductID:   "p1003",
+		ProductName: "Product3",
+		SellerName:  "Seller C",
+		Stocks:      75,
+		Category:    []int{1, 5},
+		Rank:        3,
+		MainImage:   "/images/img3.jpg",
+		ImagePath:   []string{"/images/img3.jpg"},
+		Summary:     "This is product 3",
+		RegistDay:   "2023-03-01",
+		LastUpdate:  "2023-03-05",
+	},
+	{
+		ProductID:   "p1004",
+		ProductName: "Product4",
+		SellerName:  "Seller D",
+		Stocks:      100,
+		Category:    []int{2, 3},
+		Rank:        2,
+		MainImage:   "/images/img4.jpg",
+		ImagePath:   []string{"/images/img4.jpg"},
+		Summary:     "This is product 4",
+		RegistDay:   "2023-04-01",
+		LastUpdate:  "2023-04-05",
+	},
+	{
+		ProductID:   "p1005",
+		ProductName: "Product5",
+		SellerName:  "Seller E",
+		Stocks:      30,
+		Category:    []int{1, 4},
+		Rank:        1,
+		MainImage:   "/images/img5.jpg",
+		ImagePath:   []string{"/images/img5.jpg"},
+		Summary:     "This is product 5",
+		RegistDay:   "2023-05-01",
+		LastUpdate:  "2023-05-05",
+	},
 }
 
 func searchHandler(w http.ResponseWriter, r *http.Request) {
-    query := r.URL.Query().Get("productname")
-    var filteredProducts []Product
+	query := r.URL.Query().Get("q")
+	pageStr := r.URL.Query().Get("p")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
 
-    if query != "" {
-        for _, product := range products {
-            if strings.Contains(strings.ToLower(product.Name), strings.ToLower(query)) {
-                filteredProducts = append(filteredProducts, product)
-            }
-        }
-    } else {
-        filteredProducts = products
-    }
+	var responseItems []ResponseItem
+	for _, product := range products {
+		if strings.Contains(strings.ToLower(product.ProductName), strings.ToLower(query)) {
+			for _, cat := range product.Category {
+				responseItems = append(responseItems, ResponseItem{
+					ProductID:   product.ProductID,
+					ProductName: product.ProductName,
+					SellerName:  product.SellerName,
+					Category:    cat,
+					Price:       100,
+					Ranking:     product.Rank,
+					Stocks:      product.Stocks,
+					MainURL:     product.MainImage,
+				})
+				break
+			}
+		}
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(filteredProducts)
+	resp := SearchResponse{
+		Items: responseItems,
+		Page:  page,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }
 
 func main() {
-    http.HandleFunc("/search", searchHandler)
-    http.ListenAndServe(":8080", nil)
+	http.HandleFunc("/v1/search", searchHandler)
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		panic(err)
+	}
 }
-
