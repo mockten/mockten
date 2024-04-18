@@ -46,6 +46,16 @@ var (
 		Help: "Total number of response that send from serch-item",
 	})
 
+	addItemReqCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "add_item_req_total",
+		Help: "Total number of requests that have come to add-item",
+	})
+
+	addItemResCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "add_item_res_total",
+		Help: "Total number of response that send from add-item",
+	})
+
 	logger      *zap.Logger
 	meiliclient *meilisearch.Client
 )
@@ -85,6 +95,90 @@ func searchHandler(c *gin.Context) {
 		} else {
 			logger.Error("Value is not of type pb.ResponseResult")
 		}
+	}
+
+	// increment counter
+	searchResCount.Inc()
+
+	c.JSON(http.StatusOK, gin.H{
+		"items": items,
+		"total": page,
+	})
+}
+
+// Implement SearchItemServer using REST API
+func addItemHandler(c *gin.Context) {
+	productName := c.PostForm("product_name") // string
+	sellerName := c.PostForm("seller_name")   // string
+	category := c.PostForm("category")        // number
+	price := c.PostForm("price")              // number
+	stock := c.PostForm("stock")              // number
+	token := c.PostForm("token")              // token
+
+	logger.Debug("Request Add Item log",
+		zap.String("productName", productName),
+		zap.String("sellerName", sellerName),
+		zap.String("category", category),
+		zap.String("price", price),
+		zap.String("stock", stock),
+		zap.String("token", token))
+
+	// increment counter
+	addItemReqCount.Inc()
+
+	if productName == "" {
+		logger.Error("AddItem productName parameter is missing.")
+		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
+		return
+	}
+	if sellerName == "" {
+		logger.Error("AddItem sellerName parameter is missing.")
+		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
+		return
+	}
+	if category == "" {
+		logger.Error("AddItem category parameter is missing.")
+		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
+		return
+	}
+	if price == "" {
+		logger.Error("AddItem price parameter is missing.")
+		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
+		return
+	}
+	if stock == "" {
+		logger.Error("AddItem stock parameter is missing.")
+		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
+		return
+	}
+	if token == "" {
+		logger.Error("AddItem token parameter is missing.")
+		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
+		return
+	}
+
+	mainImage, err := c.FormFile("file") // []byte
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(mainImage) <= 0 {
+		logger.Error("AddItem mainImage parameter is missing.")
+		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
+		return
+	}
+
+	// ファイルをサーバーに保存
+	path := "./uploads/" + file.Filename
+	if err := c.SaveUploadedFile(file, path); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
 	// increment counter
@@ -275,6 +369,7 @@ func main() {
 	// start application
 	router := gin.Default()
 	router.GET("v1/search", searchHandler)
+	router.POST("v1/seller/add", addItemHandler)
 	router.Run(port)
 
 }
