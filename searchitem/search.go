@@ -26,13 +26,18 @@ const (
 )
 
 type Item struct {
-	UserID   int    `json:"user_id"`
-	NickName string `json:"nick_name"`
-	Sex      string `json:"sex"`
-	Title    string `json:"title"`
-	Company  string `json:"company"`
-	Like     int    `json:"like"`
-	ImageURL string `json:"image_url"`
+	ProductId   string    `json:"product_id"`
+	ProductName string    `json:"product_name"`
+	SellerName  string    `json:"seller_name"`
+	Stocks      int       `json:"stocks"`
+	Category    []int     `json:"category"`
+	Rank        int       `json:"rank"`
+	MainImage   string    `json:"main_image"`
+	ImagePath   []string  `json:"image_path"`
+	Summary     string    `json:"summary"`
+	Price       int       `json:"price"`
+	RegistDay   time.Time `json:"regist_day"`
+	LastUpdate  time.Time `json:"last_update"`
 }
 
 var (
@@ -44,16 +49,6 @@ var (
 	searchResCount = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "search_res_total",
 		Help: "Total number of response that send from serch-item",
-	})
-
-	addItemReqCount = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "add_item_req_total",
-		Help: "Total number of requests that have come to add-item",
-	})
-
-	addItemResCount = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "add_item_res_total",
-		Help: "Total number of response that send from add-item",
 	})
 
 	logger      *zap.Logger
@@ -95,90 +90,6 @@ func searchHandler(c *gin.Context) {
 		} else {
 			logger.Error("Value is not of type pb.ResponseResult")
 		}
-	}
-
-	// increment counter
-	searchResCount.Inc()
-
-	c.JSON(http.StatusOK, gin.H{
-		"items": items,
-		"total": page,
-	})
-}
-
-// Implement SearchItemServer using REST API
-func addItemHandler(c *gin.Context) {
-	productName := c.PostForm("product_name") // string
-	sellerName := c.PostForm("seller_name")   // string
-	category := c.PostForm("category")        // number
-	price := c.PostForm("price")              // number
-	stock := c.PostForm("stock")              // number
-	token := c.PostForm("token")              // token
-
-	logger.Debug("Request Add Item log",
-		zap.String("productName", productName),
-		zap.String("sellerName", sellerName),
-		zap.String("category", category),
-		zap.String("price", price),
-		zap.String("stock", stock),
-		zap.String("token", token))
-
-	// increment counter
-	addItemReqCount.Inc()
-
-	if productName == "" {
-		logger.Error("AddItem productName parameter is missing.")
-		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
-		return
-	}
-	if sellerName == "" {
-		logger.Error("AddItem sellerName parameter is missing.")
-		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
-		return
-	}
-	if category == "" {
-		logger.Error("AddItem category parameter is missing.")
-		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
-		return
-	}
-	if price == "" {
-		logger.Error("AddItem price parameter is missing.")
-		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
-		return
-	}
-	if stock == "" {
-		logger.Error("AddItem stock parameter is missing.")
-		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
-		return
-	}
-	if token == "" {
-		logger.Error("AddItem token parameter is missing.")
-		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
-		return
-	}
-
-	mainImage, err := c.FormFile("file") // []byte
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	file, err := c.FormFile("file")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if len(mainImage) <= 0 {
-		logger.Error("AddItem mainImage parameter is missing.")
-		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
-		return
-	}
-
-	// ファイルをサーバーに保存
-	path := "./uploads/" + file.Filename
-	if err := c.SaveUploadedFile(file, path); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
 	}
 
 	// increment counter
@@ -369,7 +280,6 @@ func main() {
 	// start application
 	router := gin.Default()
 	router.GET("v1/search", searchHandler)
-	router.POST("v1/seller/add", addItemHandler)
 	router.Run(port)
 
 }
