@@ -26,13 +26,18 @@ const (
 )
 
 type Item struct {
-	UserID   int    `json:"user_id"`
-	NickName string `json:"nick_name"`
-	Sex      string `json:"sex"`
-	Title    string `json:"title"`
-	Company  string `json:"company"`
-	Like     int    `json:"like"`
-	ImageURL string `json:"image_url"`
+	ProductId   string    `json:"product_id"`
+	ProductName string    `json:"product_name"`
+	SellerName  string    `json:"seller_name"`
+	Stocks      int       `json:"stocks"`
+	Category    []int     `json:"category"`
+	Rank        int       `json:"rank"`
+	MainImage   string    `json:"main_image"`
+	ImagePath   []string  `json:"image_path"`
+	Summary     string    `json:"summary"`
+	Price       int       `json:"price"`
+	RegistDay   time.Time `json:"regist_day"`
+	LastUpdate  time.Time `json:"last_update"`
 }
 
 var (

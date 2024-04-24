@@ -10,6 +10,55 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  build_adder:
+    runs-on: ubuntu-22.04
+    # if: contains(github.event.head_commit.modified, 'adder/')
+    defaults:
+      run:
+        working-directory: adder
+    steps:
+      - uses: actions/checkout@v3
+  
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.21
+
+      - name: Build
+        run: go build -v .
+
+  push_snapshot_container_adder:
+    needs: [build_adder]
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: adder
+    env:
+      MAJOR_VERSION: 0
+      MINOR_VERSION: 0
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    - name: GCP Authenticate
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Setup GCloud
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: Configure docker to use the gcloud cli
+      run: gcloud auth configure-docker --quiet
+
+    - name: Build and push container
+      run: |
+        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/adder:latest"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
   build_ecfront:
     runs-on: ubuntu-22.04
     # if: contains(github.event.head_commit.modified, 'ecfront2/')
