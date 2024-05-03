@@ -16,7 +16,7 @@ interface Product {
 }
 
 interface SearchApiResponse {
-    products: Product[];
+    items: Product[];
     page: number;
 }
 
@@ -28,13 +28,13 @@ function App(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
 
   const sendSearchQuery = async (query: string): Promise<void> => {
-    const apiUrl = process.env.REACT_APP_SEARCH_API;
-    // const apiUrl = 'https://exampl.com/api';
+    // const apiUrl = process.env.REACT_APP_SEARCH_API;
+    const apiUrl = 'http://localhost:8080';
 
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${apiUrl}/endpoint?q=${query}&p=1&t=hoge`, {
+      const response = await fetch(`${apiUrl}/v1/search?q=${query}&p=2&t=hoge`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json'
@@ -45,7 +45,7 @@ function App(): JSX.Element {
           throw new Error('Network response was not ok');
       }
       const data: SearchApiResponse = await response.json();
-      setProducts(data.products);
+      setProducts(data.items);
       setLoading(false);
 
     } catch (error) {
@@ -73,7 +73,7 @@ function App(): JSX.Element {
       {loading && <CircularProgress />}
       {error && <Typography color="error">{error}</Typography>}
       <List>
-          {products.map(product => (
+          {products && products.map(product => (
               <ListItem key={product.product_id}>{product.product_name}</ListItem>
           ))}
       </List>

@@ -34,3 +34,8 @@ export default {
 ```
 $ npm run dev
 ```
+
+## How to use sim
+```
+$ go run sim/sim_searchitem.go
+```
