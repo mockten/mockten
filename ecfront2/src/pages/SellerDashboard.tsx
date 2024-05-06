@@ -28,9 +28,28 @@ const SellerPage = () => {
     setProduct({ ...product, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // APIへのPOSTリクエストの送信処理をここに記述
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const apiUrl = process.env.REACT_APP_ADDITEM_API;
+
+    try {
+      const response = await fetch(`${apiUrl}/v1/seller/add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        body: JSON.stringify(product)
+      });
+
+      if (!response.ok) {
+        throw new Error('Something went wrong');
+      }
+
+      const data = await response.json();
+      console.log(data); // Success handling
+    } catch (error) {
+      console.error(error); // Error handling
+    }
   };
 
   const [imageUpload, setImageUpload] = useState<ImageUploadState>({ file: null, previewUrl: null });
