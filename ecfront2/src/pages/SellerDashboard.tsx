@@ -15,13 +15,13 @@ const SellerPage = () => {
   const [product, setProduct] = useState({
     product_name: '',
     seller_name: '',
-    category: number[],
+    category: [],
     price: 0,
     stocks: 0,
     main_image: '',
     images: ['', ''],
     token: '',
-    file: File | null
+    file: null
   });
   
 
