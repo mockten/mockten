@@ -20,7 +20,8 @@ const SellerPage = () => {
     stocks: 0,
     main_image: '',
     images: ['', ''],
-    token: ''
+    token: '',
+    file: null
   });
   
 
@@ -31,14 +32,21 @@ const SellerPage = () => {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const apiUrl = process.env.REACT_APP_ADDITEM_API;
-
+    const formData = new FormData();
+    formData.append('product_name', product.product_name);
+    formData.append('price', product.price.toString());
+    formData.append('seller_name', product.seller_name);
+    formData.append('stocks', product.stocks.toString());
+    product.category.forEach(cat => {
+      formData.append('category', cat);
+    });
+    if (product.file) {
+      formData.append('file', product.file);
+    }
     try {
       const response = await fetch(`${apiUrl}/v1/seller/add`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
-        body: JSON.stringify(product)
+        body: formData
       });
 
       if (!response.ok) {
@@ -57,7 +65,7 @@ const SellerPage = () => {
   const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
-
+      setProduct(prev => ({ ...prev, file: file }));
       setImageUpload({
         file: file,
         previewUrl: URL.createObjectURL(file),
