@@ -11,8 +11,20 @@ type ImageUploadState = {
     previewUrl: string | null;
 };
 
+type Product = {
+  product_name: string;
+  seller_name: string;
+  category: number[];
+  price: number;
+  stocks: number;
+  main_image: string;
+  images: string[];
+  token: string;
+  file: File | null;
+};
+
 const SellerPage = () => {
-  const [product, setProduct] = useState({
+  const [product, setProduct] = useState<Product>({
     product_name: '',
     seller_name: '',
     category: [],
