@@ -50,7 +50,8 @@ const SellerPage = () => {
     formData.append('seller_name', product.seller_name);
     formData.append('stocks', product.stocks.toString());
     product.category.forEach(cat => {
-      formData.append('category', cat);
+      formData.append('category', cat.toString());
+
     });
     if (product.file) {
       formData.append('file', product.file);
