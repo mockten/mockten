@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent} from 'react';
+import React, { useState, ChangeEvent, useEffect} from 'react';
 import { Button, TextField, Container, Box } from '@mui/material';
 import FormLabel from '@mui/material/FormLabel';
 import FormControl from '@mui/material/FormControl';
@@ -16,11 +16,21 @@ type Product = {
   seller_name: string;
   category: number[];
   price: number;
-  stocks: number;
+  stock: number;
   main_image: string;
   images: string[];
   token: string;
   file: File | null;
+};
+
+const categories = {
+  book: 1,
+  food: 2,
+  music: 3,
+  baby: 4,
+  sports: 5,
+  electronics: 6,
+  game: 7
 };
 
 const SellerPage = () => {
@@ -29,16 +39,37 @@ const SellerPage = () => {
     seller_name: '',
     category: [],
     price: 0,
-    stocks: 0,
+    stock: 0,
     main_image: '',
     images: ['', ''],
     token: '',
     file: null
   });
   
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sellerName = params.get('name'); 
+    if (sellerName) {
+      setProduct(prev => ({ ...prev, seller_name: sellerName }));
+    }
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setProduct({ ...product, [e.target.name]: e.target.value });
+    const { name, value, checked, type } = e.target;  
+    if (type === "checkbox") {
+      const categoryId = categories[name]; 
+      setProduct(prev => ({
+        ...prev,
+        category: checked
+          ? [...prev.category, categoryId]
+          : prev.category.filter(cat => cat !== categoryId)
+      }));
+    } else {
+      setProduct(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -48,7 +79,8 @@ const SellerPage = () => {
     formData.append('product_name', product.product_name);
     formData.append('price', product.price.toString());
     formData.append('seller_name', product.seller_name);
-    formData.append('stocks', product.stocks.toString());
+    formData.append('stock', product.stock.toString());
+    formData.append('token', "test"); //??
     product.category.forEach(cat => {
       formData.append('category', cat.toString());
 
@@ -123,9 +155,9 @@ const SellerPage = () => {
           margin="normal"
           required
           fullWidth
-          id="stocks"
-          label="stocks"
-          name="stocks"
+          id="stock"
+          label="stock"
+          name="stock"
           autoComplete="price"
           autoFocus
           type="number"
@@ -143,7 +175,7 @@ const SellerPage = () => {
             sx={{ m: 3 }}
             variant="standard"
         >
-        <FormLabel component="legend">Can pick three</FormLabel>
+        <FormLabel component="legend">Can pick up to 3</FormLabel>
         <FormGroup>
           <FormControlLabel
             control={
@@ -205,7 +237,6 @@ const SellerPage = () => {
       </label>
       {imageUpload.previewUrl && <img src={imageUpload.previewUrl} alt="Preview" style={{ width: '100%', marginTop: '10px' }} />}
     </div>
-        {/* 他のフィールドも同様に追加 */}
         <Button type="submit" fullWidth variant="contained" sx={{ mt: 3, mb: 2 }}>
           Submit
         </Button>
