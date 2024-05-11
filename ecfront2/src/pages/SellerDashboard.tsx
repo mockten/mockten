@@ -23,7 +23,7 @@ type Product = {
   file: File | null;
 };
 
-const categories = {
+const categories: { [key: string]: number } = {
   book: 1,
   food: 2,
   music: 3,
