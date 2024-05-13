@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
@@ -15,27 +15,21 @@ import AddShoppingCartIcon from './item/AddShoppingCartIcon';
 import PaymentIcon from './item/PaymentIcon';
 import { Button, CardActionArea, CardActions } from '@mui/material';
 
-type ItemSummary = {
-    id: string;
-    name: string;
-    imageUrl: string;
-    favorite: boolean;
-    category: string;
-};
+interface Product {
+  product_id: string;
+  product_name: string;
+  seller_name: string;
+  category: number;
+  price: number;
+  ranking: number;
+  stocks: number;
+  main_url: string;
+}
 
-// Test Data
-const testitems: ItemSummary[] = [
-    { id: '550e8400-e29b-41d4-a716-446655440000', name: 'Sample Item 1', imageUrl: '/images/img1.jpg', favorite: true, category: '四谷物産 課長'},
-    { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Sample Item 2', imageUrl: '/images/img2.jpg', favorite: false, category: 'Yahoo! Japan 第四営業部部長'},
-    { id: '550e8400-e29b-41d4-a716-446655440002', name: 'Sample Item 3', imageUrl: '/images/img3.jpg', favorite: false, category: 'Splunk Service合同会社 CustomerSuccessManager'},
-    { id: '550e8400-e29b-41d4-a716-446655440003', name: 'Sample Item 4', imageUrl: '/images/img4.jpg', favorite: false, category: '東京大学 学生'},
-    { id: '550e8400-e29b-41d4-a716-446655440004', name: 'Sample Item 5', imageUrl: '/images/img5.jpg', favorite: false, category: 'NEC Corporation SI営業部 主任'},
-    { id: '550e8400-e29b-41d4-a716-446655440005', name: 'Sample Item 6', imageUrl: '/images/img6.jpg', favorite: false, category: 'material-Design 主任'},
-    { id: '550e8400-e29b-41d4-a716-446655440006', name: 'Sample Item 7', imageUrl: '/images/img1.jpg', favorite: false, category: 'Splunk Service合同会社 TechnicalSuccess'},
-    { id: '550e8400-e29b-41d4-a716-446655440007', name: 'Sample Item 8', imageUrl: '/images/img1.jpg', favorite: false, category: 'Splunk Service合同会社 TechnicalSuccess'},
-    { id: '550e8400-e29b-41d4-a716-446655440008', name: 'Sample Item 9', imageUrl: '/images/img1.jpg', favorite: false, category: 'Splunk Service合同会社 TechnicalSuccess'},
-    { id: '550e8400-e29b-41d4-a716-446655440009', name: 'Sample Item 10', imageUrl: '/images/img1.jpg', favorite: false, category: 'Splunk Service合同会社 TechnicalSuccess'},
-];
+interface SearchApiResponse {
+  items: Product[];
+  page: number;
+}
 
 type PaymentPopupProps = {
   open: boolean;
@@ -60,20 +54,20 @@ const PaymentPopup: React.FC<PaymentPopupProps> = ({ open, onClose }) => {
 };
 
 function RecommendedItems() {
-    const [items, setItems] = useState<ItemSummary[]>([]);
-    const [, setItem] = useState(null);
+    const [products, setProducts] = useState<Product[]>([]);
     const [isCopied, setIsCopied] = useState(false);
     const [isPaymentPopupOpen, setPaymentPopupOpen] = useState(false);
-    const [page] = useState(1); // ページネーションの現在のページ
+    const [page] = useState(1); // current page of page nation
+    const navigate = useNavigate();
+    // const apiUrl = process.env.REACT_APP_SEARCH_API;
+    const apiUrl = 'http://localhost:8080';
 
     const handleClosePaymentPopup = () => {
       setPaymentPopupOpen(false);
     };
 
-    const handleItemCardClick = () => {
-      fetch(`/item/001`)
-        .then((response) => response.json())
-        .then((item) => setItem(item));
+    const handleItemCardClick = (item_id: string) => {
+      navigate(`/item/${item_id}`);
     };
 
     const handleShareButtonClick = () => {
@@ -85,14 +79,18 @@ function RecommendedItems() {
     useEffect(() => {
       const fetchData = async () => {
         try {
-          const response = await axios.post('/service/recousers/', {
-            page: page,
+          // const response = await axios.get('/v1/recommend?category=0');
+          // actually we have to use recommend API. but this is for test. 
+          const response = await fetch(`${apiUrl}/v1/search?q=product&p=1&t=hoge`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
           });
-          setItems(response.data);
+          const data: SearchApiResponse = await response.json();
+          setProducts(data.items);
         } catch (error) {
           console.error('Error fetching recommended users:', error);
-          // debug for local environment
-          setItems(testitems);
         }
       };
   
@@ -103,21 +101,21 @@ function RecommendedItems() {
     return (
       <>
         <Grid container spacing={3}>
-            {items.map((item) => (
-                <Grid item xs={12} sm={6} md={4} key={item.id}>
+            {products.map((product) => (
+                <Grid item xs={12} sm={6} md={4} key={product.product_id}>
                   <Card>
-                    <CardActionArea onClick={handleItemCardClick}>
+                    <CardActionArea onClick={() => handleItemCardClick(product.product_id)}>
                       <CardMedia
                       component="img"
                       height="200"
-                      image={item.imageUrl}
-                      alt={item.name}
+                      image={product.main_url}
+                      alt={product.product_name}
                       />
                       <CardContent>
                         <Typography variant="h6" component="div" color="text.secondary">
-                            {item.name}
+                            {product.product_name}
                             <br></br>
-                            {item.favorite}
+                            {product.price} ¥
                         </Typography>
                       </CardContent>
                     </CardActionArea>
