@@ -57,19 +57,35 @@ var (
 	bucket     *storage.BucketHandle
 )
 
+func CORSMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		c.Next()
+	}
+}
+
 // Implement SearchItemServer using REST API
 func addItemHandler(c *gin.Context) {
 	productName := c.PostForm("product_name") // string
 	sellerName := c.PostForm("seller_name")   // string
-	category := c.PostForm("category")        // number
-	price := c.PostForm("price")              // number
-	stock := c.PostForm("stock")              // number
-	token := c.PostForm("token")              // token
+	category := c.PostFormArray("category")
+	price := c.PostForm("price") // number
+	stock := c.PostForm("stock") // number
+	token := c.PostForm("token") // token
 
 	logger.Debug("Request Add Item log",
 		zap.String("productName", productName),
 		zap.String("sellerName", sellerName),
-		zap.String("category", category),
+		zap.Strings("category", category),
 		zap.String("price", price),
 		zap.String("stock", stock),
 		zap.String("token", token))
@@ -87,7 +103,7 @@ func addItemHandler(c *gin.Context) {
 		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
 		return
 	}
-	if category == "" {
+	if len(category) == 0 {
 		logger.Error("AddItem category parameter is missing.")
 		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
 		return
@@ -137,11 +153,15 @@ func addItemHandler(c *gin.Context) {
 		logger.Error("convert error with stock value:", zap.Error(err))
 		return
 	}
-
-	numCategory, err := strconv.Atoi(category)
-	if err != nil {
-		logger.Error("convert error with category value:", zap.Error(err))
-		return
+	var categoryIDs []int
+	for _, cat := range category {
+		id, err := strconv.Atoi(cat)
+		if err != nil {
+			logger.Error("Convert error with category value", zap.String("category", cat), zap.Error(err))
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category ID"})
+			return
+		}
+		categoryIDs = append(categoryIDs, id)
 	}
 
 	numPrice, err := strconv.Atoi(price)
@@ -154,7 +174,7 @@ func addItemHandler(c *gin.Context) {
 		ProductName: productName,
 		SellerName:  sellerName,
 		Stocks:      numStock,
-		Category:    []int{numCategory},
+		Category:    categoryIDs,
 		Rank:        99999,
 		MainImage:   gcsFilePath,
 		Summary:     "test item",
@@ -181,14 +201,11 @@ func FileHeaderToReader(fh *multipart.FileHeader) (io.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	// 関数の終了時にファイルを閉じる
 	defer file.Close()
-	// ファイルを io.Reader に変換して返す
 	return file, nil
 }
 
 func main() {
-	// set-up logging environment using zap
 	var err error
 
 	environment := os.Getenv("MOCKTEN_ENV")
@@ -280,6 +297,7 @@ func main() {
 
 	// start application
 	router := gin.Default()
+	router.Use(CORSMiddleware())
 	router.POST("v1/seller/add", addItemHandler)
 	router.Run(port)
 
