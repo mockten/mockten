@@ -1,38 +1,35 @@
 import * as React from 'react';
+import { useNavigate } from 'react-router-dom';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import Badge from '@mui/material/Badge';
+import Grid from '@mui/material/Grid';
+import Container from '@mui/material/Container';
 import MenuItem from '@mui/material/MenuItem';
 import Menu from '@mui/material/Menu';
-import MenuIcon from '@mui/icons-material/Menu';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import AccountCircle from '@mui/icons-material/AccountCircle';
-import NotificationsIcon from '@mui/icons-material/Notifications';
 import MoreIcon from '@mui/icons-material/MoreVert';
 import AppbarTuneIcon from './AppbarTuneIcon';
 import AppbarSearchBox from './AppbarSearchBox';
 import AppbarShoppingCartIcon from './AppbarShoppingCartIcon';
+import AppbarUserIcon from './AppbarUserIcon';
+import AppbarFavoriteIcon from './AppbarFavoriteIcon';
+import AppbarNotificationIcon from './AppbarNotificationIcon';
+
 
 export default function PrimarySearchAppBar() {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [mobileMoreAnchorEl, setMobileMoreAnchorEl] =
     React.useState<null | HTMLElement>(null);
+  const navigate = useNavigate();
 
   const isMenuOpen = Boolean(anchorEl);
   const isMobileMenuOpen = Boolean(mobileMoreAnchorEl);
 
-  const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
+  const handleClickMockten = () => {
+    navigate('/');
   };
-
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
-
-
 
   const handleMobileMenuClose = () => {
     setMobileMoreAnchorEl(null);
@@ -85,11 +82,7 @@ export default function PrimarySearchAppBar() {
       onClose={handleMobileMenuClose}
     >
       <MenuItem>
-        <IconButton size="large" aria-label="show 7 new favorits" color="inherit">
-          <Badge badgeContent={7} color="error">
-            <FavoriteIcon />
-          </Badge>
-        </IconButton>
+        <AppbarFavoriteIcon />
         <p>Favorites</p>
       </MenuItem>
       <MenuItem>
@@ -97,27 +90,11 @@ export default function PrimarySearchAppBar() {
         <p>Cart</p>
       </MenuItem>
       <MenuItem>
-        <IconButton
-          size="large"
-          aria-label="show 17 new notifications"
-          color="inherit"
-        >
-          <Badge badgeContent={17} color="error">
-            <NotificationsIcon />
-          </Badge>
-        </IconButton>
+        <AppbarNotificationIcon />
         <p>Notifications</p>
       </MenuItem>
-      <MenuItem onClick={handleProfileMenuOpen}>
-        <IconButton
-          size="large"
-          aria-label="account of current user"
-          aria-controls="primary-search-account-menu"
-          aria-haspopup="true"
-          color="inherit"
-        >
-          <AccountCircle />
-        </IconButton>
+      <MenuItem>
+        <AppbarUserIcon />
         <p>Profile</p>
       </MenuItem>
     </Menu>
@@ -127,73 +104,24 @@ export default function PrimarySearchAppBar() {
     <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static">
         <Toolbar>
-          <IconButton
-            size="large"
-            edge="start"
-            color="inherit"
-            aria-label="open drawer"
-            onClick={handleMobileMenuOpen}
-            sx={{ mr: 2 }}
-          >
-            <MenuIcon />             
-          </IconButton>
-          <Typography
-            variant="h4"
-            noWrap
-            component="div"
-            sx={{ display: { xs: 'none', sm: 'block' } }}
-          >
-            mockten
-          </Typography>
+            <Typography
+              variant="h4"
+              noWrap
+              component="div"
+              sx={{ display: { xs: 'none', sm: 'block' } }}
+              onClick={handleClickMockten}
+            >
+              mockten
+            </Typography>
           <AppbarSearchBox />
           <AppbarTuneIcon />
           <Box sx={{ flexGrow: 1 }} />
           <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
-            <IconButton size="large" aria-label="show 7 new favorites" color="inherit">
-              <Badge badgeContent={7} color="error">
-                <FavoriteIcon />
-              </Badge>
-            </IconButton>
+            <AppbarFavoriteIcon />
             <AppbarShoppingCartIcon />
-            <IconButton
-              size="large"
-              aria-label="show 17 new notifications"
-              color="inherit"
-            >
-              <Badge badgeContent={17} color="error">
-                <NotificationsIcon />
-              </Badge>
-            </IconButton>
-            <IconButton
-              size="large"
-              edge="end"
-              aria-label="account of current user"
-              aria-controls={menuId}
-              aria-haspopup="true"
-              onClick={handleProfileMenuOpen}
-              color="inherit"
-            >
-              <AccountCircle />
-            </IconButton>
-            <Menu
-                id="menu-appbar"
-                anchorEl={anchorEl}
-                anchorOrigin={{
-                  vertical: 'top',
-                  horizontal: 'right',
-                }}
-                keepMounted
-                transformOrigin={{
-                  vertical: 'top',
-                  horizontal: 'right',
-                }}
-                open={Boolean(anchorEl)}
-                onClose={handleClose}
-              >
-              <MenuItem onClick={handleClose}>Profile</MenuItem>
-              <MenuItem onClick={handleClose}>My account</MenuItem>
-            </Menu>
+            <AppbarNotificationIcon />
           </Box>
+          <AppbarUserIcon />
           <Box sx={{ display: { xs: 'flex', md: 'none' } }}>
             <IconButton
               size="large"
