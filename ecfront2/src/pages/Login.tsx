@@ -1,4 +1,5 @@
 import React, { useState, FormEvent } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 const LoginPage: React.FC = () => {
@@ -8,32 +9,40 @@ const LoginPage: React.FC = () => {
     const [sellerpassword, setSellerPassword] = useState('');
     const navigate = useNavigate();
 
-    const handleSubmitUser = (e: FormEvent) => {
+    const handleLogin = async (e: FormEvent, isSeller: boolean) => {
         e.preventDefault();
-        
-        if (username && password) {
-            navigate('/d');
-        } else {
-            // ログイン失敗の処理をここに書く
-            alert('Invalid username or password');
-        }
-    };
+        const clientId = 'mockten-react-client'; 
+        const clientSecret = 'mockten-client-secret';
+        const realm = 'mockten-realm-dev';
+        const url = `http://localhost:8080/realms/${realm}/protocol/openid-connect/token`;
 
-    const handleSubmitSeller = (e: FormEvent) => {
-        e.preventDefault();
-        
-        if (sellername && sellerpassword) {
-            navigate(`/seller?name=${encodeURIComponent(sellername)}`);
-        } else {
-            // ログイン失敗の処理をここに書く
-            alert('Invalid sellername or password');
+        try {
+            const response = await axios.post(url, new URLSearchParams({
+                grant_type: 'password',
+                client_id: clientId,
+                client_secret: clientSecret,
+                username: isSeller ? sellername : username,
+                password: isSeller ? sellerpassword : password,
+            }));
+
+            const token = response.data.access_token;
+            console.log('Token:', token);
+
+            if (isSeller) {
+                navigate(`/seller?name=${encodeURIComponent(sellername)}`, { state: { token } });
+            } else {
+                navigate('/d', { state: { token } });
+            }
+        } catch (error) {
+            console.error('Login failed:', error);
+            alert('Invalid username or password');
         }
     };
 
     return (
         <div className="login-page">
             <h2>User Login</h2>
-            <form onSubmit={handleSubmitUser}>
+            <form onSubmit={(e) => handleLogin(e, false)}>
                 <div className="form-group">
                     <label htmlFor="username">Username:</label>
                     <input
@@ -56,9 +65,9 @@ const LoginPage: React.FC = () => {
             </form>
             <h2>Seller Login</h2>
             <h4>If you want to display your products</h4>
-            <form onSubmit={handleSubmitSeller}>
+            <form onSubmit={(e) => handleLogin(e, true)}>
                 <div className="form-group">
-                    <label htmlFor="username">SellerName:</label>
+                    <label htmlFor="sellername">SellerName:</label>
                     <input
                         type="text"
                         id="sellername"
@@ -67,7 +76,7 @@ const LoginPage: React.FC = () => {
                     />
                 </div>
                 <div className="form-group">
-                    <label htmlFor="password">Password:</label>
+                    <label htmlFor="sellerpassword">Password:</label>
                     <input
                         type="password"
                         id="sellerpassword"
