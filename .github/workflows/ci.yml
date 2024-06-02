@@ -59,7 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
   
-      - name: Set up NodeJS
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '16.x'
@@ -83,25 +83,15 @@ jobs:
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
+    
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/ecfront:latest"
+        export IMAGE_TAG="ghcr.io/${{ github.repository }}/ecfront:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
-
 
   build_ecpay:
     runs-on: ubuntu-22.04
