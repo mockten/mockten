@@ -1,0 +1,32 @@
+{
+  "realm": "mockten-realm-dev",
+  "enabled": true,
+  "clients": [
+    {
+      "clientId": "mockten-react-client",
+      "enabled": true,
+      "secret": "mockten-client-secret",
+      "redirectUris": ["http://localhost:5173/*"],
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "directAccessGrantsEnabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "customer",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "customer@example.com",
+      "firstName": "Customer",
+      "lastName": "A",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "customer"
+        }
+      ]
+    }
+  ]
+}
+

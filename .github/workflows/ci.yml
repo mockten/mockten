@@ -40,22 +40,13 @@ jobs:
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
+    
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/adder:latest"
+        export IMAGE_TAG="ghcr.io/${{ github.repository }}/adder:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -68,7 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
   
-      - name: Set up Go
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '16.x'
@@ -92,25 +83,15 @@ jobs:
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
+    
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/ecfront:latest"
+        export IMAGE_TAG="ghcr.io/${{ github.repository }}/ecfront:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
-
 
   build_ecpay:
     runs-on: ubuntu-22.04
@@ -129,10 +110,6 @@ jobs:
     - name: Build
       run: go build -v .
 
-    # - name: Test
-    #  run: go test -v .
-
-
   push_snapshot_container_ecpay:
     needs: [build_ecpay]
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
@@ -146,45 +123,13 @@ jobs:
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+    
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
-
-    # - name: Get latest version
-    #   id: get-latest-version
-    #   run: |
-    #     export LATEST_VERSION=$(gcloud container images list-tags gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay --format='get(tags)' --limit=1)
-    #     echo "::set-output name=latest_version::$LATEST_VERSION"
-
-    # - name: Increment patch version
-    #   id: increment-patch-version
-    #   run: |
-    #     version=${{ steps.get-latest-version.outputs.latest_version }}
-    #     if [ -z "$version" ]; then
-    #       echo "Error: No version number provided."
-    #       exit 1
-    #     fi
-    #     patch_version_exist=$(echo $version | awk -F. '{print $NF}')
-    #     export PATCH_VERSION=$(($patch_version_exist + 1))
-    #     echo "::set-output name=patch_version::$PATCH_VERSION"
-
-    # - name: Build and push container
-    #   run: |
-    #     export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/ecpay:v$MAJOR_VERSION.$MINOR_VERSION.${{ steps.increment-patch-version.outputs.patch_version }}"
-    #     docker build -t $IMAGE_TAG .
-    #     docker push $IMAGE_TAG
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/ecpay:latest"
+        export IMAGE_TAG="ghcr.io/${{ github.repository }}/ecpay:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -206,13 +151,9 @@ jobs:
     - name: Build
       run: go build -v .
 
-    # - name: Test
-    #  run: go test -v .
-
-
   push_snapshot_container_notification:
     needs: [build_notification]
-    if: ${{ github.event_name == 'push'  || github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
     defaults:
       run:
@@ -223,22 +164,13 @@ jobs:
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
+    
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/notification:latest"
+        export IMAGE_TAG="ghcr.io/${{ github.repository }}/notification:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -264,7 +196,7 @@ jobs:
 
   push_snapshot_container_payexecution:
     needs: [build_payexecution]
-    if: ${{ github.event_name == 'push'  || github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
     defaults:
       run:
@@ -275,22 +207,13 @@ jobs:
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
+    
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/payexecution:latest"
+        export IMAGE_TAG="ghcr.io/${{ github.repository }}/payexecution:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -311,9 +234,6 @@ jobs:
     - name: Build
       run: go build -v .
 
-    # - name: Test
-    #  run: go test -v .
-
   push_snapshot_container_ranking:
     needs: [build_ranking]
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
@@ -328,28 +248,19 @@ jobs:
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
+    
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/ranking:latest"
+        export IMAGE_TAG="ghcr.io/${{ github.repository }}/ranking:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
 
   build_searchitem:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     # if: contains(github.event.head_commit.modified, 'searchitem/')
     defaults:
       run:
@@ -365,9 +276,6 @@ jobs:
     - name: Build
       run: go build -v .
 
-    # - name: Test
-    #  run: go test -v .
-
   push_snapshot_container_searchitem:
     needs: [build_searchitem]
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
@@ -381,22 +289,13 @@ jobs:
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
+    
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/searchitem:latest"
+        export IMAGE_TAG="ghcr.io/${{ github.repository }}/searchitem:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -412,21 +311,34 @@ jobs:
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v1
-    - name: GCP Authenticate
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-    - name: Setup GCloud
-      uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        version: '>= 363.0.0'
-
-    - name: Configure docker to use the gcloud cli
-      run: gcloud auth configure-docker --quiet
+    
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="gcr.io/${{ secrets.GCP_PROJECT_ID }}/mockten/mongodb:latest"
+        export IMAGE_TAG="ghcr.io/${{ github.repository }}/mongodb:latest"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
+  push_snapshot_container_uam:
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: uam
+    env:
+      MAJOR_VERSION: 0
+      MINOR_VERSION: 0
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+    
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+    - name: Build and push container
+      run: |
+        export IMAGE_TAG="ghcr.io/${{ github.repository }}/uam:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
