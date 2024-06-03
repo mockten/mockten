@@ -321,12 +321,12 @@ jobs:
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
-  push_snapshot_container_auth:
+  push_snapshot_container_uam:
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
     defaults:
       run:
-        working-directory: auth
+        working-directory: uam
     env:
       MAJOR_VERSION: 0
       MINOR_VERSION: 0
@@ -339,6 +339,6 @@ jobs:
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository }}/auth:latest"
+        export IMAGE_TAG="ghcr.io/${{ github.repository }}/uam:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
