@@ -10,6 +10,8 @@ import SellerLogin from './pages/SellerLogin';
 import MyCartList from './pages/MyCartList';
 import MyFavoriteList from './pages/MyFavoriteList';
 import AdminLogin from './pages/AdminLogin';
+import AdminCreateUser from './pages/AdminCreateUser';
+import AdminCreateSeller from './pages/AdminCreateSeller';
 import Admin from './pages/Admin';
 
 
@@ -29,6 +31,8 @@ const App: React.FC = () => {
         <Route path="/cart/list" element={<MyCartList />} />
         <Route path="/fav/list" element={<MyFavoriteList />} />
         <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/user/create" element={<AdminCreateUser />} />
+        <Route path="/admin/seller/create" element={<AdminCreateSeller />} />
         <Route path="/admin/" element={<Admin />} />
       </Routes>
     </Router>

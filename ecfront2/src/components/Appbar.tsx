@@ -5,8 +5,6 @@ import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import Grid from '@mui/material/Grid';
-import Container from '@mui/material/Container';
 import MenuItem from '@mui/material/MenuItem';
 import Menu from '@mui/material/Menu';
 import MoreIcon from '@mui/icons-material/MoreVert';
@@ -110,6 +108,7 @@ export default function PrimarySearchAppBar() {
               component="div"
               sx={{ display: { xs: 'none', sm: 'block' } }}
               onClick={handleClickMockten}
+              style={{ cursor: 'pointer' }}
             >
               mockten
             </Typography>

@@ -18,7 +18,15 @@ const AdminLoginPage: React.FC = () => {
     };
 
     const handleEditSellerBottun = () => {
-        navigate('/admin/seller/edit');
+      navigate('/admin/seller/edit');
+    };
+
+    const handleDeleteUserBottun = () => {
+        navigate('/admin/user/delete');
+    };
+
+    const handleDeleteSellerBottun = () => {
+      navigate('/admin/seller/delete');
     };
 
     return (
@@ -27,12 +35,12 @@ const AdminLoginPage: React.FC = () => {
         <Grid container direction="column" spacing={2}>
           <Grid item >
             <Button onClick={handleCreateUserBottun} fullWidth variant="contained" color="primary">
-              Create User Account
+              Create Customer Account
             </Button>
           </Grid>
           <Grid item>
             <Button onClick={handleEditUserBottun} fullWidth variant="contained" color="primary">
-              Edit User Account
+              Edit Customer Account
             </Button>
           </Grid>
           <Grid item>
@@ -43,6 +51,16 @@ const AdminLoginPage: React.FC = () => {
           <Grid item>
             <Button onClick={handleEditSellerBottun} fullWidth variant="contained" color="success">
               Edit Seller Account
+            </Button>
+          </Grid>
+          <Grid item>
+            <Button onClick={handleDeleteUserBottun} fullWidth variant="contained" color="error">
+              Delete Seller Account
+            </Button>
+          </Grid>
+          <Grid item>
+            <Button onClick={handleDeleteSellerBottun} fullWidth variant="contained" color="error">
+              Delete Customer Account
             </Button>
           </Grid>
         </Grid>
