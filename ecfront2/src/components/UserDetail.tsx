@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 type UserDetail = {
-    user_id: number;
+    user_id: string;
     user_name: string;
     mail_address1: string;
     mail_address2: string;
@@ -19,8 +19,12 @@ type UserDetail = {
     birth_day: string;
 };
 
+interface ApiRequest {
+  user_id: string;
+}
+
 interface UserDetailProps {
-    user_id: number;
+    user_id: string;
     user_name: string;
     mail_address1: string;
     mail_address2: string;
@@ -38,7 +42,7 @@ interface UserDetailProps {
     birth_day: string;
 }
 
-const UserDetail: React.FC<UserDetailProps> = ({ user_id }) => {
+const UserDetail: React.FC<ApiRequest> = ({ user_id }) => {
     const [userDetails, setUserDetails] = useState<UserDetail | null>(null);
     // const apiUrl = process.env.REACT_APP_SEARCH_API;
     const apiUrl = 'http://localhost:8080';

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Box, Container, TextField, Button, IconButton, InputAdornment, Grid, Typography } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import bcrypt from 'bcryptjs';
 
 const AdminLoginPage: React.FC = () => {
     const navigate = useNavigate();
@@ -33,10 +32,6 @@ const AdminLoginPage: React.FC = () => {
         const apiUrl = 'http://localhost:8080';
 
         try {
-          const salt = await bcrypt.genSalt(10);
-          const hashedPassword = await bcrypt.hash(admin.password, salt);
-
-          admin.password = hashedPassword;
 
           console.log(admin); // Success handling
           const response = await fetch(`${apiUrl}/v1/admin/login`, {
