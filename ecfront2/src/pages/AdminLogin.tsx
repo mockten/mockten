@@ -28,8 +28,8 @@ const AdminLoginPage: React.FC = () => {
     const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        // const apiUrl = process.env.REACT_APP_ADMIN_API;
-        const apiUrl = 'http://localhost:8080';
+        const apiUrl = process.env.REACT_APP_ADMIN_API;
+        // const apiUrl = 'http://localhost:8080';
 
         try {
 
