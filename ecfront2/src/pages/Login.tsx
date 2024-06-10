@@ -23,19 +23,51 @@ const LoginPage: React.FC = () => {
                 client_secret: clientSecret,
                 username: isSeller ? sellername : username,
                 password: isSeller ? sellerpassword : password,
+                scope: 'openid profile'
             }));
 
             const token = response.data.access_token;
             console.log('Token:', token);
 
-            if (isSeller) {
-                navigate(`/seller?name=${encodeURIComponent(sellername)}`, { state: { token } });
-            } else {
-                navigate('/d', { state: { token } });
+            try {
+                const userInfoResponse = await axios.get(
+                    `http://localhost:8080/realms/${realm}/protocol/openid-connect/userinfo`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                );
+
+                console.log('UserInfo Response:', userInfoResponse);
+                const userInfo = userInfoResponse.data;
+                console.log('User Info:', userInfo);
+                console.log('Status Code:', userInfoResponse.status);
+                const roles = userInfo.roles || [];
+                console.log('Roles:', roles);
+
+                if (isSeller && !roles.includes('seller')) {
+                    throw new Error('You are not authorized as a seller');
+                }
+
+                if (isSeller) {
+                    navigate(`/seller?name=${encodeURIComponent(sellername)}`, { state: { token } });
+                } else {
+                    navigate('/d', { state: { token } });
+                }
+            } catch (userInfoError) {
+                if (userInfoError.response) {
+                    console.error('Failed to fetch user info:', userInfoError.response.data);
+                    console.error('Status Code:', userInfoError.response.status);
+                } else {
+                    console.error('Failed to fetch user info:', userInfoError.message);
+                }
+                alert('Failed to fetch user info');
             }
+
         } catch (error) {
             console.error('Login failed:', error);
-            alert('Invalid username or password');
+            alert(`Login failed: ${error.message}`);
         }
     };
 
