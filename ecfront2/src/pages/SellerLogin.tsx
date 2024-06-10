@@ -50,7 +50,7 @@ const SellerLogin: React.FC = () => {
                     throw new Error('You are not authorized as a seller');
                 }
 
-                navigate(`/seller?name=${encodeURIComponent(sellername)}`, { state: { token } });
+                navigate(`/seller?name=${encodeURIComponent(sellerID)}`, { state: { token } });
             } catch (userInfoError) {
                 if (axios.isAxiosError(userInfoError)) {
                     console.error('Login failed:', userInfoError.response?.data);
