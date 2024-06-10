@@ -63,7 +63,7 @@ const LoginPage: React.FC = () => {
                 } else {
                     console.error('Login failed:', userInfoError);
                 }
-                alert(`Login failed: ${userInfoError instanceof Error ? userInfoError.message : 'unauthorized error'}`);
+                alert(`Login failed: ${userInfoError instanceof Error ? userInfoError.message : 'Unauthorized error'}`);
             }
 
         } catch (error) {
