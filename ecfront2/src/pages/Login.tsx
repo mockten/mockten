@@ -43,6 +43,7 @@ const LoginPage: React.FC = () => {
                 const userInfo = userInfoResponse.data;
                 console.log('User Info:', userInfo);
                 console.log('Status Code:', userInfoResponse.status);
+
                 const roles = userInfo.roles || [];
                 console.log('Roles:', roles);
 
@@ -56,18 +57,22 @@ const LoginPage: React.FC = () => {
                     navigate('/d', { state: { token } });
                 }
             } catch (userInfoError) {
-                if (userInfoError.response) {
-                    console.error('Failed to fetch user info:', userInfoError.response.data);
-                    console.error('Status Code:', userInfoError.response.status);
+                if (axios.isAxiosError(userInfoError)) {
+                    console.error('Login failed:', userInfoError.response?.data);
+                    console.error('Status Code:', userInfoError.response?.status);
                 } else {
-                    console.error('Failed to fetch user info:', userInfoError.message);
+                    console.error('Login failed:', userInfoError);
                 }
-                alert('Failed to fetch user info');
+                alert(`Login failed: ${userInfoError instanceof Error ? userInfoError.message : 'unauthorized error'}`);
             }
 
         } catch (error) {
-            console.error('Login failed:', error);
-            alert(`Login failed: ${error.message}`);
+            if (axios.isAxiosError(error)) {
+                console.error('Login failed:', error.response?.data);
+            } else {
+                console.error('Login failed:', error);
+            }
+            alert(`Login failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     };
 
