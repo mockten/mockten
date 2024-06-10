@@ -46,15 +46,8 @@ const LoginPage: React.FC = () => {
                 const roles = userInfo.roles || [];
                 console.log('Roles:', roles);
 
-                if (isSeller && !roles.includes('seller')) {
-                    throw new Error('You are not authorized as a seller');
-                }
-
-                if (isSeller) {
-                    navigate(`/seller?name=${encodeURIComponent(sellername)}`, { state: { token } });
-                } else {
-                    navigate('/d', { state: { token } });
-                }
+                navigate('/d', { state: { token } });
+                
             } catch (userInfoError) {
                 if (axios.isAxiosError(userInfoError)) {
                     console.error('Login failed:', userInfoError.response?.data);

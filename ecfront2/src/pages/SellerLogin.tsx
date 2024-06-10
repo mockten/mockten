@@ -1,4 +1,5 @@
 import React, { useState, FormEvent } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Container, TextField, Button, Grid, Typography } from '@mui/material';
 
@@ -7,12 +8,66 @@ const SellerLogin: React.FC = () => {
     const [sellerpassword, setSellerPassword] = useState('');
     const navigate = useNavigate();
 
-    const handleLogin = (e: FormEvent) => {
+    const handleLogin = async (e: FormEvent ) => {
         e.preventDefault();
-        if (sellerID && sellerpassword) {
-            navigate(`/seller?name=${encodeURIComponent(sellerID)}`);
-        } else {
-            alert('Invalid sellername or password');
+        const clientId = 'mockten-react-client'; 
+        const clientSecret = 'mockten-client-secret';
+        const realm = 'mockten-realm-dev';
+        const url = `http://localhost:8080/realms/${realm}/protocol/openid-connect/token`;
+
+        try {
+            const response = await axios.post(url, new URLSearchParams({
+                grant_type: 'password',
+                client_id: clientId,
+                client_secret: clientSecret,
+                username: sellerID,
+                password: sellerpassword,
+                scope: 'openid profile'
+            }));
+
+            const token = response.data.access_token;
+            console.log('Token:', token);
+
+            try {
+                const userInfoResponse = await axios.get(
+                    `http://localhost:8080/realms/${realm}/protocol/openid-connect/userinfo`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                );
+
+                console.log('UserInfo Response:', userInfoResponse);
+                const userInfo = userInfoResponse.data;
+                console.log('User Info:', userInfo);
+                console.log('Status Code:', userInfoResponse.status);
+
+                const roles = userInfo.roles || [];
+                console.log('Roles:', roles);
+
+                if (!roles.includes('seller')) {
+                    throw new Error('You are not authorized as a seller');
+                }
+
+                navigate(`/seller?name=${encodeURIComponent(sellername)}`, { state: { token } });
+            } catch (userInfoError) {
+                if (axios.isAxiosError(userInfoError)) {
+                    console.error('Login failed:', userInfoError.response?.data);
+                    console.error('Status Code:', userInfoError.response?.status);
+                } else {
+                    console.error('Login failed:', userInfoError);
+                }
+                alert(`Login failed: ${userInfoError instanceof Error ? userInfoError.message : 'Unauthorized error'}`);
+            }
+
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                console.error('Login failed:', error.response?.data);
+            } else {
+                console.error('Login failed:', error);
+            }
+            alert(`Login failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     };
 
