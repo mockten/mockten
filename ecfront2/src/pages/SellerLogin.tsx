@@ -13,9 +13,7 @@ const SellerLogin: React.FC = () => {
         const clientId = 'mockten-react-client'; 
         const clientSecret = 'mockten-client-secret';
         const realm = 'mockten-realm-dev';
-        const uam_app_token_api= process.env.UAM_APP_TOKEN_API;
-        const uam_app_userinfo_api= process.env.UAM_APP_USEFINFO_API;
-        const url = `http://${uam_app_token_api}/realms/${realm}/protocol/openid-connect/token`;
+        const url = `http://localhost:8080/realms/${realm}/protocol/openid-connect/token`;
 
         try {
             const response = await axios.post(url, new URLSearchParams({
@@ -32,7 +30,7 @@ const SellerLogin: React.FC = () => {
 
             try {
                 const userInfoResponse = await axios.get(
-                  `http://${uam_app_userinfo_api}/realms/${realm}/protocol/openid-connect/userinfo`,
+                    `http://localhost:8080/realms/${realm}/protocol/openid-connect/userinfo`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`,

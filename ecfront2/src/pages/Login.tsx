@@ -30,7 +30,7 @@ const LoginPage: React.FC = () => {
 
             try {
                 const userInfoResponse = await axios.get(
-                  `http://localhost:8080/realms/${realm}/protocol/openid-connect/userinfo`,
+                    `http://localhost:8080/realms/${realm}/protocol/openid-connect/userinfo`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`,
