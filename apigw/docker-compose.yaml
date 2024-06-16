@@ -40,6 +40,18 @@ services:
       sleep 10 &&
       wget --method=POST --body-data='name=keycloak&host=host.docker.internal&port=8080&protocol=http' http://localhost:8001/services/ &&
       wget --method=POST --body-data='paths[]=/realms/mockten-realm-dev/protocol/openid-connect&strip_path=false' http://localhost:8001/services/keycloak/routes &&
+      wget --method=POST --body-data='paths[]=/api/uam&strip_path=false' http://localhost:8001/services/keycloak/routes &&
+      wget --method=POST --header='Content-Type: application/json' --body-data='{
+        \"name\": \"cors\",
+        \"config\": {
+          \"origins\": [\"http://localhost:5173\"],
+          \"methods\": [\"GET\", \"POST\", \"PUT\", \"DELETE\"],
+          \"headers\": [\"Authorization\", \"Content-Type\", \"Accept\"],
+          \"exposed_headers\": [\"Authorization\", \"Content-Length\", \"Accept\"],
+          \"credentials\": true,
+          \"max_age\": 3600
+        }
+      }' http://localhost:8001/services/keycloak/plugins -O - &&
       tail -f /dev/null
     "]
 
