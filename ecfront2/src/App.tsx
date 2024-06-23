@@ -1,21 +1,39 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
-import FirstPage from './pages/FirstPage';
+import SearchResultDashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import UserDetail from './pages/UserDetail';
+import ItemDetail from './pages/ItemDetail';
 import SellerDashboard from './pages/SellerDashboard';
+import SellerLogin from './pages/SellerLogin';
+import MyCartList from './pages/MyCartList';
+import MyFavoriteList from './pages/MyFavoriteList';
+import AdminLogin from './pages/AdminLogin';
+import AdminCreateUser from './pages/AdminCreateUser';
+import AdminCreateSeller from './pages/AdminCreateSeller';
+import Admin from './pages/Admin';
+
+
 import './App.css';
 
 const App: React.FC = () => {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<FirstPage />} />
-        <Route path="/d" element={<Dashboard />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/seller" element={<SellerDashboard />} />
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/search" element={<SearchResultDashboard />} />
+        <Route path="/user/login" element={<Login />} />
         <Route path="/user/:id" element={<UserDetail />} />
+        <Route path="/seller/login" element={<SellerLogin />} />
+        <Route path="/seller/:id" element={<SellerDashboard />} />
+        <Route path="/item/:id" element={<ItemDetail />} />
+        <Route path="/cart/list" element={<MyCartList />} />
+        <Route path="/fav/list" element={<MyFavoriteList />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/user/create" element={<AdminCreateUser />} />
+        <Route path="/admin/seller/create" element={<AdminCreateSeller />} />
+        <Route path="/admin/" element={<Admin />} />
       </Routes>
     </Router>
   );

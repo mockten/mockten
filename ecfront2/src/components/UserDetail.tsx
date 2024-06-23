@@ -1,40 +1,70 @@
 import React, { useEffect, useState } from 'react';
 
-// ユーザーの詳細情報を保持する型
-type UserDetails = {
-    id: number;
-    name: string;
-    photoUrl: string;
-    bio: string;
-    // 他の必要なフィールド...
+type UserDetail = {
+    user_id: string;
+    user_name: string;
+    mail_address1: string;
+    mail_address2: string;
+    phone_num1: string;
+    phone_num2: string;
+    phone_num3: string;
+    address1: string;
+    address2: string;
+    address3: string;
+    post_code: string;
+    pay_rank: number;
+    sex: number;
+    image_url: string;
+    regist_day: string;
+    birth_day: string;
 };
 
-interface UserDetailProps {
-    userId: number; // or string depending on your ID type
+interface ApiRequest {
+  user_id: string;
 }
 
-const UserDetail: React.FC<UserDetailProps> = ({ userId }) => {
-    const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
+interface UserDetailProps {
+    user_id: string;
+    user_name: string;
+    mail_address1: string;
+    mail_address2: string;
+    phone_num1: string;
+    phone_num2: string;
+    phone_num3: string;
+    address1: string;
+    address2: string;
+    address3: string;
+    post_code: string;
+    pay_rank: number;
+    sex: number;
+    image_url: string;
+    regist_day: string;
+    birth_day: string;
+}
 
-    // ユーザー詳細をフェッチする関数
-    const fetchUserDetails = async (id: number) => {
-        // ここでAPIからユーザー詳細をフェッチします
-        // 例: const response = await fetch(`/api/users/${id}`);
-        // setUserDetails(await response.json());
-        
-        // この例ではダミーデータを使用
-        setUserDetails({
-            id,
-            name: 'Sample User',
-            photoUrl: 'path_to_photo',
-            bio: 'Sample bio text.',
-            // 他のフィールド...
-        });
-    };
+const UserDetail: React.FC<ApiRequest> = ({ user_id }) => {
+    const [userDetails, setUserDetails] = useState<UserDetail | null>(null);
+    // const apiUrl = process.env.REACT_APP_SEARCH_API;
+    const apiUrl = 'http://localhost:8080';
 
     useEffect(() => {
-        fetchUserDetails(userId);
-    }, [userId]);
+        const fetchData = async () => {
+          try {
+            const response = await fetch(`${apiUrl}/v1/user?u=${user_id}`, {
+              method: 'GET',
+              headers: {
+                  'Content-Type': 'application/json'
+              }
+            });
+            const user: UserDetailProps = await response.json();
+            setUserDetails(user);
+          } catch (error) {
+            console.error('Error fetching recommended users:', error);
+          }
+        };
+    
+        fetchData();
+      }, []);
 
     if (!userDetails) {
         return <div>Loading...</div>;
@@ -42,10 +72,9 @@ const UserDetail: React.FC<UserDetailProps> = ({ userId }) => {
 
     return (
         <div className="user-detail">
-            <img src={userDetails.photoUrl} alt={`${userDetails.name}'s photo`} />
-            <h1>{userDetails.name}</h1>
-            <p>{userDetails.bio}</p>
-            {/* 他の詳細情報の表示 */}
+            <img src={userDetails.image_url} alt={`${userDetails.user_name}'s photo`} />
+            <h1>{userDetails.user_name}</h1>
+            <p>{userDetails.mail_address1}</p>
         </div>
     );
 };

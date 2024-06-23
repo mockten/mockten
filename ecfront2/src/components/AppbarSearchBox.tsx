@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { styled, alpha } from '@mui/material/styles';
 import InputBase from '@mui/material/InputBase';
 import SearchIcon from '@mui/icons-material/Search';
-
 
 const Search = styled('div')(({ theme }) => ({
     position: 'relative',
@@ -45,27 +45,20 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
 }));
 
 function AppbarSearchBox() {
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const navigate = useNavigate();
 
-    const handleInputChange = (event: any) => {
-      setSearchTerm(event.target.value);
-    };
   
-    const handleKeyPress = (event: any) => {
+    const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchQuery(event.target.value);
+    };
+
+    const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Enter') {
-        callBackendAPI(searchTerm);
+        navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
       }
     };
 
-    const callBackendAPI = async (searchTerm: string) => {
-        try {
-          const response = await fetch(`/api/search?query=${encodeURIComponent(searchTerm)}`);
-          const data = await response.json();
-          console.log(data); // 
-        } catch (error) {
-          console.error('Error calling backend API:', error);
-        }
-    };
     
     return (
         <div>
@@ -74,8 +67,8 @@ function AppbarSearchBox() {
                     <SearchIcon />
                 </SearchIconWrapper>
                 <StyledInputBase
-                    value={searchTerm}
-                    onChange={handleInputChange}
+                    value={searchQuery}
+                    onChange={handleChange}
                     onKeyPress={handleKeyPress}
                     placeholder="Search Item..."
                     inputProps={{ 'aria-label': 'search' }}

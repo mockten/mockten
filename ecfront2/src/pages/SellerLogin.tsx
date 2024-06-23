@@ -3,9 +3,9 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Container, TextField, Button, Grid, Typography } from '@mui/material';
 
-const LoginPage: React.FC = () => {
-    const [userID, setUserID] = useState('');
-    const [password, setPassword] = useState('');
+const SellerLogin: React.FC = () => {
+    const [sellerID, setSellerID] = useState('');
+    const [sellerpassword, setSellerPassword] = useState('');
     const navigate = useNavigate();
 
     const handleLogin = async (e: FormEvent ) => {
@@ -20,8 +20,8 @@ const LoginPage: React.FC = () => {
                 grant_type: 'password',
                 client_id: clientId,
                 client_secret: clientSecret,
-                username: userID,
-                password: password,
+                username: sellerID,
+                password: sellerpassword,
                 scope: 'openid profile'
             }));
 
@@ -46,8 +46,11 @@ const LoginPage: React.FC = () => {
                 const roles = userInfo.roles || [];
                 console.log('Roles:', roles);
 
-                navigate('/d', { state: { token } });
-                
+                if (!roles.includes('seller')) {
+                    throw new Error('You are not authorized as a seller');
+                }
+
+                navigate(`/seller?name=${encodeURIComponent(sellerID)}`, { state: { token } });
             } catch (userInfoError) {
                 if (axios.isAxiosError(userInfoError)) {
                     console.error('Login failed:', userInfoError.response?.data);
@@ -72,15 +75,15 @@ const LoginPage: React.FC = () => {
         <Container maxWidth="sm">
         <Grid container spacing={3} direction="column" alignItems="center" justifyContent="center" style={{ minHeight: '100vh' }}>
           <Grid item>
-            <Typography variant="h4">User Login</Typography>
+            <Typography variant="h4">Seller Login</Typography>
           </Grid>
           <Grid item>
             <TextField
-              label="User ID"
+              label="Seller Mail Address"
               variant="outlined"
               fullWidth
-              value={userID}
-              onChange={(e) => setUserID(e.target.value)}
+              value={sellerID}
+              onChange={(e) => setSellerID(e.target.value)}
             />
           </Grid>
           <Grid item>
@@ -89,8 +92,8 @@ const LoginPage: React.FC = () => {
               variant="outlined"
               type="password"
               fullWidth
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={sellerpassword}
+              onChange={(e) => setSellerPassword(e.target.value)}
             />
           </Grid>
           <Grid item>
@@ -101,5 +104,6 @@ const LoginPage: React.FC = () => {
         </Grid>
       </Container>
     );
-  };
-export default LoginPage;
+};
+
+export default SellerLogin;
