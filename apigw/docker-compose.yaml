@@ -25,22 +25,34 @@ services:
       KONG_CASSANDRA_CONTACT_POINTS: "kong-database"
       KONG_PROXY_LISTEN: "0.0.0.0:8082"
       KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+      KONG_ADMIN_GUI_LISTEN: "0.0.0.0:8002"
     ports:
       - "8082:8082"
       - "8001:8001"
+      - "8002:8002"
     healthcheck:
       test: ["CMD", "kong", "health"]
       interval: 10s
       timeout: 5s
       retries: 5
     entrypoint: ["/bin/sh", "-c", "
-      apk update && apk add --no-cache wget &&
+      set -x &&
+      apk update && apk add --no-cache wget jq&&
       kong migrations bootstrap &&
       kong start &&
       sleep 10 &&
       wget --method=POST --body-data='name=keycloak&host=host.docker.internal&port=8080&protocol=http' http://localhost:8001/services/ &&
       wget --method=POST --body-data='paths[]=/realms/mockten-realm-dev/protocol/openid-connect&strip_path=false' http://localhost:8001/services/keycloak/routes &&
-      wget --method=POST --body-data='paths[]=/api/uam&strip_path=false' http://localhost:8001/services/keycloak/routes &&
+      wget --method=POST --header='Content-Type: application/json' --body-data='{
+        \"name\": \"keycloak-token\",
+        \"url\": \"http://host.docker.internal:8080/realms/mockten-realm-dev/protocol/openid-connect/token\"
+      }' http://localhost:8001/services/ -O response-token.json &&
+      wget --method=POST --header='Content-Type: application/json' --body-data='{
+        \"paths\": [\"/api/uam/token\"],
+        \"strip_path\": true,
+        \"methods\": [\"POST\"],
+        \"service\": {\"id\": \"'$(cat response-token.json | jq -r '.id')'\"}
+      }' http://localhost:8001/routes -O route_creation_response_token.json &&
       wget --method=POST --header='Content-Type: application/json' --body-data='{
         \"name\": \"cors\",
         \"config\": {
@@ -54,4 +66,3 @@ services:
       }' http://localhost:8001/services/keycloak/plugins -O - &&
       tail -f /dev/null
     "]
-

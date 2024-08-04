@@ -13,7 +13,7 @@ const SellerLogin: React.FC = () => {
         const clientId = 'mockten-react-client'; 
         const clientSecret = 'mockten-client-secret';
         const realm = 'mockten-realm-dev';
-        const url = `http://localhost:8080/realms/${realm}/protocol/openid-connect/token`;
+        const url = `http://localhost:8082/api/uam/token`;
 
         try {
             const response = await axios.post(url, new URLSearchParams({
@@ -30,7 +30,7 @@ const SellerLogin: React.FC = () => {
 
             try {
                 const userInfoResponse = await axios.get(
-                    `http://localhost:8080/realms/${realm}/protocol/openid-connect/userinfo`,
+                    `http://localhost:8082/realms/${realm}/protocol/openid-connect/userinfo`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`,
@@ -60,7 +60,6 @@ const SellerLogin: React.FC = () => {
                 }
                 alert(`Login failed: ${userInfoError instanceof Error ? userInfoError.message : 'Unauthorized error'}`);
             }
-
         } catch (error) {
             if (axios.isAxiosError(error)) {
                 console.error('Login failed:', error.response?.data);
