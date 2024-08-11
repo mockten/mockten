@@ -41,8 +41,6 @@ services:
       kong migrations bootstrap &&
       kong start &&
       sleep 10 &&
-      wget --method=POST --body-data='name=keycloak&host=host.docker.internal&port=8080&protocol=http' http://localhost:8001/services/ &&
-      wget --method=POST --body-data='paths[]=/realms/mockten-realm-dev/protocol/openid-connect&strip_path=false' http://localhost:8001/services/keycloak/routes &&
       wget --method=POST --header='Content-Type: application/json' --body-data='{
         \"name\": \"keycloak-token\",
         \"url\": \"http://host.docker.internal:8080/realms/mockten-realm-dev/protocol/openid-connect/token\"
@@ -54,6 +52,16 @@ services:
         \"service\": {\"id\": \"'$(cat response-token.json | jq -r '.id')'\"}
       }' http://localhost:8001/routes -O route_creation_response_token.json &&
       wget --method=POST --header='Content-Type: application/json' --body-data='{
+        \"name\": \"keycloak-userinfo\",
+        \"url\": \"http://host.docker.internal:8080/realms/mockten-realm-dev/protocol/openid-connect/userinfo\"
+      }' http://localhost:8001/services/ -O response-userinfo.json &&
+      wget --method=POST --header='Content-Type: application/json' --body-data='{
+        \"paths\": [\"/api/uam/userinfo\"],
+        \"strip_path\": true,
+        \"methods\": [\"GET\",\"OPTIONS\"],
+        \"service\": {\"id\": \"'$(cat response-userinfo.json | jq -r '.id')'\"}
+      }' http://localhost:8001/routes -O route_creation_response_userinfo.json &&
+      wget --method=POST --header='Content-Type: application/json' --body-data='{
         \"name\": \"cors\",
         \"config\": {
           \"origins\": [\"http://localhost:5173\"],
@@ -63,6 +71,6 @@ services:
           \"credentials\": true,
           \"max_age\": 3600
         }
-      }' http://localhost:8001/services/keycloak/plugins -O - &&
+      }' http://localhost:8001/services/keycloak-userinfo/plugins -O - &&
       tail -f /dev/null
     "]
