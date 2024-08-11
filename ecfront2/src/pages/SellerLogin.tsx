@@ -12,7 +12,6 @@ const SellerLogin: React.FC = () => {
         e.preventDefault();
         const clientId = 'mockten-react-client'; 
         const clientSecret = 'mockten-client-secret';
-        const realm = 'mockten-realm-dev';
         const url = `http://localhost:8082/api/uam/token`;
 
         try {
