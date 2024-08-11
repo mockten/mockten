@@ -30,7 +30,7 @@ const SellerLogin: React.FC = () => {
 
             try {
                 const userInfoResponse = await axios.get(
-                    `http://localhost:8082/realms/${realm}/protocol/openid-connect/userinfo`,
+                    `http://localhost:8082/api/uam/userinfo`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`,
