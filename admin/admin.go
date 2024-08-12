@@ -25,43 +25,81 @@ const (
 )
 
 var (
-	getMyAccountReqCount = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "getmyaccount_request",
+	getCustomerAccountReqCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "getcustomeraccount_request",
 		Help: "Total number of requests that have come to getmyaccount query",
 	})
 
-	getMyAccountResCount = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "getmyaccount_response",
+	getCustomerAccountResCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "getcustomeraccount_response",
 		Help: "Total number of response that send from getmyaccount query",
 	})
-	editMyAccountReqCount = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "editmyaccount_request",
+	editCustomerAccountReqCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "editcustomeraccount_request",
 		Help: "Total number of requests that have come to editmyaccount query",
 	})
 
-	editMyAccountResCount = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "editmyaccount_response",
+	editCustomerAccountResCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "editcustomeraccount_response",
 		Help: "Total number of response that send from editmyaccount query",
 	})
 
-	createMyAccountReqCount = promauto.NewCounter(prometheus.CounterOpts{
+	createCustomerAccountReqCount = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "createmyaccount_request",
 		Help: "Total number of requests that have come to editmyaccount query",
 	})
 
-	createMyAccountResCount = promauto.NewCounter(prometheus.CounterOpts{
+	createCustomerAccountResCount = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "createmyaccount_response",
 		Help: "Total number of response that send from editmyaccount query",
 	})
 
-	deleteMyAccountReqCount = promauto.NewCounter(prometheus.CounterOpts{
+	deleteCustomerAccountReqCount = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "deletemyaccount_request",
 		Help: "Total number of requests that have come to editmyaccount query",
 	})
 
-	deleteMyAccountResCount = promauto.NewCounter(prometheus.CounterOpts{
+	deleteCustomerAccountResCount = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "deletemyaccount_response",
 		Help: "Total number of response that send from editmyaccount query",
+	})
+	getSellerAccountReqCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "getselleraccount_request",
+		Help: "Total number of requests that have come to getselleraccount query",
+	})
+
+	getSellerAccountResCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "getselleraccount_response",
+		Help: "Total number of response that send from getmyaccount query",
+	})
+	editSellerAccountReqCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "editselleraccount_request",
+		Help: "Total number of requests that have come to editselleraccount query",
+	})
+
+	editSellerAccountResCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "editselleraccount_response",
+		Help: "Total number of response that send from editselleraccount query",
+	})
+
+	createSellerAccountReqCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "createselleraccount_request",
+		Help: "Total number of requests that have come to editselleraccount query",
+	})
+
+	createSellerAccountResCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "createselleraccount_response",
+		Help: "Total number of response that send from editselleraccount query",
+	})
+
+	deleteSellerAccountReqCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "deleteselleraccount_request",
+		Help: "Total number of requests that have come to editselleraccount query",
+	})
+
+	deleteSellerAccountResCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "deleteselleraccount_response",
+		Help: "Total number of response that send from editselleraccount query",
 	})
 
 	logger *zap.Logger
@@ -70,22 +108,42 @@ var (
 
 type User struct {
 	UserID       string    `json:"user_id"`
-	FirstName    string    `json:"first_name"`
-	LastName     string    `json:"last_name"`
+	UserName     string    `json:"user_name"`
 	MailAddress1 string    `json:"mail_address1"`
 	MailAddress2 string    `json:"mail_address2"`
-	MailAddress3 string    `json:"mail_address3"`
-	PhoneNum1    string    `json:"phone_num1"`
-	PhoneNum2    string    `json:"phone_num2"`
-	PhoneNum3    string    `json:"phone_num3"`
+	PhoneNum     string    `json:"phone_num"`
 	Address1     string    `json:"address1"`
 	Address2     string    `json:"address2"`
 	Address3     string    `json:"address3"`
 	PostCode     int       `json:"post_code"`
-	PayRank      int       `json:"pay_rank"`
+	Premium      int       `json:"premium"`
 	Sex          int       `json:"sex"`
-	RegistDay    time.Time `json:"regist_day"`
 	Birthday     time.Time `json:"birthday"`
+	RegistDay    time.Time `json:"regist_day"`
+	LastUpdate   time.Time `json:"last_update"`
+}
+
+type Seller struct {
+	SellerID    string    `json:"seller_id"`
+	UserID      string    `json:"user_id"`
+	SellerName  string    `json:"seller_name"`
+	MailAddress string    `json:"mail_address"`
+	PhoneNum    string    `json:"phone_num"`
+	Address1    string    `json:"address1"`
+	Address2    string    `json:"address2"`
+	Address3    string    `json:"address3"`
+	PostCode    int       `json:"post_code"`
+	Sex         int       `json:"sex"`
+	Birthday    time.Time `json:"birthday"`
+	RegistDay   time.Time `json:"regist_day"`
+	LastUpdate  time.Time `json:"last_update"`
+}
+
+type UserPassword struct {
+	UserID       string    `json:"user_id"`
+	MailAddress1 string    `json:"mail_address1"`
+	Password     string    `json:"password"`
+	LastUpdate   time.Time `json:"last_update"`
 }
 
 type UserData struct {
@@ -93,8 +151,10 @@ type UserData struct {
 	Total int    `json:"total"`
 }
 
-// Manipulate SQL
-func getAccountByAdmin(c *gin.Context) {
+/*
+ * REST API
+ */
+func GetCustomerAccountByAdmin(c *gin.Context) {
 
 	userID := c.Query("u")
 
@@ -108,91 +168,61 @@ func getAccountByAdmin(c *gin.Context) {
 	logger.Debug("[getMyAccount] Request log", zap.String("user_id", userID))
 
 	// increment counter
-	getMyAccountReqCount.Inc()
+	getCustomerAccountReqCount.Inc()
 	user, err := getUserDataBySQL(userID)
 	if err != nil {
 
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message": fmt.Errorf("no user found with user_id %d", userID),
+			"message": fmt.Errorf("no user found with user_id %s", userID),
 		})
 		return
 	}
 	// increment counter
-	getMyAccountResCount.Inc()
+	getCustomerAccountResCount.Inc()
 
 	c.JSON(http.StatusOK, gin.H{
 		"data": user,
 	})
 }
 
-func getUserDataBySQL(userID string) (*User, error) {
-	query := `SELECT * FROM user_info WHERE user_id = $1`
-	row := db.QueryRow(query, userID)
-
-	var user User
-	err := row.Scan(&user.UserID, &user.FirstName, &user.LastName, &user.MailAddress1, &user.MailAddress2, &user.MailAddress3, &user.PhoneNum1, &user.PhoneNum2, &user.PhoneNum3, &user.Address1, &user.Address2, &user.Address3, &user.PostCode, &user.PayRank, &user.Sex, &user.RegistDay, &user.Birthday)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			logger.Error("No user data in MongoDB.")
-			return nil, err
-		}
-		logger.Error("SQL error when user get account data.")
-		return nil, err
-	}
-	return &user, nil
-}
-
-func editAccountByAdmin(c *gin.Context) {
+func EditCustomerAccountByAdmin(c *gin.Context) {
 	userID := c.PostForm("user_id")
-	firstName := c.PostForm("first_name")       // string
-	lastName := c.PostForm("last_name")         // number
+	userName := c.PostForm("user_name")         // string
 	mailAddress1 := c.PostForm("mail_address1") // number
 	mailAddress2 := c.PostForm("mail_address2") // number
-	mailAddress3 := c.PostForm("mail_address3") // token
-	phoneNum1 := c.PostForm("phone_num1")       // token
-	phoneNum2 := c.PostForm("phone_num2")       // token
-	phoneNum3 := c.PostForm("phone_num3")       // token
+	phoneNum := c.PostForm("phone_num")         // token
 	address1 := c.PostForm("address1")          // token
 	address2 := c.PostForm("address2")          // token
 	address3 := c.PostForm("address3")          // token
 	postCode := c.PostForm("post_code")         // token
-	payRank := c.PostForm("pay_rank")           // token
+	premium := c.PostForm("premium")            // token
 	sex := c.PostForm("sex")                    // token
 	birthday := c.PostForm("birthday")          // token
 
 	logger.Debug("Request Edit Account data",
 		zap.String("userID", userID),
-		zap.String("firstName", firstName),
-		zap.String("lastName", lastName),
+		zap.String("userName", userName),
 		zap.String("mailAddress1", mailAddress1),
 		zap.String("mailAddress2", mailAddress2),
-		zap.String("mailAddress3", mailAddress3),
-		zap.String("phoneNum1", phoneNum1),
-		zap.String("phoneNum2", phoneNum2),
-		zap.String("phoneNum3", phoneNum3),
+		zap.String("phoneNum", phoneNum),
 		zap.String("address1", address1),
 		zap.String("address2", address2),
 		zap.String("address3", address3),
 		zap.String("postCode", postCode),
-		zap.String("payRank", payRank),
+		zap.String("payRank", premium),
 		zap.String("sex", sex),
 		zap.String("birthday", birthday))
 
 	// increment counter
-	editMyAccountReqCount.Inc()
+	editCustomerAccountReqCount.Inc()
 
 	if userID == "" {
 		logger.Error("userID parameter is missing.")
 		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
 		return
 	}
-	if firstName == "" {
-		logger.Error("firstName parameter is missing.")
-		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
-		return
-	}
-	if lastName == "" {
-		logger.Error("lastName parameter is missing.")
+	if userName == "" {
+		logger.Error("userName parameter is missing.")
 		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
 		return
 	}
@@ -201,8 +231,8 @@ func editAccountByAdmin(c *gin.Context) {
 		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
 		return
 	}
-	if payRank == "" {
-		logger.Error("payRank parameter is missing.")
+	if premium == "" {
+		logger.Error("premium parameter is missing.")
 		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
 		return
 	}
@@ -212,13 +242,13 @@ func editAccountByAdmin(c *gin.Context) {
 	if err != nil {
 
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message": fmt.Errorf("no user found with user_id %d", userID),
+			"message": fmt.Errorf("no user found with user_id %s", userID),
 		})
 		return
 	}
 
-	query := `UPDATE user_info SET first_name = $1, last_name = $2, mail_address1 = $3, mail_address2 = $4, mail_address3 = $5, phone_num1 = $6, phone_num2 = $7, phone_num3 = $8, address1 = $9, address2 = $10, address3 = $11, post_code = $12, pay_rank = $13, sex = $14, birthday = $15 WHERE user_id = $16`
-	result, err := db.Exec(query, firstName, lastName, mailAddress1, mailAddress2, mailAddress3, phoneNum1, phoneNum2, phoneNum3, address1, address2, address3, postCode, payRank, sex, birthday, userID)
+	query := `UPDATE user_info SET user_name = $1, mail_address1 = $2, mail_address2 = $3, phone_num = $4, address1 = $5, address2 = $6, address3 = $7, post_code = $8, premium = $9, sex = $10, birthday = $11, last_update = NOW() WHERE user_id = $12`
+	result, err := db.Exec(query, userName, mailAddress1, mailAddress2, phoneNum, address1, address2, address3, postCode, premium, sex, birthday, userID)
 	if err != nil {
 		logger.Error("error insert data.")
 		c.JSON(http.StatusForbidden, "NG")
@@ -240,13 +270,99 @@ func editAccountByAdmin(c *gin.Context) {
 	}
 
 	// increment counter
-	editMyAccountResCount.Inc()
+	editCustomerAccountResCount.Inc()
 	c.JSON(http.StatusOK, "OK")
 }
 
-func createCustomerAccountByAdmin(c *gin.Context) {
+func EditSellerAccountByAdmin(c *gin.Context) {
+	sellerID := c.PostForm("seller_id")
+	userID := c.PostForm("user_id")           // string
+	sellerName := c.PostForm("seller_name")   // number
+	mailAddress := c.PostForm("mail_address") // number
+	phoneNum := c.PostForm("phone_num")       // token
+	address1 := c.PostForm("address1")        // token
+	address2 := c.PostForm("address2")        // token
+	address3 := c.PostForm("address3")        // token
+	postCode := c.PostForm("post_code")       // token
+	sex := c.PostForm("sex")                  // token
+	birthday := c.PostForm("birthday")        // token
 
-	customerName := c.PostForm("customer_name")
+	logger.Debug("Request Edit Account data",
+		zap.String("sellerID", sellerID),
+		zap.String("userID", userID),
+		zap.String("sellerName", sellerName),
+		zap.String("mailAddress", mailAddress),
+		zap.String("phoneNum", phoneNum),
+		zap.String("address1", address1),
+		zap.String("address2", address2),
+		zap.String("address3", address3),
+		zap.String("postCode", postCode),
+		zap.String("sex", sex),
+		zap.String("birthday", birthday))
+
+	// increment counter
+	editCustomerAccountReqCount.Inc()
+
+	if userID == "" {
+		logger.Error("userID parameter is missing.")
+		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
+		return
+	}
+	if sellerID == "" {
+		logger.Error("sellerID parameter is missing.")
+		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
+		return
+	}
+	if sellerName == "" {
+		logger.Error("sellerName parameter is missing.")
+		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
+		return
+	}
+	if mailAddress == "" {
+		logger.Error("mailAddress1 parameter is missing.")
+		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
+		return
+	}
+
+	// check the data if it exist
+	_, err := getUserDataBySQL(userID)
+	if err != nil {
+
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": fmt.Errorf("no user found with user_id %s", userID),
+		})
+		return
+	}
+
+	query := `UPDATE seller_info SET user_id = $1, seller_name = $2, mail_address = $3, phone_num = $4, address1 = $5, address2 = $6, address3 = $7, post_code = $8, sex = $9, birthday = $10, last_update = NOW() WHERE seller_id = $11`
+	result, err := db.Exec(query, userID, sellerName, mailAddress, phoneNum, address1, address2, address3, postCode, sex, birthday, sellerID)
+	if err != nil {
+		logger.Error("error insert data.")
+		c.JSON(http.StatusForbidden, "NG")
+		return
+	}
+
+	// check the number of affected rows. if it does not exist, return error.
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		logger.Error("Error when checking affected data.")
+		c.JSON(http.StatusForbidden, "NG")
+		return
+	}
+
+	if rowsAffected == 0 {
+		logger.Error("No affected data when insert.")
+		c.JSON(http.StatusForbidden, "NG")
+		return
+	}
+
+	// increment counter
+	editCustomerAccountResCount.Inc()
+	c.JSON(http.StatusOK, "OK")
+}
+
+func CreateCustomerAccountByAdmin(c *gin.Context) {
+	userName := c.PostForm("user_name")
 	password := c.PostForm("password")
 	confirmPassword := c.PostForm("confirm_password")
 	mailAddress := c.PostForm("mail_address")
@@ -261,7 +377,7 @@ func createCustomerAccountByAdmin(c *gin.Context) {
 	birthDay := c.PostForm("birth_day")
 
 	logger.Debug("Request Edit Account data",
-		zap.String("customerName", customerName),
+		zap.String("customerName", userName),
 		zap.String("password", password),
 		zap.String("confirmPassword", confirmPassword),
 		zap.String("mailAddress", mailAddress),
@@ -272,9 +388,9 @@ func createCustomerAccountByAdmin(c *gin.Context) {
 		zap.String("address3", address3),
 		zap.String("postCode", postCode))
 	// increment counter
-	createMyAccountReqCount.Inc()
+	createCustomerAccountReqCount.Inc()
 
-	if customerName == "" {
+	if userName == "" {
 		logger.Error("customerName parameter is missing.")
 		c.JSON(http.StatusNoContent, gin.H{"message": "Parameter missing"})
 		return
@@ -304,7 +420,7 @@ func createCustomerAccountByAdmin(c *gin.Context) {
 
 	query := `INSERT INTO user_info (user_id, user_name, mail_address1, mail_address2, phone_num, address1, address2, address3, post_code, premium, sex, birth_day, regist_day, last_update) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())`
 
-	_, err := db.Exec(query, newUUID, customerName, mailAddress, subMailAddress, phoneNum, address1, address2, address3, postCode, premium, sex, birthDay)
+	_, err := db.Exec(query, newUUID, userName, mailAddress, subMailAddress, phoneNum, address1, address2, address3, postCode, premium, sex, birthDay)
 	if err != nil {
 		logger.Error("error insert data to customer table.")
 		c.JSON(http.StatusForbidden, "NG")
@@ -326,11 +442,11 @@ func createCustomerAccountByAdmin(c *gin.Context) {
 	}
 
 	// increment counter
-	createMyAccountResCount.Inc()
+	createCustomerAccountResCount.Inc()
 	c.JSON(http.StatusOK, "OK")
 }
 
-func createSellerAccountByAdmin(c *gin.Context) {
+func CreateSellerAccountByAdmin(c *gin.Context) {
 
 	sellerName := c.PostForm("seller_name") // string
 	password := c.PostForm("password")      // string
@@ -356,7 +472,7 @@ func createSellerAccountByAdmin(c *gin.Context) {
 		zap.String("birthday", birthday))
 
 	// increment counter
-	createMyAccountReqCount.Inc()
+	createSellerAccountReqCount.Inc()
 
 	if sellerName == "" {
 		logger.Error("sellerName parameter is missing.")
@@ -407,27 +523,11 @@ func createSellerAccountByAdmin(c *gin.Context) {
 	}
 
 	// increment counter
-	createMyAccountResCount.Inc()
+	createSellerAccountResCount.Inc()
 	c.JSON(http.StatusOK, "OK")
 }
 
-func verifyPassword(pass string, cpass string) bool {
-	if pass != cpass {
-		return false
-	}
-	// if passowrd doesnot contain special charactor, return false
-	return true
-}
-
-func hashPassword(password string) (string, error) {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return "", err
-	}
-	return string(hashedPassword), nil
-}
-
-func deleteAccountByAdmin(c *gin.Context) {
+func DeleteCustomerAccountByAdmin(c *gin.Context) {
 
 	userID := c.PostForm("userID")             // string
 	mailaddress := c.PostForm("mail_address1") // number
@@ -452,7 +552,7 @@ func deleteAccountByAdmin(c *gin.Context) {
 		return
 	}
 
-	if "password" != password {
+	if password != "password" {
 		logger.Error("different password")
 		return
 	}
@@ -476,7 +576,107 @@ func deleteAccountByAdmin(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, "OK")
-	return
+}
+
+func DeleteSellerAccountByAdmin(c *gin.Context) {
+
+	sellerID := c.PostForm("sellerID")        // string
+	mailaddress := c.PostForm("mail_address") // number
+	password := c.PostForm("password")        // number
+
+	if sellerID == "" || mailaddress == "" || password == "" {
+		logger.Error("Delete account parameter is missing.")
+		c.JSON(http.StatusNoContent, gin.H{"message": "Some mandatory parameter are missing."})
+		return
+	}
+	// logging request log
+	logger.Debug("Request log", zap.String("sellerID", sellerID), zap.String("mailaddress", mailaddress), zap.String("password", password))
+
+	seller, err := getSellerDataBySQL(sellerID)
+	if err != nil {
+		logger.Error("error on getting data from SQL")
+		return
+	}
+
+	if seller.MailAddress != mailaddress {
+		logger.Error("different mailaddress")
+		return
+	}
+
+	if password != "password" {
+		logger.Error("different password")
+		return
+	}
+
+	query := `DELETE FROM seller_info WHERE seller_id = $1`
+	result, err := db.Exec(query, sellerID)
+	if err != nil {
+		logger.Error("No user data in MongoDB.")
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		logger.Error("No user data in MongoDB.")
+		return
+	}
+
+	if rowsAffected == 0 {
+		logger.Error("No user data in MongoDB.")
+		return
+	}
+
+	c.JSON(http.StatusOK, "OK")
+}
+
+func getUserDataBySQL(userID string) (*User, error) {
+	query := `SELECT * FROM user_info WHERE user_id = $1`
+	row := db.QueryRow(query, userID)
+
+	var user User
+	err := row.Scan(&user.UserID, &user.UserName, &user.MailAddress1, &user.MailAddress2, &user.PhoneNum, &user.Address1, &user.Address2, &user.Address3, &user.PostCode, &user.Premium, &user.Sex, &user.RegistDay, &user.Birthday, &user.LastUpdate)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			logger.Error("No user data in MongoDB.")
+			return nil, err
+		}
+		logger.Error("SQL error when user get account data.")
+		return nil, err
+	}
+	return &user, nil
+}
+
+func getSellerDataBySQL(sellerID string) (*Seller, error) {
+	query := `SELECT * FROM seller_info WHERE seller_id = $1`
+	row := db.QueryRow(query, sellerID)
+
+	var seller Seller
+	err := row.Scan(&seller.SellerID, &seller.UserID, &seller.SellerName, &seller.MailAddress, &seller.PhoneNum, &seller.Address1, &seller.Address2, &seller.Address3, &seller.PostCode, &seller.Sex, &seller.Birthday, &seller.RegistDay, &seller.LastUpdate)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			logger.Error("No user data in MongoDB.")
+			return nil, err
+		}
+		logger.Error("SQL error when user get account data.")
+		return nil, err
+	}
+	return &seller, nil
+}
+
+func verifyPassword(pass string, cpass string) bool {
+	if pass != cpass {
+		return false
+	}
+	// if passowrd doesnot contain special charactor, return false
+	return true
+}
+
+func hashPassword(password string) (string, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hashedPassword), nil
 }
 
 func main() {
@@ -555,10 +755,12 @@ func main() {
 
 	// start application
 	router := gin.Default()
-	router.POST("v1/admin/account/create", createCustomerAccountByAdmin)
-	router.POST("v1/admin/seller/create", createSellerAccountByAdmin)
-	router.POST("v1/admin/account/edit", editAccountByAdmin)
-	router.DELETE("v1/admin/account/delete", deleteAccountByAdmin)
+	router.POST("v1/admin/customer/create", CreateCustomerAccountByAdmin)
+	router.POST("v1/admin/seller/create", CreateSellerAccountByAdmin)
+	router.POST("v1/admin/customer/edit", EditCustomerAccountByAdmin)
+	router.POST("v1/admin/seller/edit", EditSellerAccountByAdmin)
+	router.DELETE("v1/admin/customer/delete", DeleteCustomerAccountByAdmin)
+	router.DELETE("v1/admin/seller/delete", DeleteSellerAccountByAdmin)
 	router.Run(port)
 
 }
