@@ -69,15 +69,6 @@
   "groups": [
     {
       "name": "Seller"
-    },
-    {
-      "name": "admin-group",
-      "realmRoles": [],
-      "clientRoles": {
-        "realm-management": [
-          "realm-admin"
-        ]
-      }
     }
   ],
   "users": [
@@ -93,9 +84,6 @@
           "type": "password",
           "value": "superadmin"
         }
-      ],
-      "groups": [
-        "admin-group"
       ]
     },
     {
