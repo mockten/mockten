@@ -10,8 +10,6 @@ const SellerLogin: React.FC = () => {
 
     const handleLogin = async (e: FormEvent ) => {
         e.preventDefault();
-        const clientId = 'mockten-react-client'; 
-        const clientSecret = 'mockten-client-secret';
         const url = `/api/uam/token`;
 
         try {
