@@ -12,7 +12,7 @@ const SellerLogin: React.FC = () => {
         e.preventDefault();
         const clientId = 'mockten-react-client'; 
         const clientSecret = 'mockten-client-secret';
-        const url = `http://localhost/api/uam/token`;
+        const url = `/api/uam/token`;
 
         try {
             const response = await axios.post(url, new URLSearchParams({
