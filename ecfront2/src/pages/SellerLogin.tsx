@@ -29,7 +29,7 @@ const SellerLogin: React.FC = () => {
 
             try {
                 const userInfoResponse = await axios.get(
-                    `http://localhost/api/uam/userinfo`,
+                    `/api/uam/userinfo`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`,
