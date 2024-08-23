@@ -2,7 +2,6 @@ _format_version: "2.1"
 services:
   - name: keycloak-token
     url: http://uam-service.default.svc.cluster.local:8080/realms/mockten-realm-dev/protocol/openid-connect/token
-    #url: http://host.docker.internal:8080/realms/mockten-realm-dev/protocol/openid-connect/token
     routes:
       - name: keycloak-token-route
         paths:
@@ -12,7 +11,6 @@ services:
           - POST
   - name: keycloak-userinfo
     url: http://uam-service.default.svc.cluster.local:8080/realms/mockten-realm-dev/protocol/openid-connect/userinfo
-    #url: http://host.docker.internal:8080/realms/mockten-realm-dev/protocol/openid-connect/userinfo
     routes:
       - name: keycloak-userinfo-route
         paths:
