@@ -16,12 +16,8 @@ const SellerLogin: React.FC = () => {
 
         try {
             const response = await axios.post(url, new URLSearchParams({
-                grant_type: 'password',
-                client_id: clientId,
-                client_secret: clientSecret,
                 username: sellerID,
                 password: sellerpassword,
-                scope: 'openid profile'
             }));
 
             const token = response.data.access_token;
