@@ -12,7 +12,7 @@ const SellerLogin: React.FC = () => {
         e.preventDefault();
         const clientId = 'mockten-react-client'; 
         const clientSecret = 'mockten-client-secret';
-        const url = `http://localhost:8082/api/uam/token`;
+        const url = `http://localhost/api/uam/token`;
 
         try {
             const response = await axios.post(url, new URLSearchParams({
@@ -29,7 +29,7 @@ const SellerLogin: React.FC = () => {
 
             try {
                 const userInfoResponse = await axios.get(
-                    `http://localhost:8082/api/uam/userinfo`,
+                    `http://localhost/api/uam/userinfo`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`,
