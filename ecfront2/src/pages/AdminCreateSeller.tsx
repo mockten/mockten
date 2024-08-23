@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Box, Container, TextField, Button, IconButton, InputAdornment, Grid, Typography } from '@mui/material';
+import { Box, Container, TextField, Button, IconButton, InputAdornment, Grid, Typography, Breadcrumbs, Link } from '@mui/material';
+import { AdminPanelSettings as AdminPanelSettingsIcon, Login as LoginIcon } from '@mui/icons-material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
@@ -24,6 +25,11 @@ const AdminCreateSeller = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [email, setEmail] = useState('');
+
+  const handleClick = (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
+    event.preventDefault();
+    console.info('You clicked a breadcrumb.');
+  };
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -82,6 +88,17 @@ const AdminCreateSeller = () => {
 
   return (
     <Container component="main" maxWidth="xs">
+      <Breadcrumbs aria-label="breadcrumb">
+        <Link color="inherit" href="/admin/login" onClick={handleClick}>
+          <LoginIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+          Admin Login
+        </Link>
+        <Link color="inherit" href="/admin" onClick={handleClick}>
+          <AdminPanelSettingsIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+          Admin Home
+        </Link>
+        <Typography color="textPrimary">Create Seller</Typography>
+      </Breadcrumbs>
     <h2>Create Seller Account </h2>
       <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1 }}>
         <TextField
