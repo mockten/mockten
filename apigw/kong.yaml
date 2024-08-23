@@ -1,0 +1,21 @@
+_format_version: "2.1"
+services:
+  - name: keycloak-token
+    url: http://host.docker.internal:8080/realms/mockten-realm-dev/protocol/openid-connect/token
+    routes:
+      - name: keycloak-token-route
+        paths:
+          - /api/uam/token
+        strip_path: true
+        methods:
+          - POST
+  - name: keycloak-userinfo
+    url: http://host.docker.internal:8080/realms/mockten-realm-dev/protocol/openid-connect/userinfo
+    routes:
+      - name: keycloak-userinfo-route
+        paths:
+          - /api/uam/userinfo
+        strip_path: true
+        methods:
+          - GET
+          - OPTIONS
