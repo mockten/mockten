@@ -363,24 +363,3 @@ jobs:
         export IMAGE_TAG="ghcr.io/${{ github.repository }}/apigw:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
-        push_snapshot_container_apigw:
-          if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
-          runs-on: ubuntu-22.04
-          defaults:
-            run:
-              working-directory: apigw
-          env:
-            MAJOR_VERSION: 0
-            MINOR_VERSION: 0
-          steps:
-          - name: Checkout the repository
-            uses: actions/checkout@v1
-          
-          - name: Log in to GitHub Container Registry
-            run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-      
-          - name: Build and push container
-            run: |
-              export IMAGE_TAG="ghcr.io/${{ github.repository }}/apigw:latest"
-              docker build -t $IMAGE_TAG .
-              docker push $IMAGE_TAG
