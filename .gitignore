@@ -15,3 +15,5 @@
 # vendor/
 
 ecfront2/node_modules/*
+/ecfront2/node_modules/.vite
+/ecfront2/node_modules/.vite

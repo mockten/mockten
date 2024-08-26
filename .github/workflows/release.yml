@@ -201,3 +201,25 @@ jobs:
         export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/uam:release-v${SNAPSHOT_VERSION}"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
+
+  release-apigw:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: apigw
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v2
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push the docker image
+      run: |
+        export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/apigw/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/apigw:release-v${SNAPSHOT_VERSION}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG

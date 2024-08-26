@@ -10,18 +10,12 @@ const SellerLogin: React.FC = () => {
 
     const handleLogin = async (e: FormEvent ) => {
         e.preventDefault();
-        const clientId = 'mockten-react-client'; 
-        const clientSecret = 'mockten-client-secret';
-        const url = `http://localhost:8082/api/uam/token`;
+        const url = `/api/uam/token`;
 
         try {
             const response = await axios.post(url, new URLSearchParams({
-                grant_type: 'password',
-                client_id: clientId,
-                client_secret: clientSecret,
                 username: sellerID,
                 password: sellerpassword,
-                scope: 'openid profile'
             }));
 
             const token = response.data.access_token;
@@ -29,7 +23,7 @@ const SellerLogin: React.FC = () => {
 
             try {
                 const userInfoResponse = await axios.get(
-                    `http://localhost:8082/api/uam/userinfo`,
+                    `/api/uam/userinfo`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`,
