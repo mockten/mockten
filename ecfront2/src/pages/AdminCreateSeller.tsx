@@ -5,17 +5,17 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
 const AdminCreateSeller = () => {
   const [seller, setSeller] = useState({
-    seller_name: '',
+    displayname: '',
+    firstname: '',
+    lastname: '',
     password: '',
-    mail_address: '',
-    phone_num: '',
+    email: '',
+    phonenum: '',
     address1: '',
     address2: '',
     address3: '',
-    post_code: 0,
-    birth_day: '',
-    regist_day: '',
-    last_update: ''
+    postcode: '',
+    birthday: ''
   });
 
   const [password, setPassword] = useState('');
@@ -49,7 +49,7 @@ const AdminCreateSeller = () => {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const apiUrl = process.env.REACT_APP_ADMIN_API;
-    // const apiUrl = 'http://localhost:8080';
+    // const apiUrl = 'http://localhost:50051';
 
     if (password !== confirmPassword) {
       setErrorMessage('Passwords do not match');
@@ -58,7 +58,7 @@ const AdminCreateSeller = () => {
     } else {
       setErrorMessage('');
       seller.password = password;
-      seller.mail_address = email;
+      seller.email = email;
       try {
         const response = await fetch(`${apiUrl}/v1/admin/seller/create`, {
           method: 'POST',
@@ -88,15 +88,38 @@ const AdminCreateSeller = () => {
           margin="normal"
           required
           fullWidth
-          id="seller_name"
-          label="Seller Name"
-          name="seller_name"
-          autoComplete="seller_name"
+          id="displayname"
+          label="Display Name"
+          name="displayname"
+          autoComplete="displayname"
           autoFocus
           onChange={handleChange}
         />
         <TextField
           margin="normal"
+          required
+          fullWidth
+          id="firstname"
+          label="First Name"
+          name="firstname"
+          autoComplete="firstname"
+          autoFocus
+          onChange={handleChange}
+        />
+        <TextField
+          margin="normal"
+          required
+          fullWidth
+          id="lastname"
+          label="Last Name"
+          name="lastname"
+          autoComplete="lastname"
+          autoFocus
+          onChange={handleChange}
+        />
+        <TextField
+          margin="normal"
+          required
           label="Password"
           variant="outlined"
           type={showPassword ? 'text' : 'password'}
@@ -120,6 +143,7 @@ const AdminCreateSeller = () => {
         />
         <TextField
           margin="normal"
+          required
           label="Confirm Password"
           variant="outlined"
           type={showConfirmPassword ? 'text' : 'password'}
@@ -152,35 +176,30 @@ const AdminCreateSeller = () => {
           margin="normal"
           required
           fullWidth
-          id="mail_address"
-          label="Main Mail Address"
-          name="mail_address1"
-          autoComplete="mail_address1"
+          id="email"
+          label="Mail Address"
+          name="email"
+          autoComplete="email"
           autoFocus
           onChange={(e) => setEmail(e.target.value)}
           />
         <TextField
           margin="normal"
-          fullWidth
-          id="mail_address2"
-          label="Sub Mail Address"
-          name="mail_address2"
-          autoComplete="mail_address2"
-          autoFocus
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <TextField
-          margin="normal"
           required
           fullWidth
-          id="phone_number1"
+          id="phonenum"
+          inputProps={{
+            pattern: '\\d*',  
+            inputMode: 'tel', 
+            maxLength: 15,  
+          }}
           label="Phone Number"
-          name="phone_number1"
-          autoComplete="phone_number1"
+          name="phonenum"
+          autoComplete="phonenum"
           autoFocus
           type="number"
           onChange={handleChange}
-        />       
+        /> 
         <TextField
           margin="normal"
           required
@@ -219,11 +238,31 @@ const AdminCreateSeller = () => {
           required
           fullWidth
           id="postcode"
+          inputProps={{
+            pattern: '[0-9]{3}-?[0-9]{4}', 
+            inputMode: 'numeric',        
+            maxLength: 8,               
+          }}
           label="Postcode"
           name="postcode"
           autoComplete="postcode"
           autoFocus
-          type="number"
+          helperText="ex: 123-4567"
+          onChange={handleChange}
+        />
+        <TextField
+          margin="normal"
+          type="date"
+          required
+          fullWidth
+          id="birthday"
+          InputLabelProps={{
+            shrink: true,
+          }}
+          label="Birth Day"
+          name="birthday"
+          autoComplete="birthday"
+          autoFocus
           onChange={handleChange}
         />
       <div>
