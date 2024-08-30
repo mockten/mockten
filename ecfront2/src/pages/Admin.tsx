@@ -54,12 +54,12 @@ const AdminLoginPage: React.FC = () => {
             </Button>
           </Grid>
           <Grid item>
-            <Button onClick={handleDeleteUserBottun} fullWidth variant="contained" color="error">
+            <Button onClick={handleDeleteSellerBottun} fullWidth variant="contained" color="error">
               Delete Seller Account
             </Button>
           </Grid>
           <Grid item>
-            <Button onClick={handleDeleteSellerBottun} fullWidth variant="contained" color="error">
+            <Button onClick={handleDeleteUserBottun} fullWidth variant="contained" color="error">
               Delete Customer Account
             </Button>
           </Grid>

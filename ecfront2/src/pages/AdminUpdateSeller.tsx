@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Container, TextField, Button, Grid, Typography } from '@mui/material';
+import { Container, TextField, Button, Grid, Typography } from '@mui/material';
 
 interface SellerUser {
   id: string;
@@ -17,11 +17,6 @@ const AdminUpdateSeller = () => {
   const [email, setEmail] = useState('');
   // const apiUrl = process.env.REACT_APP_ADMIN_API;
   const apiUrl = 'http://localhost:50051';
-
-  const validateEmail = (email: string) => {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(email);
-  };
 
   const handleSearch = async () => {
     setLoading(true);

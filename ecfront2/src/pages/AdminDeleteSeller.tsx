@@ -13,8 +13,8 @@ const AdminDeleteSeller = () => {
   const [error, setError] = useState<string | null>(null);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [email, setEmail] = useState('');
-  // const apiUrl = process.env.REACT_APP_ADMIN_API;
-  const apiUrl = 'http://localhost:50051';
+  const apiUrl = process.env.REACT_APP_ADMIN_API;
+  // const apiUrl = 'http://localhost:50051';
 
   const handleSearch = async () => {
     setLoading(true);
