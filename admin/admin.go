@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
@@ -18,13 +19,20 @@ import (
 )
 
 const (
-	port         = ":50051"
-	keycloakURL  = "http://localhost:8080"
-	realm        = "mockten-realm-dev"
-	adminUser    = "superadmin"
-	adminPass    = "superadmin"
-	clientID     = "admin-cli"
-	clientSecret = "mockten-client-secret"
+	port            = ":50051"
+	findSellerAPI   = "v1/admin/seller"
+	createSellerAPI = "v1/admin/seller/create"
+	updateSellerAPI = "v1/admin/seller/update"
+	deleteSellerAPI = "v1/admin/seller/delete"
+)
+
+var (
+	keycloakURL  string
+	realm        string
+	adminUser    string
+	adminPass    string
+	clientID     string
+	clientSecret string
 )
 
 var user struct {
@@ -42,6 +50,7 @@ var user struct {
 }
 
 var deleteUser struct {
+	UserID   string `json:"userid" binding:"required"`
 	Email    string `json:"email" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
@@ -70,7 +79,7 @@ func CORSMiddleware() gin.HandlerFunc {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
@@ -115,11 +124,13 @@ func getAccessToken() (string, error) {
 func findUserByEmail(email string) ([]map[string]interface{}, error) {
 	token, err := getAccessToken()
 	if err != nil {
+		logger.Error("Unexpected error occurred when get access token.")
 		return nil, err
 	}
 
 	req, err := http.NewRequest("GET", keycloakURL+"/admin/realms/"+realm+"/users?email="+email, nil)
 	if err != nil {
+		logger.Error("Unexpected error occurred when creating request.")
 		return nil, err
 	}
 
@@ -128,14 +139,16 @@ func findUserByEmail(email string) ([]map[string]interface{}, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
+		logger.Error("Unexpected error occurred when call find user request.")
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		logger.Error("error")
-	}
-	logger.Debug(string(b))
+
+	// b, err := io.ReadAll(resp.Body)
+	// if err != nil {
+	// 	logger.Error("error")
+	// }
+	// logger.Debug(string(b))
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to find user: %s", resp.Status)
@@ -143,10 +156,34 @@ func findUserByEmail(email string) ([]map[string]interface{}, error) {
 
 	var users []map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&users); err != nil {
+		logger.Error("error occurred when specific user data convert to json.", zap.Error(err))
 		return nil, err
 	}
 
 	return users, nil
+}
+
+func findSpecifcSellerUser(c *gin.Context) {
+	email := c.Query("email")
+
+	if email == "" {
+		logger.Error("email parameter is missing.")
+		c.JSON(http.StatusNoContent, gin.H{"message": "There is no users"})
+		return
+	}
+
+	foundUser, err := findUserByEmail(email)
+	if err != nil {
+		logger.Error("error", zap.Error(err))
+		c.JSON(http.StatusNoContent, gin.H{"message": "Unexpected error occurred when find user."})
+		return
+	}
+
+	c.JSON(http.StatusOK, foundUser[0])
+}
+
+func replaceSpacesWithUnderscores(input string) string {
+	return strings.ReplaceAll(input, " ", "_")
 }
 
 // Function to create a new user in Keycloak
@@ -170,10 +207,15 @@ func createSellerUser(c *gin.Context) {
 		zap.String("birthday", user.Birthday),
 	)
 
+	createSellerReqCount.Inc()
+
 	data, err := findUserByEmail(user.Email)
-	if err == nil {
-		logger.Error("user data already exist.")
-		logger.Debug(data[0]["username"].(string))
+	if err != nil {
+		logger.Error("something wrong when find users.")
+		return
+	}
+	if len(data) > 0 {
+		logger.Error("user already existed")
 		return
 	}
 
@@ -185,7 +227,7 @@ func createSellerUser(c *gin.Context) {
 	logger.Debug(token)
 
 	user := map[string]interface{}{
-		"username":      user.Displayname,
+		"username":      replaceSpacesWithUnderscores(user.Displayname),
 		"email":         user.Email,
 		"enabled":       true,
 		"emailVerified": true,
@@ -263,6 +305,8 @@ func updateSellerUser(c *gin.Context) {
 		zap.String("phonenum", user.PhoneNum),
 		zap.String("birthday", user.Birthday),
 	)
+
+	updateSellerReqCount.Inc()
 
 	foundUser, err := findUserByEmail(user.Email)
 	if err != nil {
@@ -379,17 +423,12 @@ func deleteSellerUser(c *gin.Context) {
 	}
 
 	logger.Debug("DeleteSellerUser called",
+		zap.String("userid", deleteUser.UserID),
 		zap.String("email", deleteUser.Email),
 		zap.String("password", deleteUser.Password),
 	)
 
-	foundUser, err := findUserByEmail(deleteUser.Email)
-	if err != nil {
-		logger.Error("failed to get user data by email.")
-		return
-	}
-
-	userID := foundUser[0]["id"].(string)
+	deleteSellerReqCount.Inc()
 
 	token, err := getAccessToken()
 	if err != nil {
@@ -399,7 +438,7 @@ func deleteSellerUser(c *gin.Context) {
 
 	logger.Debug(token)
 
-	req, err := http.NewRequest("DELETE", keycloakURL+"/admin/realms/"+realm+"/users/"+userID, nil)
+	req, err := http.NewRequest("DELETE", keycloakURL+"/admin/realms/"+realm+"/users/"+deleteUser.UserID, nil)
 	if err != nil {
 		logger.Error("error occurd when delete request URL in deleteselleruser.")
 		return
@@ -451,15 +490,48 @@ func main() {
 
 	defer logger.Sync()
 
+	keycloakURL = os.Getenv("MOCKTEN_KEYCLOAK_URL")
+	realm = os.Getenv("MOCKTEN_KEYCLOAK_REALM")
+	adminUser = os.Getenv("MOCKTEN_KEYCLOAK_ADMIN_USER")
+	adminPass = os.Getenv("MOCKTEN_KEYCLOAK_ADMIN_PASSWORD")
+	clientID = os.Getenv("MOCKTEN_KEYCLOAK_CLIENT_ID")
+	clientSecret = os.Getenv("MOCKTEN_KEYCLOAK_CLIENT_SECRET")
+
+	if keycloakURL == "" {
+		keycloakURL = "http://localhost:8080"
+		logger.Info("keycloakURL is empty.")
+	}
+	if realm == "" {
+		realm = "mockten-realm-dev"
+		logger.Info("keycloak realm is empty.")
+	}
+	if adminUser == "" {
+		adminUser = "superadmin"
+		logger.Info("keycloak adminuser is empty.")
+	}
+	if adminPass == "" {
+		adminPass = "superadmin"
+		logger.Info("keycloak adminpassword is empty.")
+	}
+	if clientID == "" {
+		clientID = "admin-cli"
+		logger.Info("keycloak clientid is empty.")
+	}
+	if clientSecret == "" {
+		clientSecret = "mockten-client-secret"
+		logger.Info("keycloak clientsecret is empty.")
+	}
+
 	// expose /metrics endpoint for observer(by default Prometheus).
 	go exportMetrics()
 
 	// start application
 	router := gin.Default()
 	router.Use(CORSMiddleware())
-	router.POST("v1/admin/seller/create", createSellerUser)
-	router.PUT("v1/admin/seller/update", updateSellerUser)
-	router.DELETE("v1/admin/seller/delete", deleteSellerUser)
+	router.GET(findSellerAPI, findSpecifcSellerUser)
+	router.POST(createSellerAPI, createSellerUser)
+	router.PUT(updateSellerAPI, updateSellerUser)
+	router.DELETE(deleteSellerAPI, deleteSellerUser)
 	router.Run(port)
 
 }

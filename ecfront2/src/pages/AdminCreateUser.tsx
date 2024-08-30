@@ -49,7 +49,7 @@ const AdminCreateUser = () => {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const apiUrl = process.env.REACT_APP_ADMIN_API;
-    // const apiUrl = 'http://localhost:8080';
+    // const apiUrl = 'http://localhost:50051';
 
     if (password !== confirmPassword) {
       setErrorMessage('Passwords do not match');
