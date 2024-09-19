@@ -18,12 +18,14 @@ const AdminCreateSeller = () => {
     birthday: ''
   });
 
+  const [token, setToken] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [email, setEmail] = useState('');
+  const realm = 'mockten-realm-dev';
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -46,10 +48,41 @@ const AdminCreateSeller = () => {
     event.preventDefault();
   };
 
+  const getToken = async () => {
+    const params = new URLSearchParams();
+    params.append('grant_type', 'password');
+    params.append('client_id', 'admin-cli');
+    params.append('client_secret', 'mockten-client-secret');
+    params.append('username', 'superadmin');
+    params.append('password', 'superadmin');
+
+    try {
+      const response = await fetch(`http://localhost:8080/realms/${realm}/protocol/openid-connect/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch token');
+      }
+
+      const data = await response.json();
+      setToken(data.access_token);
+      console.log('Access Token:', data.access_token);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const apiUrl = process.env.REACT_APP_ADMIN_API;
-    // const apiUrl = 'http://localhost:50051';
+    // const apiUrl = 'http://localhost:8080';
+
+    getToken();
 
     if (password !== confirmPassword) {
       setErrorMessage('Passwords do not match');
@@ -59,13 +92,42 @@ const AdminCreateSeller = () => {
       setErrorMessage('');
       seller.password = password;
       seller.email = email;
+
+      const userData = {
+        username: seller.displayname,
+        email: seller.email,
+        enabled: true,
+        emailVerified: true,
+        firstName: seller.firstname,
+        lastName: seller.lastname,
+        credentials: [
+          {
+            type: 'password',
+            value: seller.password,
+            temporary: false,
+          },
+        ],
+        groups: [
+          "Seller"
+        ],
+        attributes: {
+          phonenum: seller.phonenum,
+          postcode: seller.postcode,
+          address1: seller.address1,
+          address2: seller.address2,
+          address3: seller.address3,
+          birthday: seller.birthday,
+        }
+      };
+
       try {
-        const response = await fetch(`${apiUrl}/v1/admin/seller/create`, {
+        const response = await fetch(`${apiUrl}/admin/realms/${realm}/users`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify(seller)
+          body: JSON.stringify(userData)
         });
 
         if (!response.ok) {
