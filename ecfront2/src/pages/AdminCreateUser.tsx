@@ -49,7 +49,7 @@ const AdminCreateUser = () => {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const apiUrl = process.env.REACT_APP_ADMIN_API;
-    // const apiUrl = 'http://localhost:8080';
+    // const apiUrl = 'http://localhost:50051';
 
     if (password !== confirmPassword) {
       setErrorMessage('Passwords do not match');
@@ -82,16 +82,16 @@ const AdminCreateUser = () => {
 
   return (
     <Container component="main" maxWidth="xs">
-    <h2>Create Seller Account </h2>
+    <h2>Create Customer Account </h2>
       <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1 }}>
         <TextField
           margin="normal"
           required
           fullWidth
-          id="seller_name"
-          label="Seller Name"
-          name="seller_name"
-          autoComplete="seller_name"
+          id="customer_name"
+          label="Customer Name"
+          name="customer_name"
+          autoComplete="customer_name"
           autoFocus
           onChange={handleChange}
         />
