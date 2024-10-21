@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Container, TextField, Button, IconButton, InputAdornment, Grid, Typography } from '@mui/material';
+import { Box, Container, TextField, Button, IconButton, InputAdornment, Grid, Typography, Breadcrumbs, Link} from '@mui/material';
+import { Home as HomeIcon, Grain as GrainIcon } from '@mui/icons-material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
@@ -12,6 +13,11 @@ const AdminLoginPage: React.FC = () => {
       name: '',
       password: ''
     });
+
+    const handleClick = (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
+      event.preventDefault();
+      console.info('You clicked a breadcrumb.');
+    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setAdmin({ ...admin, [e.target.name]: e.target.value });
@@ -32,8 +38,6 @@ const AdminLoginPage: React.FC = () => {
         // const apiUrl = 'http://localhost:8080';
 
         try {
-
-          console.log(admin); // Success handling
           const response = await fetch(`${apiUrl}/v1/admin/login`, {
             method: 'POST',
             headers: {
@@ -58,6 +62,11 @@ const AdminLoginPage: React.FC = () => {
 
     return (
         <Container maxWidth="sm">
+          <Breadcrumbs aria-label="breadcrumb">
+            <Link color="inherit" href="/admin/login" onClick={handleClick}>
+              <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+            </Link>
+          </Breadcrumbs>
         <Box component="form" onSubmit={handleLogin} noValidate sx={{ mt: 1 }}>
         <Grid container spacing={3} direction="column" alignItems="center" justifyContent="center" style={{ minHeight: '100vh' }}>
           <Grid item>
