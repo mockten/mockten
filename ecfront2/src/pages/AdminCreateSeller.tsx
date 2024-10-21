@@ -26,6 +26,7 @@ const AdminCreateSeller = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [email, setEmail] = useState('');
   const realm = 'mockten-realm-dev';
+  const keycloak = 'localhost:8080'
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -52,21 +53,25 @@ const AdminCreateSeller = () => {
     const params = new URLSearchParams();
     params.append('grant_type', 'password');
     params.append('client_id', 'admin-cli');
+    // params.append('client_id', 'mockten-react-client');
     params.append('client_secret', 'mockten-client-secret');
     params.append('username', 'superadmin');
     params.append('password', 'superadmin');
+    // params.append('username', 'seller');
+    // params.append('password', 'seller');
 
     try {
-      const response = await fetch(`http://localhost:8080/realms/${realm}/protocol/openid-connect/token`, {
+      const response = await fetch(`http://${keycloak}/realms/${realm}/protocol/openid-connect/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: params.toString(),
+        mode: 'cors',
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch token');
+        throw new Error(`Error: ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -79,8 +84,8 @@ const AdminCreateSeller = () => {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const apiUrl = process.env.REACT_APP_ADMIN_API;
-    // const apiUrl = 'http://localhost:8080';
+    // const apiUrl = process.env.REACT_APP_ADMIN_API;
+    const apiUrl = 'http://localhost:8080';
 
     getToken();
 
@@ -127,9 +132,9 @@ const AdminCreateSeller = () => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify(userData)
+          body: JSON.stringify(userData),
+          mode: 'cors',
         });
-
         if (!response.ok) {
           throw new Error('Something went wrong');
         }
