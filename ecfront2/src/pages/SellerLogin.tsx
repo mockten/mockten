@@ -11,10 +11,8 @@ const SellerLogin: React.FC = () => {
     const handleLogin = async (e: FormEvent ) => {
         e.preventDefault();
         const clientId = 'mockten-react-client'; 
-        // const clientId = 'admin-cli'; 
         const clientSecret = 'mockten-client-secret';
-        // const url = `http://localhost:8082/api/uam/token`;
-        const url = `http://localhost:8080/realms/mockten-realm-dev/protocol/openid-connect/token`;
+        const url = `http://localhost:8082/api/uam/token`;
 
 
         try {
