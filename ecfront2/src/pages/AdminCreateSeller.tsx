@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Container, TextField, Button, IconButton, InputAdornment, Grid, Typography } from '@mui/material';
+import { Box, Container, TextField, Button, IconButton, InputAdornment, Grid, Typography, Snackbar, Alert } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
@@ -18,13 +18,16 @@ const AdminCreateSeller = () => {
     birthday: ''
   });
 
-  const [token, setToken] = useState<string | null>(null);
+  // const [token, setToken] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [email, setEmail] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [severity, setSeverity] = useState<'success' | 'error'>('success');
   const realm = 'mockten-realm-dev';
   const keycloak = 'localhost:8080'
 
@@ -49,11 +52,22 @@ const AdminCreateSeller = () => {
     event.preventDefault();
   };
 
-  const getToken = async () => {
+  const showSnackbar = (message: string, severity: 'success' | 'error') => {
+    setMessage(message);
+    setSeverity(severity);
+    setOpen(true);
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+    setErrorMessage('');
+  };
+
+  const getToken = async (): Promise<string | null> => {
     const params = new URLSearchParams();
     params.append('grant_type', 'password');
-    params.append('client_id', 'admin-cli');
-    // params.append('client_id', 'mockten-react-client');
+    // params.append('client_id', 'admin-cli');
+    params.append('client_id', 'mockten-react-client');
     params.append('client_secret', 'mockten-client-secret');
     params.append('username', 'superadmin');
     params.append('password', 'superadmin');
@@ -75,10 +89,12 @@ const AdminCreateSeller = () => {
       }
 
       const data = await response.json();
-      setToken(data.access_token);
+      // setToken(data.access_token);
       console.log('Access Token:', data.access_token);
+      return data.access_token;
     } catch (error) {
       console.error(error);
+      return null;
     }
   };
 
@@ -87,7 +103,7 @@ const AdminCreateSeller = () => {
     // const apiUrl = process.env.REACT_APP_ADMIN_API;
     const apiUrl = 'http://localhost:8080';
 
-    getToken();
+    const token = await getToken();
 
     if (password !== confirmPassword) {
       setErrorMessage('Passwords do not match');
@@ -136,13 +152,17 @@ const AdminCreateSeller = () => {
           mode: 'cors',
         });
         if (!response.ok) {
-          throw new Error('Something went wrong');
+          console.error(`Failed to create user:  ${response.status}`);
+          showSnackbar('Request ', 'error');          
+          // throw new Error(`Failed to create user:'  ${response.status}`);
         }
 
         const apiStatus = await response.json();
         console.log(apiStatus); // Success handling
+        showSnackbar('Request succeeded!', 'success');
       } catch (error) {
         console.error(error); // Error handling
+        showSnackbar('Request succeeded!', 'success');          
       }
     }
   };
@@ -337,6 +357,11 @@ const AdminCreateSeller = () => {
         <Button type="submit" fullWidth variant="contained" sx={{ mt: 3, mb: 2 }}>
           Create
         </Button>
+        <Snackbar open={open} autoHideDuration={6000} onClose={handleClose}>
+          <Alert onClose={handleClose} severity={severity} sx={{ width: '100%' }}>
+            {message}
+          </Alert>
+      </Snackbar>
       </Box>
     </Container>
   );
