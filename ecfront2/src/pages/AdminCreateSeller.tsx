@@ -1,29 +1,35 @@
 import React, { useState } from 'react';
-import { Box, Container, TextField, Button, IconButton, InputAdornment, Grid, Typography } from '@mui/material';
+import { Box, Container, TextField, Button, IconButton, InputAdornment, Grid, Typography, Snackbar, Alert } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
 const AdminCreateSeller = () => {
   const [seller, setSeller] = useState({
-    seller_name: '',
+    displayname: '',
+    firstname: '',
+    lastname: '',
     password: '',
-    mail_address: '',
-    phone_num: '',
+    email: '',
+    phonenum: '',
     address1: '',
     address2: '',
     address3: '',
-    post_code: 0,
-    birth_day: '',
-    regist_day: '',
-    last_update: ''
+    postcode: '',
+    birthday: ''
   });
 
+  // const [token, setToken] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [email, setEmail] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [severity, setSeverity] = useState<'success' | 'error'>('success');
+  const realm = 'mockten-realm-dev';
+  const keycloak = 'localhost:8080'
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -46,10 +52,58 @@ const AdminCreateSeller = () => {
     event.preventDefault();
   };
 
+  const showSnackbar = (message: string, severity: 'success' | 'error') => {
+    setMessage(message);
+    setSeverity(severity);
+    setOpen(true);
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+    setErrorMessage('');
+  };
+
+  const getToken = async (): Promise<string | null> => {
+    const params = new URLSearchParams();
+    params.append('grant_type', 'password');
+    // params.append('client_id', 'admin-cli');
+    params.append('client_id', 'mockten-react-client');
+    params.append('client_secret', 'mockten-client-secret');
+    params.append('username', 'superadmin');
+    params.append('password', 'superadmin');
+    // params.append('username', 'seller');
+    // params.append('password', 'seller');
+
+    try {
+      const response = await fetch(`http://${keycloak}/realms/${realm}/protocol/openid-connect/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
+        mode: 'cors',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      // setToken(data.access_token);
+      console.log('Access Token:', data.access_token);
+      return data.access_token;
+    } catch (error) {
+      console.error(error);
+      return null;
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const apiUrl = process.env.REACT_APP_ADMIN_API;
-    // const apiUrl = 'http://localhost:8080';
+    // const apiUrl = process.env.REACT_APP_ADMIN_API;
+    const apiUrl = 'http://localhost:8080';
+
+    const token = await getToken();
 
     if (password !== confirmPassword) {
       setErrorMessage('Passwords do not match');
@@ -58,24 +112,57 @@ const AdminCreateSeller = () => {
     } else {
       setErrorMessage('');
       seller.password = password;
-      seller.mail_address = email;
+      seller.email = email;
+
+      const userData = {
+        username: seller.displayname,
+        email: seller.email,
+        enabled: true,
+        emailVerified: true,
+        firstName: seller.firstname,
+        lastName: seller.lastname,
+        credentials: [
+          {
+            type: 'password',
+            value: seller.password,
+            temporary: false,
+          },
+        ],
+        groups: [
+          "Seller"
+        ],
+        attributes: {
+          phonenum: seller.phonenum,
+          postcode: seller.postcode,
+          address1: seller.address1,
+          address2: seller.address2,
+          address3: seller.address3,
+          birthday: seller.birthday,
+        }
+      };
+
       try {
-        const response = await fetch(`${apiUrl}/v1/admin/seller/create`, {
+        const response = await fetch(`${apiUrl}/admin/realms/${realm}/users`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify(seller)
+          body: JSON.stringify(userData),
+          mode: 'cors',
         });
-
         if (!response.ok) {
-          throw new Error('Something went wrong');
+          console.error(`Failed to create user:  ${response.status}`);
+          showSnackbar('Request ', 'error');          
+          // throw new Error(`Failed to create user:'  ${response.status}`);
         }
 
         const apiStatus = await response.json();
         console.log(apiStatus); // Success handling
+        showSnackbar('Request succeeded!', 'success');
       } catch (error) {
         console.error(error); // Error handling
+        showSnackbar('Request succeeded!', 'success');          
       }
     }
   };
@@ -88,15 +175,38 @@ const AdminCreateSeller = () => {
           margin="normal"
           required
           fullWidth
-          id="seller_name"
-          label="Seller Name"
-          name="seller_name"
-          autoComplete="seller_name"
+          id="displayname"
+          label="Display Name"
+          name="displayname"
+          autoComplete="displayname"
           autoFocus
           onChange={handleChange}
         />
         <TextField
           margin="normal"
+          required
+          fullWidth
+          id="firstname"
+          label="First Name"
+          name="firstname"
+          autoComplete="firstname"
+          autoFocus
+          onChange={handleChange}
+        />
+        <TextField
+          margin="normal"
+          required
+          fullWidth
+          id="lastname"
+          label="Last Name"
+          name="lastname"
+          autoComplete="lastname"
+          autoFocus
+          onChange={handleChange}
+        />
+        <TextField
+          margin="normal"
+          required
           label="Password"
           variant="outlined"
           type={showPassword ? 'text' : 'password'}
@@ -120,6 +230,7 @@ const AdminCreateSeller = () => {
         />
         <TextField
           margin="normal"
+          required
           label="Confirm Password"
           variant="outlined"
           type={showConfirmPassword ? 'text' : 'password'}
@@ -152,35 +263,30 @@ const AdminCreateSeller = () => {
           margin="normal"
           required
           fullWidth
-          id="mail_address"
-          label="Main Mail Address"
-          name="mail_address1"
-          autoComplete="mail_address1"
+          id="email"
+          label="Mail Address"
+          name="email"
+          autoComplete="email"
           autoFocus
           onChange={(e) => setEmail(e.target.value)}
           />
         <TextField
           margin="normal"
-          fullWidth
-          id="mail_address2"
-          label="Sub Mail Address"
-          name="mail_address2"
-          autoComplete="mail_address2"
-          autoFocus
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <TextField
-          margin="normal"
           required
           fullWidth
-          id="phone_number1"
+          id="phonenum"
+          inputProps={{
+            pattern: '\\d*',  
+            inputMode: 'tel', 
+            maxLength: 15,  
+          }}
           label="Phone Number"
-          name="phone_number1"
-          autoComplete="phone_number1"
+          name="phonenum"
+          autoComplete="phonenum"
           autoFocus
           type="number"
           onChange={handleChange}
-        />       
+        /> 
         <TextField
           margin="normal"
           required
@@ -219,11 +325,31 @@ const AdminCreateSeller = () => {
           required
           fullWidth
           id="postcode"
+          inputProps={{
+            pattern: '[0-9]{3}-?[0-9]{4}', 
+            inputMode: 'numeric',        
+            maxLength: 8,               
+          }}
           label="Postcode"
           name="postcode"
           autoComplete="postcode"
           autoFocus
-          type="number"
+          helperText="ex: 123-4567"
+          onChange={handleChange}
+        />
+        <TextField
+          margin="normal"
+          type="date"
+          required
+          fullWidth
+          id="birthday"
+          InputLabelProps={{
+            shrink: true,
+          }}
+          label="Birth Day"
+          name="birthday"
+          autoComplete="birthday"
+          autoFocus
           onChange={handleChange}
         />
       <div>
@@ -231,6 +357,11 @@ const AdminCreateSeller = () => {
         <Button type="submit" fullWidth variant="contained" sx={{ mt: 3, mb: 2 }}>
           Create
         </Button>
+        <Snackbar open={open} autoHideDuration={6000} onClose={handleClose}>
+          <Alert onClose={handleClose} severity={severity} sx={{ width: '100%' }}>
+            {message}
+          </Alert>
+      </Snackbar>
       </Box>
     </Container>
   );

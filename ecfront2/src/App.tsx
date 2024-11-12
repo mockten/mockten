@@ -12,6 +12,8 @@ import MyFavoriteList from './pages/MyFavoriteList';
 import AdminLogin from './pages/AdminLogin';
 import AdminCreateUser from './pages/AdminCreateUser';
 import AdminCreateSeller from './pages/AdminCreateSeller';
+import AdminUpdateSeller from './pages/AdminUpdateSeller';
+import AdminDeleteSeller from './pages/AdminDeleteSeller';
 import Admin from './pages/Admin';
 
 
@@ -33,6 +35,8 @@ const App: React.FC = () => {
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/user/create" element={<AdminCreateUser />} />
         <Route path="/admin/seller/create" element={<AdminCreateSeller />} />
+        <Route path="/admin/seller/edit" element={<AdminUpdateSeller />} />
+        <Route path="/admin/seller/delete" element={<AdminDeleteSeller />} />
         <Route path="/admin/" element={<Admin />} />
       </Routes>
     </Router>

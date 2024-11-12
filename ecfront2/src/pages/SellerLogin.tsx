@@ -12,6 +12,7 @@ const SellerLogin: React.FC = () => {
         e.preventDefault();
         const url = `/api/uam/token`;
 
+
         try {
             const response = await axios.post(url, new URLSearchParams({
                 username: sellerID,
