@@ -4,7 +4,6 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm install
 COPY . ./
-ENV ESBUILD_BINARY_PATH=""
 RUN npm run build:dev
 
 # Execution Stage
