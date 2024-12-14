@@ -198,8 +198,8 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/uam/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/uam:release-v${SNAPSHOT_VERSION}"
+        #export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/uam/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/uam"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -220,7 +220,7 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/apigw/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/apigw:release-v${SNAPSHOT_VERSION}"
+        #export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/apigw/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/apigw"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
