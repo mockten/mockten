@@ -1,0 +1,15 @@
+version: "3"
+tasks:
+  build: 
+    cmds:
+      - (cd uam && docker run --rm --name uam -p 8080:8080 -dit uam)
+      - (cd apigw && docker run --rm --name apigw -p 8082:8082 -p 8001:8001 -p 8002:8002 -dit apigw)
+      - (cd ecfront2 && npm run dev)
+  destroy: 
+    cmds:
+      - (docker stop uam)
+      - (docker stop apigw)
+  setup:
+    cmds:
+      - (cd uam && docker build -t uam .)
+      - (cd apigw && docker build -t apigw .)
