@@ -12,6 +12,10 @@ jobs:
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v2
+      
+    - name: Set Permissions
+      run: echo "::add-mask::${{ secrets.GITHUB_TOKEN }}"
+      
     - name: Log in to GitHub Container Registry
       uses: docker/login-action@v2
       with:
@@ -19,10 +23,14 @@ jobs:
         username: ${{ github.repository_owner }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Debug Verify Tags
+      run: |
+        curl -v -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://ghcr.io/v2/${{ github.repository_owner }}/ecfront/tags/list
+
     - name: Push the docker image
       run: |
-        curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://ghcr.io/v2/mockten/ecfront/tags/list
-        export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/ecfront/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
+        export SNAPSHOT_VERSION=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://ghcr.io/v2/${{ github.repository_owner }}/ecfront/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
+        #export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/ecfront/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
         export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/ecfront:release-v${SNAPSHOT_VERSION}"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
