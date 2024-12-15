@@ -1,12 +1,14 @@
 import React, { useState, FormEvent } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../Auth';
 import { Container, TextField, Button, Grid, Typography } from '@mui/material';
 
 const LoginPage: React.FC = () => {
     const [userID, setUserID] = useState('');
     const [password, setPassword] = useState('');
     const navigate = useNavigate();
+    const auth = useAuth();
 
     const handleLogin = async (e: FormEvent ) => {
         e.preventDefault();
@@ -45,8 +47,10 @@ const LoginPage: React.FC = () => {
 
                 const roles = userInfo.roles || [];
                 console.log('Roles:', roles);
+                auth.login(token);
 
-                navigate('/d', { state: { token } });
+                // navigate('/', { state: { token } });
+                navigate('/');
                 
             } catch (userInfoError) {
                 if (axios.isAxiosError(userInfoError)) {

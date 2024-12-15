@@ -63,12 +63,19 @@
       {
         "name": "seller",
         "description": "Role for sellers"
+      },
+      {
+        "name": "customer",
+        "description": "Role for customers"
       }
     ]
   },
   "groups": [
     {
       "name": "Seller"
+    },
+    {
+      "name": "Customer"
     },
     {
       "name": "admin-group",
