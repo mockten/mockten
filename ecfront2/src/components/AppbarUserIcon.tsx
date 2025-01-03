@@ -17,12 +17,12 @@ function AppbarUserIcon() {
   };
 
   const handleMyAccountClick = () => {
-    window.open('/user/login', '_blank');
+    window.open('/user/id', '_blank');
     handleClose();
   };
 
   const handleSellerAccountClick = () => {
-    window.open('/seller/login', '_blank');
+    window.open('/seller/id', '_blank');
     handleClose();
   };
 

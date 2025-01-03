@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import IconButton from '@mui/material/IconButton';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import Badge from '@mui/material/Badge';
+import { useNavigate } from 'react-router-dom';
 
 interface Cart {
   amount: number;
@@ -10,12 +11,13 @@ interface Cart {
 
 function AppbarShoppingCartIcon() {
   const [cartAmount, setCartAmount] = useState<number>();
+  const navigate = useNavigate();
 
   // const apiUrl = process.env.REACT_APP_ACCOUNT_API;
   const apiUrl = 'http://localhost:8080';
 
   const handleIconClick = () => {
-    window.open('/cart/list', '_blank');
+    navigate('/cart/list');
   };
 
   useEffect(() => {
