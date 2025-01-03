@@ -1,3 +1,8 @@
+# Run colima on local laptop
+```
+$ colima start
+```
+
 # Run uam(keycloak) component
 ```
 $ cd uam

@@ -28,7 +28,6 @@ const LoginPage: React.FC = () => {
             }));
 
             const token = response.data.access_token;
-            console.log('Token:', token);
 
             try {
                 const userInfoResponse = await axios.get(

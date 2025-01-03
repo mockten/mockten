@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import IconButton from '@mui/material/IconButton';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import Badge from '@mui/material/Badge';
+import { useNavigate } from 'react-router-dom';
 
 interface Favorite {
   amount: number;
@@ -10,12 +11,14 @@ interface Favorite {
 
 function AppbarFavoriteIcon() {
   const [favoriteAmount, setFavoriteAmount] = useState<number>();
+  const navigate = useNavigate();
 
   // const apiUrl = process.env.REACT_APP_ACCOUNT_API;
   const apiUrl = 'http://localhost:8080';
 
   const handleIconClick = () => {
-    window.open('/fav/list', '_blank');
+    navigate('/fav/list');
+    // window.open('/fav/list', '_blank');
   };
 
   useEffect(() => {
