@@ -28,6 +28,12 @@ const LoginPage: React.FC = () => {
             }));
 
             const token = response.data.access_token;
+            const decodedToken = JSON.parse(atob(token.split('.')[1]));
+            const roles = decodedToken.roles || [];
+
+            if (!roles.includes('customer')) {
+              throw new Error('You are not authorized as a customer');
+            }
 
             try {
                 const userInfoResponse = await axios.get(
@@ -39,13 +45,9 @@ const LoginPage: React.FC = () => {
                     }
                 );
 
-                console.log('UserInfo Response:', userInfoResponse);
                 const userInfo = userInfoResponse.data;
                 console.log('User Info:', userInfo);
-                console.log('Status Code:', userInfoResponse.status);
 
-                const roles = userInfo.roles || [];
-                console.log('Roles:', roles);
                 auth.login(token);
 
                 // navigate('/', { state: { token } });
@@ -54,7 +56,6 @@ const LoginPage: React.FC = () => {
             } catch (userInfoError) {
                 if (axios.isAxiosError(userInfoError)) {
                     console.error('Login failed:', userInfoError.response?.data);
-                    console.error('Status Code:', userInfoError.response?.status);
                 } else {
                     console.error('Login failed:', userInfoError);
                 }

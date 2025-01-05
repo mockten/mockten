@@ -17,7 +17,7 @@ function AppbarUserIcon() {
   };
 
   const handleMyAccountClick = () => {
-    window.open('/user/id', '_blank');
+    window.open('/user', '_blank');
     handleClose();
   };
 

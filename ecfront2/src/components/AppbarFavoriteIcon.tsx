@@ -18,7 +18,6 @@ function AppbarFavoriteIcon() {
 
   const handleIconClick = () => {
     navigate('/fav/list');
-    // window.open('/fav/list', '_blank');
   };
 
   useEffect(() => {

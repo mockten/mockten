@@ -1,12 +1,14 @@
 import React, { useState, FormEvent } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../Auth';
 import { Container, TextField, Button, Grid, Typography } from '@mui/material';
 
 const SellerLogin: React.FC = () => {
     const [sellerID, setSellerID] = useState('');
     const [sellerpassword, setSellerPassword] = useState('');
     const navigate = useNavigate();
+    const auth = useAuth();
 
     const handleLogin = async (e: FormEvent ) => {
         e.preventDefault();
@@ -22,6 +24,13 @@ const SellerLogin: React.FC = () => {
             const token = response.data.access_token;
             console.log('Token:', token);
 
+            const decodedToken = JSON.parse(atob(token.split('.')[1]));
+            const roles = decodedToken.roles || [];
+
+            if (!roles.includes('seller')) {
+              throw new Error('You are not authorized as a seller');
+            }
+
             try {
                 const userInfoResponse = await axios.get(
                     `/api/uam/userinfo`,
@@ -32,19 +41,13 @@ const SellerLogin: React.FC = () => {
                     }
                 );
 
-                console.log('UserInfo Response:', userInfoResponse);
                 const userInfo = userInfoResponse.data;
                 console.log('User Info:', userInfo);
-                console.log('Status Code:', userInfoResponse.status);
 
-                const roles = userInfo.roles || [];
-                console.log('Roles:', roles);
-
-                if (!roles.includes('seller')) {
-                    throw new Error('You are not authorized as a seller');
-                }
+                auth.login(token);
 
                 navigate(`/seller?name=${encodeURIComponent(sellerID)}`, { state: { token } });
+
             } catch (userInfoError) {
                 if (axios.isAxiosError(userInfoError)) {
                     console.error('Login failed:', userInfoError.response?.data);
