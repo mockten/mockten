@@ -12,19 +12,12 @@ const LoginPage: React.FC = () => {
 
     const handleLogin = async (e: FormEvent ) => {
         e.preventDefault();
-        const clientId = 'mockten-react-client'; 
-        const clientSecret = 'mockten-client-secret';
-        const realm = 'mockten-realm-dev';
-        const url = `http://localhost:8080/realms/${realm}/protocol/openid-connect/token`;
+        const url = `/api/uam/token`;
 
         try {
             const response = await axios.post(url, new URLSearchParams({
-                grant_type: 'password',
-                client_id: clientId,
-                client_secret: clientSecret,
                 username: userID,
                 password: password,
-                scope: 'openid profile'
             }));
 
             const token = response.data.access_token;
@@ -37,7 +30,7 @@ const LoginPage: React.FC = () => {
 
             try {
                 const userInfoResponse = await axios.get(
-                    `http://localhost:8080/realms/${realm}/protocol/openid-connect/userinfo`,
+                    `/api/uam/userinfo`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`,
