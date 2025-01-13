@@ -1,36 +1,36 @@
 import React, { useState, FormEvent } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../Auth';
 import { Container, TextField, Button, Grid, Typography } from '@mui/material';
 
 const LoginPage: React.FC = () => {
     const [userID, setUserID] = useState('');
     const [password, setPassword] = useState('');
     const navigate = useNavigate();
+    const auth = useAuth();
 
     const handleLogin = async (e: FormEvent ) => {
         e.preventDefault();
-        const clientId = 'mockten-react-client'; 
-        const clientSecret = 'mockten-client-secret';
-        const realm = 'mockten-realm-dev';
-        const url = `http://localhost:8080/realms/${realm}/protocol/openid-connect/token`;
+        const url = `/api/uam/token`;
 
         try {
             const response = await axios.post(url, new URLSearchParams({
-                grant_type: 'password',
-                client_id: clientId,
-                client_secret: clientSecret,
                 username: userID,
                 password: password,
-                scope: 'openid profile'
             }));
 
             const token = response.data.access_token;
-            console.log('Token:', token);
+            const decodedToken = JSON.parse(atob(token.split('.')[1]));
+            const roles = decodedToken.roles || [];
+
+            if (!roles.includes('customer')) {
+              throw new Error('You are not authorized as a customer');
+            }
 
             try {
                 const userInfoResponse = await axios.get(
-                    `http://localhost:8080/realms/${realm}/protocol/openid-connect/userinfo`,
+                    `/api/uam/userinfo`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`,
@@ -38,20 +38,17 @@ const LoginPage: React.FC = () => {
                     }
                 );
 
-                console.log('UserInfo Response:', userInfoResponse);
                 const userInfo = userInfoResponse.data;
                 console.log('User Info:', userInfo);
-                console.log('Status Code:', userInfoResponse.status);
 
-                const roles = userInfo.roles || [];
-                console.log('Roles:', roles);
+                auth.login(token);
 
-                navigate('/d', { state: { token } });
+                // navigate('/', { state: { token } });
+                navigate('/');
                 
             } catch (userInfoError) {
                 if (axios.isAxiosError(userInfoError)) {
                     console.error('Login failed:', userInfoError.response?.data);
-                    console.error('Status Code:', userInfoError.response?.status);
                 } else {
                     console.error('Login failed:', userInfoError);
                 }

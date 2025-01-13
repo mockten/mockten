@@ -1,6 +1,9 @@
 {
   "realm": "mockten-realm-dev",
   "enabled": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "emailAsUsername": true,
   "clients": [
     {
       "clientId": "mockten-react-client",
@@ -63,12 +66,19 @@
       {
         "name": "seller",
         "description": "Role for sellers"
+      },
+      {
+        "name": "customer",
+        "description": "Role for customers"
       }
     ]
   },
   "groups": [
     {
       "name": "Seller"
+    },
+    {
+      "name": "Customer"
     },
     {
       "name": "admin-group",
