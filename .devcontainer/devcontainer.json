@@ -1,0 +1,6 @@
+{
+    "image": "mcr.microsoft.com/devcontainers/universal:2",
+    "features": {
+    },
+    "postCreateCommand": "go install github.com/go-task/task/v3/cmd/task@latest && cd ecfront2 && npm install"
+  }

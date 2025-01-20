@@ -28,3 +28,29 @@ services:
         methods:
           - GET
           - OPTIONS
+  - name: keycloak-admin-users
+    #url: http://host.docker.internal:8080/admin/realms/mockten-realm-dev/users
+    url: http://uam-service.default.svc.cluster.local:8080/admin/realms/mockten-realm-dev/users
+    routes:
+      - name: keycloak-admin-users-route
+        paths:
+          - /api/uam/users
+        strip_path: true
+        methods:
+          - POST
+          - OPTIONS
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - Authorization:$http_authorization
+          remove:
+            headers:
+              - host
+      - name: cors
+        config:
+          origins: ['*']
+          methods: ['POST', 'OPTIONS']
+          headers: ['Authorization', 'Content-Type']
+          credentials: true
