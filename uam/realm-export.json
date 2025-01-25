@@ -1,9 +1,12 @@
 {
   "realm": "mockten-realm-dev",
   "enabled": true,
+  "registrationAllowed": false,
+  "registrationEmailAsUsername": true,
+  "rememberMe": false,
+  "verifyEmail": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
-  "emailAsUsername": true,
   "clients": [
     {
       "clientId": "mockten-react-client",
