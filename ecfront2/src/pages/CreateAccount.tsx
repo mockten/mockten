@@ -162,8 +162,8 @@ const CreateAccount = () => {
         console.log('(3)User created successfully');     
         console.log('(4)Fetching created user by email: ', user.email);
 
-        //const userSearchResponse = await fetch(`/api/uam/users`, {
-        const userSearchResponse = await fetch(`http://localhost:8082/api/uam/users`, {
+        const userSearchResponse = await fetch(`/api/uam/users`, {
+        //const userSearchResponse = await fetch(`http://localhost:8082/api/uam/users`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
