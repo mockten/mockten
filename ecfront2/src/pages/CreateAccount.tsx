@@ -28,8 +28,6 @@ const CreateAccount = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [severity, setSeverity] = useState<'success' | 'error'>('success');
-  //const realm = 'mockten-realm-dev';
-  //const keycloak = 'localhost:8080'
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -66,7 +64,7 @@ const CreateAccount = () => {
   const getToken = async (): Promise<string | null> => {
     const params = new URLSearchParams();
     params.append('grant_type', 'password');
-    // params.append('client_id', 'admin-cli');
+    //params.append('client_id', 'admin-cli'); 
     params.append('client_id', 'mockten-react-client');
     params.append('client_secret', 'mockten-client-secret');
     params.append('username', 'superadmin');
@@ -75,8 +73,9 @@ const CreateAccount = () => {
     // params.append('password', 'seller');
 
     try {
-      const response = await fetch(`/api/uam/token`, {     
-      //const response = await fetch(`http://${keycloak}/realms/${realm}/protocol/openid-connect/token`, {
+      console.log('(1) Requesting Admin Access Token...');
+      //const response = await fetch(`http://localhost:8082/api/uam/token`, {     
+      const response = await fetch(`/api/uam/token`, { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -84,13 +83,13 @@ const CreateAccount = () => {
         body: params.toString(),
         mode: 'cors',
       });
-
       if (!response.ok) {
         throw new Error(`Error: ${response.statusText}`);
       }
 
       const data = await response.json();
       // setToken(data.access_token);
+      console.log('(1.1) Admin Access Token retrieved successfully.')
       console.log('Access Token:', data.access_token);
       return data.access_token;
     } catch (error) {
@@ -102,7 +101,6 @@ const CreateAccount = () => {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     // const apiUrl = process.env.REACT_APP_ADMIN_API;
-    //const apiUrl = 'http://localhost:8080';
 
     const token = await getToken();
 
@@ -130,8 +128,11 @@ const CreateAccount = () => {
           },
         ],
         groups: [
-          "Seller"
+          "Customer"
         ],
+        realmRoles: [
+          "customer"
+        ],        
         attributes: {
           postcode: user.postcode,
           address1: user.address1,
@@ -142,25 +143,96 @@ const CreateAccount = () => {
       };
 
       try {
+        console.log('(2)Creating user with email:', user.email);
         const response = await fetch(`/api/uam/users`, {
-        //const response = await fetch(`${apiUrl}/admin/realms/${realm}/users`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(userData),
-          mode: 'cors',
-        });
+          //const response = await fetch(`http://localhost:8082/api/uam/users`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(userData),
+            mode: 'cors',
+          });        
         if (!response.ok) {
           console.error(`Failed to create user:  ${response.status}`);
           showSnackbar('Request ', 'error');          
           // throw new Error(`Failed to create user:'  ${response.status}`);
         }
+        console.log('(3)User created successfully');     
+        console.log('(4)Fetching created user by email: ', user.email);
 
-        const apiStatus = await response.json();
-        console.log(apiStatus); // Success handling
+        //const userSearchResponse = await fetch(`/api/uam/users`, {
+        const userSearchResponse = await fetch(`http://localhost:8082/api/uam/users`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!userSearchResponse.ok) {
+          console.error(`Failed to fetch users: ${userSearchResponse.status}`);
+          showSnackbar("Failed to fetch users", "error");
+          return;
+        }
+        const users = await userSearchResponse.json();
+        const targetUser = users.find((u: { email: string }) => u.email === user.email);
+    
+        if (!targetUser) {
+          console.error(`User with email ${user.email} not found`);
+          showSnackbar(`User with email ${user.email} not found`, "error");
+          return;
+        }
+        console.log('(5)User ID:', targetUser.id)   
+
         showSnackbar('Request succeeded!', 'success');
+        console.log('(6) Fetching role ID for "customer"');
+        //const rolesResponse = await fetch(`http://localhost:8082/api/uam/roles`, {
+        const rolesResponse = await fetch(`/api/uam/roles`, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+    
+        if (!rolesResponse.ok) {
+          console.error(`Failed to fetch roles: ${rolesResponse.status}`);
+          showSnackbar("Failed to fetch roles", "error");
+          return;
+        }
+    
+        const roles = await rolesResponse.json();
+        const customerRole = roles.find((r: { name: string }) => r.name === "customer");
+    
+        if (!customerRole) {
+          console.error(`Role "customer" not found`);
+          showSnackbar(`Role "customer" not found`, "error");
+          return;
+        }
+        console.log('(7) Retrieved role ID:', customerRole.id);
+        console.log('(8)Fetching roles assigned to the user...')
+        const assignRoleRequestBody = {
+          user_id: targetUser.id,  
+          roles: [{ id: customerRole.id, name: "customer" }] 
+        };
+        ;
+        console.log("assignRoleRequestBody の型:", typeof assignRoleRequestBody);
+        console.log("Assign Role Request Body:", assignRoleRequestBody);
+        //const assignRoleResponse = await fetch(`http://localhost:8082/api/uam/role-mapping`, {
+        const assignRoleResponse = await fetch(`/api/uam/role-mapping`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(assignRoleRequestBody)
+        });
+
+        if (!assignRoleResponse.ok) {
+          const errorText = await assignRoleResponse.text();
+          console.error(`Failed to assign role: ${assignRoleResponse.status}, Response: ${errorText}`);
+          showSnackbar('Role assignment failed', 'error');
+        } else {
+          console.log('Role assigned successfully');
+        }
       } catch (error) {
         console.error(error); // Error handling
         showSnackbar('Request succeeded!', 'success');          
