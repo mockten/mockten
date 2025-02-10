@@ -31,8 +31,8 @@ services:
           - GET
           - OPTIONS
   - name: keycloak-admin-users
-    url: http://host.docker.internal:8080/admin/realms/mockten-realm-dev/users
-    #url: http://uam-service.default.svc.cluster.local:8080/admin/realms/mockten-realm-dev/users
+    #url: http://host.docker.internal:8080/admin/realms/mockten-realm-dev/users
+    url: http://uam-service.default.svc.cluster.local:8080/admin/realms/mockten-realm-dev/users
     routes:
       - name: keycloak-admin-users-route
         expression: 'http.path == "/api/uam/users" && (http.method == "POST" || http.method == "OPTIONS" || http.method == "GET")'
@@ -53,8 +53,8 @@ services:
           headers: ['Authorization', 'Content-Type']
           credentials: true
   - name: keycloak-admin-roles-mapping
-    url: http://host.docker.internal:8080/admin/realms/mockten-realm-dev/users
-    #url: http://uam-service.default.svc.cluster.local:8080/admin/realms/mockten-realm-dev/users
+    #url: http://host.docker.internal:8080/admin/realms/mockten-realm-dev/users
+    url: http://uam-service.default.svc.cluster.local:8080/admin/realms/mockten-realm-dev/users
     routes:
       - name: keycloak-role-mapping-route
         paths:
@@ -202,8 +202,8 @@ services:
           credentials: true
 
   - name: keycloak-admin-roles
-    url: http://host.docker.internal:8080/admin/realms/mockten-realm-dev/roles
-    #url: http://uam-service.default.svc.cluster.local:8080/admin/realms/mockten-realm-dev/users
+    #url: http://host.docker.internal:8080/admin/realms/mockten-realm-dev/roles
+    url: http://uam-service.default.svc.cluster.local:8080/admin/realms/mockten-realm-dev/roles
     routes:
       - name: keycloak-admin-roles-route
         paths:
