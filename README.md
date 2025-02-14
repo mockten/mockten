@@ -13,12 +13,12 @@ go1.21.4
 node: '20.9.0'
 ```
 
-## Building Dev Infrastructure
+# Building Dev Infrastructure
 Before proceeding, ensure you have the following tool installed on your system:
 
 - [gotask](https://taskfile.dev/#/installation)
 
-## Verify Installation
+## Testing your code
 
 To confirm that `gotask` is correctly installed, run the following command:
 
