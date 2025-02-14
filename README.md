@@ -12,3 +12,39 @@ go1.21.4
 ```
 node: '20.9.0'
 ```
+
+[![DryRun(minikube)](https://github.com/mockten/IaC/actions/workflows/dry-run-local.yml/badge.svg)](https://github.com/mockten/IaC/actions/workflows/dry-run-local.yml)
+[![DryRun(Azure)](https://github.com/mockten/IaC/actions/workflows/dry-run-azure.yml/badge.svg)](https://github.com/mockten/IaC/actions/workflows/dry-run-azure.yml)
+# Building Dev Infrastructure
+
+
+## For Local Environment
+Before proceeding, ensure you have the following tool installed on your system:
+
+- [gotask](https://taskfile.dev/#/installation)
+
+## Verify Installation
+
+To confirm that `gotask` is correctly installed, run the following command:
+
+```sh
+task -v
+```
+
+1. To update your containers, please execute the following commands:
+
+    ```sh
+    task setup
+    ```
+2. To build k8s in your local environment, please execute the following command:
+
+    ```sh
+    task build
+    ```
+3. To clean up, please execute the following command after you cancel your reac app with Ctrl + C:
+
+    ```sh
+    task destroy
+    ```
+
+

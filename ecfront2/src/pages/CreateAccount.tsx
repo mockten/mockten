@@ -85,8 +85,6 @@ const CreateAccount = () => {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // const apiUrl = process.env.REACT_APP_ADMIN_API;
-
     const token = await getToken();
 
     if (password !== confirmPassword) {
