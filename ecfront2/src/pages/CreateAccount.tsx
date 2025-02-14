@@ -74,7 +74,6 @@ const CreateAccount = () => {
 
     try {
       console.log('(1) Requesting Admin Access Token...');
-      //const response = await fetch(`http://localhost:8082/api/uam/token`, {     
       const response = await fetch(`/api/uam/token`, { 
         method: 'POST',
         headers: {
@@ -145,7 +144,6 @@ const CreateAccount = () => {
       try {
         console.log('(2)Creating user with email:', user.email);
         const response = await fetch(`/api/uam/users`, {
-      //const response = await fetch(`http://localhost:8082/api/uam/users`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -163,7 +161,6 @@ const CreateAccount = () => {
         console.log('(4)Fetching created user by email: ', user.email);
 
         const userSearchResponse = await fetch(`/api/uam/users`, {
-        //const userSearchResponse = await fetch(`http://localhost:8082/api/uam/users`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -187,7 +184,6 @@ const CreateAccount = () => {
 
         showSnackbar('Request succeeded!', 'success');
         console.log('(6) Fetching role ID for "customer"');
-        //const rolesResponse = await fetch(`http://localhost:8082/api/uam/roles`, {
         const rolesResponse = await fetch(`/api/uam/roles`, {
           method: "GET",
           headers: { Authorization: `Bearer ${token}` },
@@ -218,7 +214,6 @@ const CreateAccount = () => {
         ;
         console.log("assignRoleRequestBody の型:", typeof assignRoleRequestBody);
         console.log("Assign Role Request Body:", assignRoleRequestBody);
-        //const assignRoleResponse = await fetch(`http://localhost:8082/api/uam/users/${targetUser.id}/role-mappings/realm`, {
         const assignRoleResponse = await fetch(`/api/uam/users/${targetUser.id}/role-mappings/realm`, {
 
           method: 'POST',
