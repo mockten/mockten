@@ -13,12 +13,7 @@ go1.21.4
 node: '20.9.0'
 ```
 
-[![DryRun(minikube)](https://github.com/mockten/IaC/actions/workflows/dry-run-local.yml/badge.svg)](https://github.com/mockten/IaC/actions/workflows/dry-run-local.yml)
-[![DryRun(Azure)](https://github.com/mockten/IaC/actions/workflows/dry-run-azure.yml/badge.svg)](https://github.com/mockten/IaC/actions/workflows/dry-run-azure.yml)
-# Building Dev Infrastructure
-
-
-## For Local Environment
+## Building Dev Infrastructure
 Before proceeding, ensure you have the following tool installed on your system:
 
 - [gotask](https://taskfile.dev/#/installation)
