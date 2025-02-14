@@ -62,24 +62,13 @@ const CreateAccount = () => {
   };
 
   const getToken = async (): Promise<string | null> => {
-    const params = new URLSearchParams();
-    params.append('grant_type', 'password');
-    //params.append('client_id', 'admin-cli'); 
-    params.append('client_id', 'mockten-react-client');
-    params.append('client_secret', 'mockten-client-secret');
-    params.append('username', 'superadmin');
-    params.append('password', 'superadmin');
-    // params.append('username', 'seller');
-    // params.append('password', 'seller');
 
     try {
-      console.log('(1) Requesting Admin Access Token...');
-      const response = await fetch(`/api/uam/token`, { 
+      const response = await fetch(`/api/uam/creation/token`, { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: params.toString(),
         mode: 'cors',
       });
       if (!response.ok) {
@@ -87,9 +76,6 @@ const CreateAccount = () => {
       }
 
       const data = await response.json();
-      // setToken(data.access_token);
-      console.log('(1.1) Admin Access Token retrieved successfully.')
-      console.log('Access Token:', data.access_token);
       return data.access_token;
     } catch (error) {
       console.error(error);
@@ -142,7 +128,6 @@ const CreateAccount = () => {
       };
 
       try {
-        console.log('(2)Creating user with email:', user.email);
         const response = await fetch(`/api/uam/users`, {
             method: 'POST',
             headers: {
@@ -157,8 +142,6 @@ const CreateAccount = () => {
           showSnackbar('Request ', 'error');          
           // throw new Error(`Failed to create user:'  ${response.status}`);
         }
-        console.log('(3)User created successfully');     
-        console.log('(4)Fetching created user by email: ', user.email);
 
         const userSearchResponse = await fetch(`/api/uam/users`, {
           method: "GET",
@@ -180,10 +163,8 @@ const CreateAccount = () => {
           showSnackbar(`User with email ${user.email} not found`, "error");
           return;
         }
-        console.log('(5)User ID:', targetUser.id)   
 
         showSnackbar('Request succeeded!', 'success');
-        console.log('(6) Fetching role ID for "customer"');
         const rolesResponse = await fetch(`/api/uam/roles`, {
           method: "GET",
           headers: { Authorization: `Bearer ${token}` },
@@ -203,8 +184,6 @@ const CreateAccount = () => {
           showSnackbar(`Role "customer" not found`, "error");
           return;
         }
-        console.log('(7) Retrieved role ID:', customerRole.id);
-        console.log('(8)Fetching roles assigned to the user...')
         const assignRoleRequestBody = [
           {
             id: customerRole.id,
@@ -212,8 +191,6 @@ const CreateAccount = () => {
           }
         ];
         ;
-        console.log("assignRoleRequestBody の型:", typeof assignRoleRequestBody);
-        console.log("Assign Role Request Body:", assignRoleRequestBody);
         const assignRoleResponse = await fetch(`/api/uam/users/${targetUser.id}/role-mappings/realm`, {
 
           method: 'POST',

@@ -64,23 +64,12 @@ const AdminCreateSeller = () => {
   };
 
   const getToken = async (): Promise<string | null> => {
-    const params = new URLSearchParams();
-    params.append('grant_type', 'password');
-    // params.append('client_id', 'admin-cli');
-    params.append('client_id', 'mockten-react-client');
-    params.append('client_secret', 'mockten-client-secret');
-    params.append('username', 'superadmin');
-    params.append('password', 'superadmin');
-    // params.append('username', 'seller');
-    // params.append('password', 'seller');
-
     try {
-      const response = await fetch(`/api/uam/token`, {
+      const response = await fetch(`/api/uam/creation/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: params.toString(),
         mode: 'cors',
       });
 
@@ -90,7 +79,6 @@ const AdminCreateSeller = () => {
 
       const data = await response.json();
       // setToken(data.access_token);
-      console.log('Access Token:', data.access_token);
       return data.access_token;
     } catch (error) {
       console.error(error);

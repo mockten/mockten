@@ -19,6 +19,27 @@ services:
               - grant_type:password
               - scope:openid profile
 
+  - name: keycloak-creation-token
+    url: http://uam-service.default.svc.cluster.local:8080/realms/mockten-realm-dev/protocol/openid-connect/token
+    routes:
+      - name: keycloak-creation-token-route
+        paths:
+          - /api/uam/creation/token
+        strip_path: true
+        methods:
+          - POST
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            body:
+              - client_id:mockten-react-client
+              - client_secret:mockten-client-secret
+              - grant_type:password
+              - scope:openid profile
+              - username:superadmin
+              - password:superadmin
+
   - name: keycloak-userinfo
     url: http://uam-service.default.svc.cluster.local:8080/realms/mockten-realm-dev/protocol/openid-connect/userinfo
     routes:
