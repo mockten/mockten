@@ -36,6 +36,10 @@ task -v
     ```sh
     task build
     ```
+3. You can do any tests with http://localhost:
+   
+    ![CleanShot 2025-02-14 at 13 23 37@2x](https://github.com/user-attachments/assets/32157356-2d52-4583-90f8-0469ad32765e)
+
 3. To clean up, please execute the following command after you cancel your reac app with Ctrl + C:
 
     ```sh
