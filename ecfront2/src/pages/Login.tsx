@@ -13,7 +13,6 @@ const LoginPage: React.FC = () => {
     const handleLogin = async (e: FormEvent ) => {
         e.preventDefault();
         const url = `/api/uam/token`;
-
         try {
             const response = await axios.post(url, new URLSearchParams({
                 username: userID,
@@ -23,6 +22,8 @@ const LoginPage: React.FC = () => {
             const token = response.data.access_token;
             const decodedToken = JSON.parse(atob(token.split('.')[1]));
             const roles = decodedToken.roles || [];
+            console.log('Access Token:', token);
+            console.log('roles', roles);
 
             if (!roles.includes('customer')) {
               throw new Error('You are not authorized as a customer');

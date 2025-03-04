@@ -1,4 +1,4 @@
-_format_version: "2.1"
+_format_version: "3.0"
 services:
   - name: keycloak-token
     url: http://uam-service.default.svc.cluster.local:8080/realms/mockten-realm-dev/protocol/openid-connect/token
@@ -18,6 +18,28 @@ services:
               - client_secret:mockten-client-secret
               - grant_type:password
               - scope:openid profile
+
+  - name: keycloak-creation-token
+    url: http://uam-service.default.svc.cluster.local:8080/realms/mockten-realm-dev/protocol/openid-connect/token
+    routes:
+      - name: keycloak-creation-token-route
+        paths:
+          - /api/uam/creation/token
+        strip_path: true
+        methods:
+          - POST
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            body:
+              - client_id:mockten-react-client
+              - client_secret:mockten-client-secret
+              - grant_type:password
+              - scope:openid profile
+              - username:superadmin
+              - password:superadmin
+
   - name: keycloak-userinfo
     url: http://uam-service.default.svc.cluster.local:8080/realms/mockten-realm-dev/protocol/openid-connect/userinfo
     routes:
@@ -29,7 +51,6 @@ services:
           - GET
           - OPTIONS
   - name: keycloak-admin-users
-    #url: http://host.docker.internal:8080/admin/realms/mockten-realm-dev/users
     url: http://uam-service.default.svc.cluster.local:8080/admin/realms/mockten-realm-dev/users
     routes:
       - name: keycloak-admin-users-route
@@ -37,6 +58,7 @@ services:
           - /api/uam/users
         strip_path: true
         methods:
+          - GET
           - POST
           - OPTIONS
     plugins:
@@ -51,6 +73,31 @@ services:
       - name: cors
         config:
           origins: ['*']
-          methods: ['POST', 'OPTIONS']
+          methods: ['POST','OPTIONS','GET']
+          headers: ['Authorization', 'Content-Type']
+          credentials: true
+
+  - name: keycloak-admin-roles
+    url: http://uam-service.default.svc.cluster.local:8080/admin/realms/mockten-realm-dev/roles
+    routes:
+      - name: keycloak-admin-roles-route
+        paths:
+          - /api/uam/roles
+        strip_path: true
+        methods:
+          - OPTIONS
+          - GET
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - Authorization:$http_authorization
+          remove:
+            headers:
+              - host
+      - name: cors
+        config:
+          origins: ['*']
           headers: ['Authorization', 'Content-Type']
           credentials: true

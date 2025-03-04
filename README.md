@@ -12,3 +12,38 @@ go1.21.4
 ```
 node: '20.9.0'
 ```
+
+# Building Dev Infrastructure
+Before proceeding, ensure you have the following tool installed on your system:
+
+- [gotask](https://taskfile.dev/#/installation)
+
+## Testing your code
+
+To confirm that `gotask` is correctly installed, run the following command:
+
+```sh
+task -v
+```
+
+1. To update your containers, please execute the following commands:
+
+    ```sh
+    task setup
+    ```
+2. To build k8s in your local environment, please execute the following command:
+
+    ```sh
+    task build
+    ```
+3. You can do any tests with http://localhost:
+   
+    ![CleanShot 2025-02-14 at 13 23 37@2x](https://github.com/user-attachments/assets/32157356-2d52-4583-90f8-0469ad32765e)
+
+3. To clean up, please execute the following command after you cancel your reac app with Ctrl + C:
+
+    ```sh
+    task destroy
+    ```
+
+
