@@ -2,13 +2,15 @@ version: "3"
 tasks:
   build: 
     cmds:
-      - (cd uam && docker run --rm --name uam -p 8080:8080 -dit uam)
-      - (cd apigw && docker run --rm --name apigw -p 8082:8082 -p 8001:8001 -p 8002:8002 -dit apigw)
+      - (docker network create mockten_nw)
+      - (cd uam && docker run --rm --name uam-service.default.svc.cluster.local --network mockten_nw -p 8080:8080 -dit uam)
+      - (cd apigw && docker run --rm --name apigw --network mockten_nw -p 8082:8082 -p 8001:8001 -p 8002:8002 -dit apigw)
       - (cd ecfront2 && npm run dev)
   destroy: 
     cmds:
-      - (docker stop uam)
+      - (docker stop uam-service.default.svc.cluster.local)
       - (docker stop apigw)
+      - (docker network rm mockten_nw)
   setup:
     cmds:
       - (cd uam && docker build -t uam .)

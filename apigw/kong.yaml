@@ -2,7 +2,6 @@ _format_version: "3.0"
 services:
   - name: keycloak-token
     url: http://uam-service.default.svc.cluster.local:8080/realms/mockten-realm-dev/protocol/openid-connect/token
-    #url: http://host.docker.internal:8080/realms/mockten-realm-dev/protocol/openid-connect/token
     routes:
       - name: keycloak-token-route
         paths:
@@ -31,161 +30,17 @@ services:
           - GET
           - OPTIONS
   - name: keycloak-admin-users
-    #url: http://host.docker.internal:8080/admin/realms/mockten-realm-dev/users
     url: http://uam-service.default.svc.cluster.local:8080/admin/realms/mockten-realm-dev/users
     routes:
       - name: keycloak-admin-users-route
-        expression: 'http.path == "/api/uam/users" && (http.method == "POST" || http.method == "OPTIONS" || http.method == "GET")'
-        strip_path: true
-        priority: 1
-    plugins:
-      - name: request-transformer
-        config:
-          add:
-            headers:
-              - Authorization:$http_authorization
-          remove:
-            headers:
-              - host
-      - name: cors
-        config:
-          origins: ['*']
-          headers: ['Authorization', 'Content-Type']
-          credentials: true
-  - name: keycloak-admin-roles-mapping
-    #url: http://host.docker.internal:8080/admin/realms/mockten-realm-dev/users
-    url: http://uam-service.default.svc.cluster.local:8080/admin/realms/mockten-realm-dev/users
-    routes:
-      - name: keycloak-role-mapping-route
         paths:
-          - /api/uam/role-mapping
-        strip_path: false
+          - /api/uam/users
+        strip_path: true
         methods:
+          - GET
           - POST
           - OPTIONS
     plugins:
-      - name: pre-function
-        config:
-          access:
-            - |
-              local function table_to_json(tbl)
-                  local function serialize(v)
-                      if type(v) == "table" then
-                          local inner_json = "{"
-                          local first = true
-                          for k, val in pairs(v) do
-                              if not first then inner_json = inner_json .. "," end
-                              first = false
-                              inner_json = inner_json .. '"' .. tostring(k) .. '":' .. serialize(val)
-                          end
-                          inner_json = inner_json .. "}"
-                          return inner_json
-                      else
-                          return '"' .. tostring(v) .. '"'
-                      end
-                  end
-                  
-                  if type(tbl) ~= "table" then
-                      return "null"
-                  end
-                  return serialize(tbl)
-              end
-
-              local function parse_json(json_str)
-                  local result = {}
-                  for key, id, name in json_str:gmatch('"(%d+)":%s*{.-"id"%s*:%s*"([^"]+)".-"name"%s*:%s*"([^"]+)"') do
-                      table.insert(result, { id = id, name = name })
-                  end
-                  return result
-              end
-
-              local function fix_json_format(wrong_json_str)
-                  local fixed_array = parse_json(wrong_json_str)
-                  local json_result = "["
-                  local first = true
-                  for _, entry in ipairs(fixed_array) do
-                      if not first then json_result = json_result .. "," end
-                      first = false
-                      json_result = json_result .. string.format('{"id":"%s","name":"%s"}', entry.id, entry.name)
-                  end
-                  json_result = json_result .. "]"
-                  return json_result
-              end
-              local method = kong.request.get_method()
-              kong.log.debug("debug01")
-              if method == "OPTIONS" then
-                  kong.log.debug("debug02")
-                  kong.log.debug("Handling OPTIONS request manually.")
-                  kong.response.set_header("Access-Control-Allow-Origin", "*")
-                  kong.response.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-                  kong.response.set_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
-                  kong.response.set_header("Access-Control-Allow-Credentials", "true")
-                  kong.response.exit(204)
-              end
-              kong.log.debug("debug03")
-              local req_body_raw = kong.request.get_raw_body()
-              kong.log.debug("======== Kong Incoming Request ========")
-              kong.log.debug("Method: ", kong.request.get_method())
-              kong.log.debug("URL: ", kong.request.get_path())
-
-              if not req_body_raw then
-                  kong.log.err("Request body is nil")
-                  return kong.response.exit(400, { message = "Invalid request body" })
-              end
-
-              kong.log.debug("Raw Body: ", req_body_raw)
-              local req_body = kong.request.get_body()
-              if not req_body then
-                  kong.log.err("Parsed request body is nil")
-                  return kong.response.exit(400, { message = "Invalid request body" })
-              end
-
-              local user_id = req_body.user_id
-              if not user_id then
-                  kong.log.err("Missing user_id in request body.")
-                  return kong.response.exit(400, { message = "user_id is required" })
-              end
-
-              local roles = req_body.roles
-              if not roles or type(roles) ~= "table" then
-                  kong.log.err("Invalid roles format")
-                  return kong.response.exit(400, { message = "roles must be an array" })
-              end
-
-              local new_path = "/admin/realms/mockten-realm-dev/users/" .. user_id .. "/role-mappings/realm"
-              kong.log.debug("Setting new path:", new_path)
-              kong.service.request.set_path(new_path)
-
-              local auth_header = kong.request.get_header("Authorization")
-              if auth_header then
-                  kong.log.debug("Final headers before proxying: ", auth_header)
-                  kong.service.request.set_header("Authorization", auth_header)
-              else
-                  kong.log.err("Authorization header missing")
-                  return kong.response.exit(401, { message = "Authorization header required" })
-              end
-
-              kong.log.debug("======== Kong Outgoing Request ========")
-              kong.log.debug("New Path: ", new_path)
-
-              local outgoing_body = table_to_json(roles)
-              kong.log.debug("Outgoing Body (Before Fix): ", table_to_json(roles))
-              outgoing_body = fix_json_format(outgoing_body)
-
-              local function json_to_table(json_str)
-                  local result = {}
-                  for id, name in json_str:gmatch('{"id":"([^"]+)","name":"([^"]+)"}') do
-                      table.insert(result, { id = id, name = name })
-                  end
-                  return result
-              end
-
-              local fixed_table = json_to_table(outgoing_body)
-              kong.log.debug("Fixed Table: ", fixed_table)
-
-              kong.service.request.set_body(fixed_table)
-
-
       - name: request-transformer
         config:
           add:
@@ -202,7 +57,6 @@ services:
           credentials: true
 
   - name: keycloak-admin-roles
-    #url: http://host.docker.internal:8080/admin/realms/mockten-realm-dev/roles
     url: http://uam-service.default.svc.cluster.local:8080/admin/realms/mockten-realm-dev/roles
     routes:
       - name: keycloak-admin-roles-route
