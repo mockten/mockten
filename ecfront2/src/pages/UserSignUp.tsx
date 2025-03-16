@@ -35,6 +35,8 @@ const CreateAccount = () => {
   const navigate = useNavigate();
   const realm = 'mockten-realm-dev';
   const keycloak = 'localhost:8080'
+  //const realm = 'mockten-realm-dev';
+  //const keycloak = 'localhost:8080'
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -78,7 +80,8 @@ const CreateAccount = () => {
     params.append('password', 'superadmin');
 
     try {
-      const response = await fetch(`http://${keycloak}/realms/${realm}/protocol/openid-connect/token`, {
+      const response = await fetch(`/api/uam/token`, {     
+      //const response = await fetch(`http://${keycloak}/realms/${realm}/protocol/openid-connect/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -104,7 +107,7 @@ const CreateAccount = () => {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     // const apiUrl = process.env.REACT_APP_ADMIN_API;
-    const apiUrl = 'http://localhost:8080';
+    //const apiUrl = 'http://localhost:8080';
 
     const token = await getToken();
 
@@ -144,7 +147,8 @@ const CreateAccount = () => {
       };
 
       try {
-        const response = await fetch(`${apiUrl}/admin/realms/${realm}/users`, {
+        const response = await fetch(`/api/uam/users`, {
+        //const response = await fetch(`${apiUrl}/admin/realms/${realm}/users`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
