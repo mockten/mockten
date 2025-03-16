@@ -1,6 +1,9 @@
 import DashboardBottomNavigation from '../components/DashboardBottomNavigation';
 import Appbar from '../components/Appbar';
+import { login } from '../module/login';
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../Auth';
 import { Box, Container, TextField, Button, IconButton, InputAdornment, Grid, Typography, Snackbar, Alert  } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -28,6 +31,8 @@ const CreateAccount = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [severity, setSeverity] = useState<'success' | 'error'>('success');
+  const auth = useAuth();
+  const navigate = useNavigate();
   const realm = 'mockten-realm-dev';
   const keycloak = 'localhost:8080'
 
@@ -71,8 +76,6 @@ const CreateAccount = () => {
     params.append('client_secret', 'mockten-client-secret');
     params.append('username', 'superadmin');
     params.append('password', 'superadmin');
-    // params.append('username', 'seller');
-    // params.append('password', 'seller');
 
     try {
       const response = await fetch(`http://${keycloak}/realms/${realm}/protocol/openid-connect/token`, {
@@ -129,7 +132,7 @@ const CreateAccount = () => {
           },
         ],
         groups: [
-          "Seller"
+          "Customer"
         ],
         attributes: {
           postcode: user.postcode,
@@ -159,9 +162,19 @@ const CreateAccount = () => {
         const apiStatus = await response.json();
         console.log(apiStatus); // Success handling
         showSnackbar('Request succeeded!', 'success');
+        try {
+          const { token, userInfo } = await login(user.email, user.password);
+          console.log('User Info:', userInfo);
+    
+          auth.login(token); 
+          navigate('/');
+        } catch (error) {
+          alert(error instanceof Error ? error.message : 'Login failed');
+        }
       } catch (error) {
         console.error(error); // Error handling
-        showSnackbar('Request succeeded!', 'success');          
+        showSnackbar('Request Error', 'error');
+        navigate('/');     
       }
     }
   };
