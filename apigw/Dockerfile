@@ -1,4 +1,4 @@
-FROM kong/kong-gateway:2.8.1.0-alpine
+FROM kong/kong-gateway:3.9
 
 USER root
 
@@ -9,11 +9,12 @@ ENV KONG_DATABASE=off \
     KONG_DECLARATIVE_CONFIG=/kong/kong.yaml \
     KONG_PROXY_ACCESS_LOG=/tmp/access.log \
     KONG_PROXY_ERROR_LOG=/tmp/error.log \
-    KONG_LOG_LEVEL=debug
+    KONG_LOG_LEVEL=debug \
+    KONG_ROUTER_FLAVOR=expressions
 
 COPY kong.yaml /kong/kong.yaml
 
-ENTRYPOINT ["/bin/sh", "-c", "set -x && apk update && kong migrations bootstrap && kong start && tail -f /tmp/access.log /tmp/error.log"]
+ENTRYPOINT ["/bin/sh", "-c", "set -x && apt update && kong migrations bootstrap && kong start && tail -f /tmp/access.log /tmp/error.log"]
 
 EXPOSE 8082 8001 8002
 
