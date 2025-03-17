@@ -2,8 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import SearchResultDashboard from './pages/Dashboard';
-import Login from './pages/Login';
-import CreateAccount from './pages/CreateAccount';
+import UserLogin from './pages/UserLogin';
+import UserSignUp from './pages/UserSignUp';
 import UserDetail from './pages/UserDetail';
 import ItemDetail from './pages/ItemDetail';
 import SellerDashboard from './pages/SellerDashboard';
@@ -29,8 +29,8 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>}/>
           <Route path="/search" element={<PrivateRoute><SearchResultDashboard /></PrivateRoute>} />
-          <Route path="/user/login" element={<Login />} />
-          <Route path="/user/create" element={<CreateAccount />} />
+          <Route path="/user/login" element={<UserLogin />} />
+          <Route path="/user/signup" element={<UserSignUp />} />
           <Route path="/user" element={<PrivateRoute><UserDetail /></PrivateRoute>} />
           <Route path="/seller/login" element={<PrivateRoute><SellerLogin /></PrivateRoute>} />
           <Route path="/seller/:id" element={<PrivateRoute><SellerDashboard /></PrivateRoute>} />
