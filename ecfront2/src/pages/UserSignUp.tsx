@@ -89,7 +89,7 @@ const CreateAccount = () => {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const token = await getToken();
+    const creationToken = await getToken();
 
     if (password !== confirmPassword) {
       setErrorMessage('Passwords do not match');
@@ -131,7 +131,7 @@ const CreateAccount = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${creationToken}`
           },
           body: JSON.stringify(userData),
           mode: 'cors',
@@ -145,7 +145,7 @@ const CreateAccount = () => {
         const userSearchResponse = await fetch(`/api/uam/users`, {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${creationToken}`,
           },
         });
 
@@ -166,7 +166,7 @@ const CreateAccount = () => {
         showSnackbar('Request succeeded!', 'success');
         const rolesResponse = await fetch(`/api/uam/roles`, {
           method: "GET",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${creationToken}` },
         });
     
         if (!rolesResponse.ok) {
@@ -195,7 +195,7 @@ const CreateAccount = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${creationToken}`
           },
           body: JSON.stringify(assignRoleRequestBody)
         });
@@ -210,10 +210,10 @@ const CreateAccount = () => {
 
         try {
           // Diffrent token between login_token and token(L92).
-          const { login_token, userInfo } = await login(user.email, user.password);
+          const { token, userInfo } = await login(user.email, user.password);
           console.log('User Info:', userInfo);
     
-          auth.login(login_token); 
+          auth.login(token); 
           navigate('/');
         } catch (error) {
           alert(error instanceof Error ? error.message : 'Login failed');
