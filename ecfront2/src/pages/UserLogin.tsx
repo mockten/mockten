@@ -30,6 +30,10 @@ const UserLogin: React.FC = () => {
         }
     };
 
+    const handleSignUp = () => {
+      navigate('/user/signup');
+    };
+
     return (
         <Container maxWidth="sm">
         <Grid container spacing={3} direction="column" alignItems="center" justifyContent="center" style={{ minHeight: '100vh' }}>
@@ -59,6 +63,12 @@ const UserLogin: React.FC = () => {
             <Button variant="contained" color="primary" onClick={handleLogin} fullWidth>
               Login
             </Button>
+          </Grid>
+          <Grid item>
+          <Typography variant="body2">登録していないユーザはこちら</Typography>
+          <Button variant="outlined" color="secondary" onClick={handleSignUp} fullWidth>
+            Sign Up
+          </Button>
           </Grid>
         </Grid>
       </Container>

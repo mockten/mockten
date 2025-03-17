@@ -90,6 +90,7 @@ const CreateAccount = () => {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const creationToken = await getToken();
+    console.log("createToken:" + creationToken);
 
     if (password !== confirmPassword) {
       setErrorMessage('Passwords do not match');
