@@ -11,6 +11,7 @@ function AppbarUserIcon() {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const { isAuthenticated } = useAuth();
   const menuId = 'primary-search-account-menu';
+  const auth = useAuth();
 
   const StyledBadge = styled(Badge)(({ theme }) => ({
     '& .MuiBadge-badge': {
@@ -59,6 +60,11 @@ function AppbarUserIcon() {
     handleClose();
   };
 
+  const handleLogoutClick = () => {
+    auth.logout(); 
+    handleClose();
+  };
+
   return (
     <div>
       <IconButton
@@ -99,6 +105,7 @@ function AppbarUserIcon() {
         >
         <MenuItem onClick={handleMyAccountClick}>My Account</MenuItem>
         <MenuItem onClick={handleSellerAccountClick}>Seller Account</MenuItem>
+        <MenuItem onClick={handleLogoutClick}>Logout</MenuItem>
       </Menu>
     </div>
   );
