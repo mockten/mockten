@@ -1,0 +1,12 @@
+[
+    {
+      "product_id": "123e4567-e89b-12d3-a456-426614174000",
+      "product_name": "bone conduction earphones",
+      "seller_name": "Headphone company",
+      "category": 1,
+      "price": 500,
+      "ranking": 40,
+      "stocks": 20,
+      "main_url": "http://localhost/api/storage/b150d47f-f4fb-40a2-a336-ac8e897af607.png"
+    }
+  ]
