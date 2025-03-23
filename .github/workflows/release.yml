@@ -228,7 +228,7 @@ jobs:
     runs-on: ubuntu-22.04
     defaults:
       run:
-        working-directory: minio
+        working-directory: minIO
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v2
@@ -240,7 +240,6 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Push the docker image
-      shell: bash
       run: |
         export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/minio"
         docker build -t $IMAGE_TAG .
