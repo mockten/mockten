@@ -1,12 +1,52 @@
 [
     {
       "product_id": "123e4567-e89b-12d3-a456-426614174000",
-      "product_name": "bone conduction earphones",
+      "product_name": "Bone conduction earphones",
       "seller_name": "Headphone company",
       "category": 1,
       "price": 500,
       "ranking": 40,
       "stocks": 20,
       "main_url": "http://localhost/api/storage/b150d47f-f4fb-40a2-a336-ac8e897af607.png"
+    },
+    {
+      "product_id": "580414f1-e962-4f6c-a461-d88d168e7cb1",
+      "product_name": "Lemongrass",
+      "seller_name": "Greengrocer",
+      "category": 2,
+      "price": 6,
+      "ranking": 100,
+      "stocks": 50,
+      "main_url": "http://localhost/api/storage/580414f1-e962-4f6c-a461-d88d168e7cb1.png"
+    },
+    {
+      "product_id": "91e438c6-f073-4c57-95b3-0f98ccdedf34",
+      "product_name": "Playing cards",
+      "seller_name": "Toy company",
+      "category": 3,
+      "price": 5,
+      "ranking": 284,
+      "stocks": 5,
+      "main_url": "http://localhost/api/storage/91e438c6-f073-4c57-95b3-0f98ccdedf34.png"
+    },
+    {
+      "product_id": "fe88e32f-678f-403a-bed2-331a4ff406c2",
+      "product_name": "Protain bar",
+      "seller_name": "Health company",
+      "category": 2,
+      "price": 20,
+      "ranking": 8,
+      "stocks": 18,
+      "main_url": "http://localhost/api/storage/fe88e32f-678f-403a-bed2-331a4ff406c2.png"
+    },
+    {
+      "product_id": "d82f659a-a1ff-47f5-afb8-c93c02702fa4",
+      "product_name": "Snowboard earphones",
+      "seller_name": "Sports company",
+      "category": 4,
+      "price": 100,
+      "ranking": 29,
+      "stocks": 6,
+      "main_url": "http://localhost/api/storage/d82f659a-a1ff-47f5-afb8-c93c02702fa4.png"
     }
   ]
