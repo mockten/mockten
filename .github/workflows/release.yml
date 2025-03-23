@@ -240,6 +240,7 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Push the docker image
+      shell: bash
       run: |
         export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/minio"
         docker build -t $IMAGE_TAG .
