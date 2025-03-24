@@ -6,16 +6,16 @@ tasks:
       - (cd uam && docker run --rm --platform linux/amd64 --name uam-service.default.svc.cluster.local --network mockten_nw -p 8080:8080 -dit uam)
       - (cd minio && docker run --rm --name minio-service.default.svc.cluster.local --network mockten_nw -p 9000:9000 -p 9001:9001 -dit minio)
       - (cd apigw && docker run --rm --name apigw --network mockten_nw -p 8082:8082 -p 8001:8001 -p 8002:8002 -dit apigw)
-      - (cd meilisearch && docker run --rm --name meilisearch --network mockten_nw -p 7700:7700 -dit meilisearch)
+      - (cd meilisearch && docker run --rm --name meilisearch-service.default.svc.cluster.local --network mockten_nw -p 7700:7700 -dit meilisearch)
       - (docker run --rm --name nginx --network mockten_nw -v $(pwd)/dev_nginx.conf:/etc/nginx/nginx.conf:ro -p 80:80 -dit nginx)
       - (cd ecfront2 && npm run dev -- --host 0.0.0.0 --port 5173)
   destroy: 
     cmds:
       - (docker stop uam-service.default.svc.cluster.local)
       - (docker stop minio-service.default.svc.cluster.local)
+      - (docker stop meilisearch-service.default.svc.cluster.local)
       - (docker stop apigw)
       - (docker stop nginx)
-      - (docker stop meilisearch)
       - (docker network rm mockten_nw)
   setup:
     cmds:
