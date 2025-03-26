@@ -220,7 +220,48 @@ jobs:
 
     - name: Push the docker image
       run: |
-        #export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/apigw/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
         export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/apigw"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
+  release-minio:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: minIO
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v2
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push the docker image
+      run: |
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/minio"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
+  release-meilisearch:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: meilisearch
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v2
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push the docker image
+      run: |
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/meilisearch"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
