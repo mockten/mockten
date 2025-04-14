@@ -53,10 +53,26 @@ function AppbarSearchBox() {
       setSearchQuery(event.target.value);
     };
 
-    const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    const handleKeyPress = async (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Enter') {
-        navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
-      }
+        try {
+          const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}&p=1`);
+          if (!response.ok) {
+            throw new Error('Search failed');
+          }
+          const data = await response.json();
+          // TODO: debug
+          console.log(data);
+
+          navigate('/search', {
+            state: {
+              items: data.items,
+            },
+          });
+        } catch (error) {
+          console.error('Error fetching search results:', error);
+        }
+     }
     };
 
     

@@ -7,7 +7,7 @@
       "price": 500,
       "ranking": 40,
       "stocks": 20,
-      "main_url": "http://localhost/api/storage/b150d47f-f4fb-40a2-a336-ac8e897af607.png"
+      "main_url": "/api/storage/b150d47f-f4fb-40a2-a336-ac8e897af607.png"
     },
     {
       "product_id": "580414f1-e962-4f6c-a461-d88d168e7cb1",
@@ -17,7 +17,7 @@
       "price": 6,
       "ranking": 100,
       "stocks": 50,
-      "main_url": "http://localhost/api/storage/580414f1-e962-4f6c-a461-d88d168e7cb1.png"
+      "main_url": "/api/storage/580414f1-e962-4f6c-a461-d88d168e7cb1.png"
     },
     {
       "product_id": "91e438c6-f073-4c57-95b3-0f98ccdedf34",
@@ -27,7 +27,7 @@
       "price": 5,
       "ranking": 284,
       "stocks": 5,
-      "main_url": "http://localhost/api/storage/91e438c6-f073-4c57-95b3-0f98ccdedf34.png"
+      "main_url": "/api/storage/91e438c6-f073-4c57-95b3-0f98ccdedf34.png"
     },
     {
       "product_id": "fe88e32f-678f-403a-bed2-331a4ff406c2",
@@ -37,7 +37,7 @@
       "price": 20,
       "ranking": 8,
       "stocks": 18,
-      "main_url": "http://localhost/api/storage/fe88e32f-678f-403a-bed2-331a4ff406c2.png"
+      "main_url": "/api/storage/fe88e32f-678f-403a-bed2-331a4ff406c2.png"
     },
     {
       "product_id": "d82f659a-a1ff-47f5-afb8-c93c02702fa4",
@@ -47,6 +47,6 @@
       "price": 100,
       "ranking": 29,
       "stocks": 6,
-      "main_url": "http://localhost/api/storage/d82f659a-a1ff-47f5-afb8-c93c02702fa4.png"
+      "main_url": "/api/storage/d82f659a-a1ff-47f5-afb8-c93c02702fa4.png"
     }
   ]
