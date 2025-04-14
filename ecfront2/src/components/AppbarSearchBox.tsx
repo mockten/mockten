@@ -56,15 +56,17 @@ function AppbarSearchBox() {
     const handleKeyPress = async (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Enter') {
         try {
-          const response = await fetch(`/v1/search?q=${encodeURIComponent(searchQuery)}&p=1`);
+          const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}&p=1`);
           if (!response.ok) {
             throw new Error('Search failed');
           }
           const data = await response.json();
+          // TODO: debug
           console.log(data);
+
           navigate('/search', {
             state: {
-              data: data,
+              items: data.items,
             },
           });
         } catch (error) {

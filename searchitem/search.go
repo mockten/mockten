@@ -136,7 +136,7 @@ func main() {
 	meiliBackend := os.Getenv("MEILI_SVC")
 	if meiliBackend == "" {
 		logger.Error("does not exist MEILI_SVC.")
-		meiliBackend = "127.0.0.1"
+		meiliBackend = "meilisearch-service.default.svc.cluster.local"
 	}
 
 	meiliclient = meilisearch.NewClient(meilisearch.ClientConfig{
