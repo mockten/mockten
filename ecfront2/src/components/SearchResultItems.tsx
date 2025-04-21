@@ -101,7 +101,7 @@ const SearchResultItems: React.FC<Props> = ({ items }) => {
                       {isCopied && (
                         <p>Copied URL!</p>
                       )}
-                      <FavoriteIcon />
+                      <FavoriteIcon productId={item.product_id}/>
                       <PaymentIcon />
                       <AddShoppingCartIcon />
                     </CardActions>
