@@ -3,6 +3,7 @@ tasks:
   build: 
     cmds:
       - (docker network create mockten_nw)
+      - (cd mysql && docker run --rm -d --name mysql-service.default.svc.cluster.local -e MYSQL_ROOT_PASSWORD=rootpassword -e MYSQL_DATABASE=mocktendb -e MYSQL_USER=mocktenusr -e MYSQL_PASSWORD=mocktenpassword --network mockten_nw -p 3306:3306 mockten-mysql)
       - (cd uam && docker run --rm --platform linux/amd64 --name uam-service.default.svc.cluster.local --network mockten_nw -p 8080:8080 -dit uam)
       - (cd minio && docker run --rm --name minio-service.default.svc.cluster.local --network mockten_nw -p 9000:9000 -p 9001:9001 -dit minio)
       - (cd apigw && docker run --rm --name apigw --network mockten_nw -p 8082:8082 -p 8001:8001 -p 8002:8002 -dit apigw)
@@ -16,11 +17,13 @@ tasks:
       - (docker stop minio-service.default.svc.cluster.local)
       - (docker stop meilisearch-service.default.svc.cluster.local)
       - (docker stop searchitem-service.default.svc.cluster.local)
+      - (docker stop mysql-service.default.svc.cluster.local)
       - (docker stop apigw)
       - (docker stop nginx)
       - (docker network rm mockten_nw)
   setup:
     cmds:
+      - (cd mysql && docker build -t mockten-mysql .)
       - (cd uam && docker build --platform linux/amd64 -t uam .)
       - (cd apigw && docker build -t apigw .)
       - (cd minio && docker build -t minio . )

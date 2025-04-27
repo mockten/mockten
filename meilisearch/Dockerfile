@@ -1,6 +1,17 @@
-FROM getmeili/meilisearch
+FROM debian:bullseye-slim
 
-COPY products.json /data/products.json
-COPY init.sh /init.sh
+# Install required packages
+RUN apt-get update && apt-get install -y curl default-mysql-client
 
-ENTRYPOINT /bin/sh /init.sh
+# Download latest MeiliSearch release
+RUN curl -L https://install.meilisearch.com | sh
+
+# Make sure init.sh is copied
+COPY *.sh /
+RUN chmod +x /*.sh
+
+# Expose default MeiliSearch port
+EXPOSE 7700
+
+# Set entrypoint to our init script
+ENTRYPOINT ["/init.sh"]
