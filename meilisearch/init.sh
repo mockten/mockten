@@ -1,11 +1,11 @@
-#!/bin/sh
+#!/bin/bash
 
 # Start Meilisearch in background
-/meilisearch --http-addr "0.0.0.0:7700" &
+./meilisearch --http-addr "0.0.0.0:7700" &
 
 # Wait for Meilisearch to be available
 until curl -s http://localhost:7700/health | grep -q '"status":"available"'; do
-  echo "Waiting for Meilisearch..."
+  echo "Waiting for MeiliSearch to be available..."
   sleep 1
 done
 
@@ -14,10 +14,7 @@ curl -X POST 'http://localhost:7700/indexes' \
   -H 'Content-Type: application/json' \
   -d '{"uid": "products"}'
 
-# Upload product data
-curl -X POST 'http://localhost:7700/indexes/products/documents' \
-  -H 'Content-Type: application/json' \
-  --data-binary @/data/products.json
-
+# Fetch product data from MySQL
+./load_mysql.sh
 # Keep container running
 wait
