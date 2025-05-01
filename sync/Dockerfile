@@ -5,4 +5,4 @@ RUN apt-get update && apt-get install -y curl jq default-mysql-client
 COPY *.sh /
 RUN chmod +x /*.sh
 
-CMD ["bash", "-c", "while true; do sleep 120; /sync_script.sh; done"]
+CMD ["bash", "-c", "while true; do sleep 180; /sync_script.sh; done"]
