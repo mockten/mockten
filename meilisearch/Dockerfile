@@ -1,9 +1,11 @@
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
-# Install required packages
-RUN apt-get update && apt-get install -y curl default-mysql-client
+RUN apt-get update && \
+    apt-get install -y curl default-mysql-client ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Download latest MeiliSearch release
+# Install MeiliSearch
 RUN curl -L https://install.meilisearch.com | sh
 
 # Make sure init.sh is copied
