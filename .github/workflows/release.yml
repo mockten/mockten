@@ -132,8 +132,7 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/searchitem/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/searchitem:release-v${SNAPSHOT_VERSION}"
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/searchitem"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -263,5 +262,47 @@ jobs:
     - name: Push the docker image
       run: |
         export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/meilisearch"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
+  release-mysql:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: mysql
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v2
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push the docker image
+      run: |
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/mysql"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
+  release-sync:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: sync
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v2
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push the docker image
+      run: |
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/sync"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG

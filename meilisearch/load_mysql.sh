@@ -44,3 +44,11 @@ current_line=0
 curl -X POST 'http://localhost:7700/indexes/products/documents' \
   -H 'Content-Type: application/json' \
   --data-binary @/tmp/products.json
+
+# Set searchableAttributes to restrict searchable fields
+curl -X PUT 'http://localhost:7700/indexes/products/settings/searchable-attributes' \
+  -H 'Content-Type: application/json' \
+  --data-binary '[
+    "product_name",
+    "seller_name"
+  ]'
