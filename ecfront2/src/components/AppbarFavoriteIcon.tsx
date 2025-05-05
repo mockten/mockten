@@ -13,9 +13,6 @@ function AppbarFavoriteIcon() {
   const [favoriteAmount, setFavoriteAmount] = useState<number>();
   const navigate = useNavigate();
 
-  // const apiUrl = process.env.REACT_APP_ACCOUNT_API;
-  const apiUrl = 'http://localhost:8080';
-
   const handleIconClick = () => {
     navigate('/fav/list');
   };
@@ -23,7 +20,7 @@ function AppbarFavoriteIcon() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`${apiUrl}/v1/fav/amount?`, {
+        const response = await fetch(`/v1/fav/amount?`, {
           method: 'GET',
           headers: {
               'Content-Type': 'application/json'
