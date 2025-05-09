@@ -14,17 +14,14 @@ tasks:
       - (cd ecfront2 && npm run dev -- --host 0.0.0.0 --port 5173)
   destroy: 
     cmds:
-      - (docker stop mockten-sync)
-      - (docker stop uam-service.default.svc.cluster.local)
-      - (docker stop minio-service.default.svc.cluster.local)
-      - (docker stop meilisearch-service.default.svc.cluster.local)
-      - (docker stop searchitem-service.default.svc.cluster.local)
-      - (docker stop mysql-service.default.svc.cluster.local)
-      - (docker stop apigw)
-      - (docker stop nginx)
-      - (docker network rm mockten_nw)
+      - docker stop mockten-sync
+      - docker ps --no-trunc | awk '$NF ~ /-service\.default\.svc\.cluster\.local$/ { print $NF }' | xargs -r docker stop
+      - docker stop nginx
+      - docker stop apigw
+      - docker network rm mockten_nw
   setup:
     cmds:
+      - (cd redis && docker build -t mockten-redis .)
       - (cd mysql && docker build -t mockten-mysql .)
       - (cd uam && docker build --platform linux/amd64 -t uam .)
       - (cd apigw && docker build -t apigw .)
