@@ -19,6 +19,12 @@ CREATE TABLE Stock (
   stocks INT
 );
 
+CREATE TABLE Wishlist (
+  user_id VARCHAR(255) PRIMARY KEY,
+  product_ids JSON NOT NULL, 
+  updated_at DATETIME
+);
+
 INSERT INTO Seller (seller_id, seller_name) VALUES
 ('a38025d8-3598-4ccf-9d70-7e6dbf6edd09', 'Headphone company'),
 ('d3b4f7a37-0e05-4e04-8409-e5b0a55cf669', 'Greengrocer'),
