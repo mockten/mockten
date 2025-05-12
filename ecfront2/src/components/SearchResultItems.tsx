@@ -20,15 +20,12 @@ type Props = {
   items: Item[];
 };
 
+// see: https://github.com/mockten/mockten/wiki/Data-Architecture
 interface Item {
   product_id: string;
   product_name: string;
   seller_name: string;
-  category: number;
   price: number;
-  ranking: number;
-  stocks: number;
-  main_url: string;
 }
 
 type PaymentPopupProps = {
@@ -83,14 +80,14 @@ const SearchResultItems: React.FC<Props> = ({ items }) => {
                       <CardMedia
                       component="img"
                       height="200"
-                      image={item.main_url}
+                      image={`/api/storage/${item.product_id}.png`}
                       alt={item.product_name}
                       />
                       <CardContent>
                         <Typography variant="h6" component="div" color="text.secondary">
                             {item.product_name}
                             <br></br>
-                            {item.price} ¥
+                            $ {item.price}
                         </Typography>
                       </CardContent>
                     </CardActionArea>
@@ -101,7 +98,7 @@ const SearchResultItems: React.FC<Props> = ({ items }) => {
                       {isCopied && (
                         <p>Copied URL!</p>
                       )}
-                      <FavoriteIcon />
+                      <FavoriteIcon productId={item.product_id}/>
                       <PaymentIcon />
                       <AddShoppingCartIcon />
                     </CardActions>

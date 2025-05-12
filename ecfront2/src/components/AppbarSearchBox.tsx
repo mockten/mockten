@@ -64,7 +64,7 @@ function AppbarSearchBox() {
           // TODO: debug
           console.log(data);
 
-          navigate('/search', {
+          navigate(`/search?q=${encodeURIComponent(searchQuery)}`, {
             state: {
               items: data.items,
             },
