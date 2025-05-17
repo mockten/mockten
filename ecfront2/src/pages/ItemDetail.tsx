@@ -10,7 +10,12 @@ import {
   Divider,
   Chip,
 } from '@mui/material';
-import Appbar from '../components/Appbar';
+import FavoriteIcon from '../components/item/FavoriteIcon';
+import AddShoppingCartIcon from '../components/item/AddShoppingCartIcon';
+import PaymentIcon from '../components/item/PaymentIcon';
+import Slider from 'react-slick';
+import 'slick-carousel/slick/slick.css';
+import 'slick-carousel/slick/slick-theme.css';
 
 
 type ItemDetailType = {
@@ -30,6 +35,14 @@ const ItemDetailsPage: React.FC = () => {
 
     const { id } = useParams<{ id: string }>();
     const [item, setItem] = useState<ItemDetailType | null>(null);
+
+    const settings = {
+      dots: true,
+      infinite: true,
+      speed: 500,
+      slidesToShow: 1,
+      slidesToScroll: 1,
+    };
   
     useEffect(() => {
       const fetchItemDetail = async () => {
@@ -53,9 +66,18 @@ const ItemDetailsPage: React.FC = () => {
     if (!item) {
       return <p>Loading...</p>;
     }
+
+    const imageUrls = Array.from({ length: 5 }, (_) => `/api/storage/${item.product_id}.png`);
   
     return (
       <Card sx={{ maxWidth: 800, margin: 'auto', mt: 4, boxShadow: 3 }}>
+      <Box sx={{ width: '100%', maxWidth: 500 }}>
+      <Slider {...settings}>
+        {imageUrls.map((url, index) => (
+          <Box key={index} component="img" src={url} sx={{ width: '100%' }} />
+        ))}
+      </Slider>
+      </Box>
       <Grid container spacing={2}>
         <Grid item xs={12} md={5}>
           <CardMedia
@@ -90,6 +112,9 @@ const ItemDetailsPage: React.FC = () => {
               <Chip label={`Category: ${item.category}`} sx={{ mr: 1 }} />
               <Chip label={`Stocks: ${item.stocks}`} />
             </Box>
+            <FavoriteIcon productId={item.product_id}/>
+            <PaymentIcon />
+            <AddShoppingCartIcon />
           </CardContent>
         </Grid>
       </Grid>

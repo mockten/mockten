@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bufio"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"encoding/json"
 	"database/sql"
 	"time"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	meilisearch "github.com/meilisearch/meilisearch-go"
@@ -49,6 +52,9 @@ type Item struct {
 	MainURL     string    `json:"main_url"`
 }
 
+type CategoryMap map[string]string
+
+
 var (
 	searchReqCount = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "search_req_total",
@@ -62,7 +68,44 @@ var (
 
 	logger      *zap.Logger
 	meiliclient *meilisearch.Client
+	categoryMap map[string]string
 )
+
+func LoadCategoryConfig(filepath string) (CategoryMap, error) {
+	file, err := os.Open(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	categories := make(CategoryMap)
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		line = strings.TrimSpace(line)
+
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid line format: %s", line)
+		}
+
+		code := strings.TrimSpace(parts[0])
+		name := strings.TrimSpace(parts[1])
+		categories[code] = name
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	return categories, nil
+}
+
 
 // Implement SearchItemServer using REST API
 func searchHandler(c *gin.Context) {
@@ -120,6 +163,38 @@ type ProductDetail struct {
 	Stocks      int       `json:"stocks"`
 }
 
+type ProductDetailResponse struct {
+	ProductID    string    `json:"product_id"`
+	ProductName  string    `json:"product_name"`
+	Price        int       `json:"price"`
+	CategoryName string    `json:"category"`
+	Summary      string    `json:"summary"`
+	RegistDay    time.Time `json:"regist_day"`
+	LastUpdate   time.Time `json:"last_update"`
+	SellerName   string    `json:"seller_name"`
+	Stocks       int       `json:"stocks"`
+}
+
+func ConvertToResponse(detail *ProductDetail, categoryMap map[string]string) ProductDetailResponse {
+	categoryKey := fmt.Sprintf("%02d", detail.Category)
+	categoryName, ok := categoryMap[categoryKey]
+	if !ok {
+		categoryName = "Unknown"
+	}
+
+	return ProductDetailResponse{
+		ProductID:    detail.ProductID,
+		ProductName:  detail.ProductName,
+		Price:        detail.Price,
+		CategoryName: categoryName,
+		Summary:      detail.Summary,
+		RegistDay:    detail.RegistDay,
+		LastUpdate:   detail.LastUpdate,
+		SellerName:   detail.SellerName,
+		Stocks:       detail.Stocks,
+	}
+}
+
 func getItemDetailHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		productID := c.Query("id")
@@ -172,7 +247,8 @@ func getItemDetailHandler(db *sql.DB) gin.HandlerFunc {
 			logger.Debug("No error scanning db")
 		}
 
-		c.JSON(http.StatusOK, detail)
+		responseJson := ConvertToResponse(&detail, categoryMap)
+		c.JSON(http.StatusOK, responseJson)
 	}
 }
 
@@ -201,6 +277,16 @@ func main() {
 	logger.Info("success set-up logging function.")
 
 	defer logger.Sync()
+
+	// read config file
+	jsonData, err := os.ReadFile("category.json")
+	if err != nil {
+		panic(err)
+	}
+
+	if err := json.Unmarshal(jsonData, &categoryMap); err != nil {
+		panic(err)
+	}
 
 	// set-up meilisearch to register products json(documents) to index.
 	meiliBackend := os.Getenv("MEILI_SVC")
