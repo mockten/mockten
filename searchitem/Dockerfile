@@ -1,5 +1,5 @@
 # multi stage build
-FROM golang:1.21.4 as builder
+FROM golang:1.23.9 as builder
 WORKDIR /go/setenv
 ENV CGO_ENABLED=0
 RUN mkdir setenv && \
