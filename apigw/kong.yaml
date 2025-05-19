@@ -119,3 +119,12 @@ services:
         strip_path: true
         methods:
           - GET
+  - name: item-detail
+    url: http://searchitem-service.default.svc.cluster.local:50051/v1/item/detail
+    routes:
+      - name: get-item-detail
+        paths:
+          - /api/item/detail
+        strip_path: true
+        methods:
+          - GET

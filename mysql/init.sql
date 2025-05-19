@@ -19,6 +19,7 @@ CREATE TABLE Stock (
   stocks INT
 );
 
+
 CREATE TABLE Wishlist (
   user_id VARCHAR(255) PRIMARY KEY,
   product_ids JSON NOT NULL, 
