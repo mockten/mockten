@@ -1,5 +1,5 @@
 # multi stage build
-FROM golang:1.21.4 as builder
+FROM golang:1.23.9 as builder
 WORKDIR /go/setenv
 ENV CGO_ENABLED=0
 RUN mkdir setenv && \
@@ -14,4 +14,5 @@ FROM alpine:3
 RUN apk --no-cache add ca-certificates &&\
     apk add gcompat
 COPY --from=builder  /go/setenv/searchitem .
+COPY category.json .
 CMD ["./searchitem"]
