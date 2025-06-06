@@ -7,8 +7,8 @@ ENV QUARKUS_LOG_CATEGORY__IO_QUARKUS_HTTP_ACCESS_LOGGER__LEVEL=DEBUG
 ENV QUARKUS_HTTP_ACCESS_LOG_ENABLED=true
 
 COPY realm-export.json /opt/keycloak/data/import/realm-export.json
+COPY docker-entrypoint.sh /opt/keycloak/docker-entrypoint.sh
 
 EXPOSE 8080
 
-
-ENTRYPOINT ["/opt/keycloak/bin/kc.sh", "start-dev", "--import-realm","--log-level=DEBUG"]
+ENTRYPOINT ["/opt/keycloak/docker-entrypoint.sh"]

@@ -112,16 +112,16 @@
       ]
     },
     {
-      "username": "seller",
+      "username": "Health company",
       "enabled": true,
       "emailVerified": true,
-      "email": "seller@example.com",
-      "firstName": "Seller",
-      "lastName": "B",
+      "email": "healthcompany@example.com",
+      "firstName": "Wei",
+      "lastName": "Li",
       "credentials": [
         {
           "type": "password",
-          "value": "seller"
+          "value": "healthcompany"
         }
       ],
       "groups": [
@@ -130,6 +130,86 @@
       "realmRoles": [
         "seller"
       ]
-    }
+    },
+    {
+      "username": "Sports company",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "sportscompany@example.com",
+      "firstName": "Emily",
+      "lastName": "Johnson",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "sportscompany"
+        }
+      ],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ]
+    },
+    {
+      "username": "Toy company",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "toycompany@example.com",
+      "firstName": "Pierre",
+      "lastName": "Dubois",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "toycompany"
+        }
+      ],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ]
+    },
+    {
+      "username": "Headphone company",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "headphonecompany@example.com",
+      "firstName": "Haruki",
+      "lastName": "Saito",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "headphonecompany"
+        }
+      ],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ]
+    },
+    {
+      "username": "Greengrocer",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "greengrocer@example.com",
+      "firstName": "Ananya",
+      "lastName": "Patel",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "greengrocer"
+        }
+      ],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ]
+    }    
   ]
 }
