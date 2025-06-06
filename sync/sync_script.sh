@@ -17,17 +17,18 @@ mysql -h $MYSQL_HOST -u $MYSQL_USER -p$MYSQL_PASS -D $MYSQL_DB --batch --raw --s
 SELECT 
   p.product_id, 
   p.product_name, 
-  s.seller_name, 
+  ue.USERNAME AS seller_name, 
   p.price, 
   c.category_id, 
   c.category_name
 FROM Product p
-JOIN Seller s ON p.seller_id = s.seller_id
+JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
+JOIN USER_GROUP_MEMBERSHIP ugm ON ue.ID = ugm.USER_ID
+JOIN KEYCLOAK_GROUP kg ON ugm.GROUP_ID = kg.ID
 JOIN Category c ON p.category_id = c.category_id
-WHERE 
-  GREATEST(
+WHERE kg.NAME = 'Seller'
+  AND GREATEST(
     IFNULL(p.last_update, '1970-01-01 00:00:00'),
-    IFNULL(s.last_update, '1970-01-01 00:00:00'),
     IFNULL(c.last_update, '1970-01-01 00:00:00')
   ) > '$LAST_SYNC'
 " > /tmp/updated_products.csv

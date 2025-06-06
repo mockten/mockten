@@ -1,22 +1,36 @@
 #!/bin/bash
 
+MYSQL_HOST="mysql-service.default.svc.cluster.local"
+MYSQL_USER="mocktenusr"
+MYSQL_PASS="mocktenpassword"
+MYSQL_DB="mocktendb"
+
 # Wait for MySQL to be available
-until mysqladmin ping -h mysql-service.default.svc.cluster.local -u mocktenusr -pmocktenpassword --silent; do
+until mysqladmin ping -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" --silent; do
   echo "Waiting for MySQL to be available..."
   sleep 1
 done
 
+# Wait for Keycloak readiness
+until curl -sf http://uam-service.default.svc.cluster.local:8080/realms/mockten-realm-dev; do
+  echo "Waiting for Keycloak to be ready..."
+  sleep 2
+done
+
 # Fetch product data from MySQL
-mysql -h mysql-service.default.svc.cluster.local -u mocktenusr -pmocktenpassword -D mocktendb --batch --raw --silent -e "
+mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" -D "$MYSQL_DB" --batch --raw --silent -e "
 SELECT
   p.product_id,
   p.product_name,
-  s.seller_name,
+  ue.USERNAME AS seller_name,
   p.price,
   c.category_name
 FROM Product p
-JOIN Seller s ON p.seller_id = s.seller_id
+JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
+JOIN USER_GROUP_MEMBERSHIP ugm ON ue.ID = ugm.USER_ID
+JOIN KEYCLOAK_GROUP kg ON ugm.GROUP_ID = kg.ID
 JOIN Category c ON p.category_id = c.category_id
+WHERE kg.NAME = 'Seller'
 " > /tmp/products.csv
 
 # Count total lines
@@ -57,7 +71,7 @@ curl -X PUT 'http://localhost:7700/indexes/products/settings/searchable-attribut
     "category_name"
   ]'
 # Set filterableAttributes to restrict filterable fields
-  curl -X PUT 'http://meilisearch-service.default.svc.cluster.local:7700/indexes/products/settings/filterable-attributes' \
+curl -X PUT 'http://meilisearch-service.default.svc.cluster.local:7700/indexes/products/settings/filterable-attributes' \
   -H 'Content-Type: application/json' \
   --data-binary '[
     "seller_name",

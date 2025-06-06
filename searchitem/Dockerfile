@@ -14,5 +14,4 @@ FROM alpine:3
 RUN apk --no-cache add ca-certificates &&\
     apk add gcompat
 COPY --from=builder  /go/setenv/searchitem .
-COPY category.json .
 CMD ["./searchitem"]

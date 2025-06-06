@@ -1,27 +1,24 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
+	"database/sql"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
-	"encoding/json"
-	"database/sql"
 	"time"
-	"strings"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/go-sql-driver/mysql"
 	meilisearch "github.com/meilisearch/meilisearch-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
-	_ "github.com/go-sql-driver/mysql"
 )
 
 const (
-	port           = ":50051"
+	port = ":50051"
 )
 
 /*
@@ -39,21 +36,18 @@ type Item struct {
 	RegistDay   time.Time `json:"regist_day"`
 	LastUpdate  time.Time `json:"last_update"`
 }
-	*/
+*/
 
 type Item struct {
-	ProductId   string    `json:"product_id"`
-	ProductName string    `json:"product_name"`
-	SellerName  string    `json:"seller_name"`
-	Category    int       `json:"category"`
-	Price       int       `json:"price"`
-	Rank        int       `json:"ranking"`
-	Stocks      int       `json:"stocks"`
-	MainURL     string    `json:"main_url"`
+	ProductId   string `json:"product_id"`
+	ProductName string `json:"product_name"`
+	SellerName  string `json:"seller_name"`
+	Category    int    `json:"category"`
+	Price       int    `json:"price"`
+	Rank        int    `json:"ranking"`
+	Stocks      int    `json:"stocks"`
+	MainURL     string `json:"main_url"`
 }
-
-type CategoryMap map[string]string
-
 
 var (
 	searchReqCount = promauto.NewCounter(prometheus.CounterOpts{
@@ -68,44 +62,7 @@ var (
 
 	logger      *zap.Logger
 	meiliclient *meilisearch.Client
-	categoryMap map[string]string
 )
-
-func LoadCategoryConfig(filepath string) (CategoryMap, error) {
-	file, err := os.Open(filepath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
-	}
-	defer file.Close()
-
-	categories := make(CategoryMap)
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		line = strings.TrimSpace(line)
-
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		parts := strings.SplitN(line, ":", 2)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid line format: %s", line)
-		}
-
-		code := strings.TrimSpace(parts[0])
-		name := strings.TrimSpace(parts[1])
-		categories[code] = name
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-
-	return categories, nil
-}
-
 
 // Implement SearchItemServer using REST API
 func searchHandler(c *gin.Context) {
@@ -137,8 +94,8 @@ func searchHandler(c *gin.Context) {
 	logger.Debug("searchres:", zap.Any("searchres:", searchRes))
 
 	var items []Item
-    hitsJson, _ := json.Marshal(searchRes.Hits) // []interface{} → []byte
-	json.Unmarshal(hitsJson, &items)      // []byte → []Book
+	hitsJson, _ := json.Marshal(searchRes.Hits) // []interface{} → []byte
+	json.Unmarshal(hitsJson, &items)            // []byte → []Book
 
 	// increment counter
 	searchResCount.Inc()
@@ -152,22 +109,11 @@ func searchHandler(c *gin.Context) {
 }
 
 type ProductDetail struct {
-	ProductID   string    `json:"product_id"`
-	ProductName string    `json:"product_name"`
-	Price       int       `json:"price"`
-	Category    int       `json:"category"`
-	Summary     string    `json:"summary"`
-	RegistDay   time.Time `json:"regist_day"`
-	LastUpdate  time.Time `json:"last_update"`
-	SellerName  string    `json:"seller_name"`
-	Stocks      int       `json:"stocks"`
-}
-
-type ProductDetailResponse struct {
 	ProductID    string    `json:"product_id"`
 	ProductName  string    `json:"product_name"`
 	Price        int       `json:"price"`
-	CategoryName string    `json:"category"`
+	CategoryID   string    `json:"category_id"`
+	CategoryName string    `json:"category_name"`
 	Summary      string    `json:"summary"`
 	RegistDay    time.Time `json:"regist_day"`
 	LastUpdate   time.Time `json:"last_update"`
@@ -175,18 +121,26 @@ type ProductDetailResponse struct {
 	Stocks       int       `json:"stocks"`
 }
 
-func ConvertToResponse(detail *ProductDetail, categoryMap map[string]string) ProductDetailResponse {
-	categoryKey := fmt.Sprintf("%02d", detail.Category)
-	categoryName, ok := categoryMap[categoryKey]
-	if !ok {
-		categoryName = "Unknown"
-	}
+type ProductDetailResponse struct {
+	ProductID    string    `json:"product_id"`
+	ProductName  string    `json:"product_name"`
+	Price        int       `json:"price"`
+	CategoryName string    `json:"category"`
+	CategoryID   string    `json:"category_id"`
+	Summary      string    `json:"summary"`
+	RegistDay    time.Time `json:"regist_day"`
+	LastUpdate   time.Time `json:"last_update"`
+	SellerName   string    `json:"seller_name"`
+	Stocks       int       `json:"stocks"`
+}
 
+func ConvertToResponse(detail *ProductDetail) ProductDetailResponse {
 	return ProductDetailResponse{
 		ProductID:    detail.ProductID,
 		ProductName:  detail.ProductName,
 		Price:        detail.Price,
-		CategoryName: categoryName,
+		CategoryName: detail.CategoryName,
+		CategoryID:   detail.CategoryID,
 		Summary:      detail.Summary,
 		RegistDay:    detail.RegistDay,
 		LastUpdate:   detail.LastUpdate,
@@ -195,10 +149,24 @@ func ConvertToResponse(detail *ProductDetail, categoryMap map[string]string) Pro
 	}
 }
 
+func waitForMySQL(db *sql.DB, logger *zap.Logger) {
+	maxAttempts := 20
+	for i := 1; i <= maxAttempts; i++ {
+		err := db.Ping()
+		if err == nil {
+			logger.Info("MySQL is ready.")
+			return
+		}
+		logger.Warn("Waiting for MySQL to be ready...", zap.Int("attempt", i), zap.Error(err))
+		time.Sleep(3 * time.Second)
+	}
+	logger.Fatal("MySQL did not become ready in time.")
+}
+
 func getItemDetailHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		productID := c.Query("id")
-		
+
 		if productID == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing id parameter"})
 			return
@@ -207,38 +175,41 @@ func getItemDetailHandler(db *sql.DB) gin.HandlerFunc {
 		logger.Debug("Request log", zap.String("id", productID))
 
 		query := `
-			SELECT 
-				p.product_id,
-				p.product_name,
-				p.price,
-				p.category,
-				p.summary,
-				p.regist_day,
-				p.last_update,
-				s.seller_name,
-				t.stocks
-			FROM Product p
-			JOIN Seller s ON p.seller_id = s.seller_id
-			JOIN Stock t ON p.product_id = t.product_id
-			WHERE p.product_id = ?
-		`
-
+         SELECT 
+            p.product_id,
+            p.product_name,
+            p.price,
+            c.category_id,
+            c.category_name,
+            p.summary,
+            p.regist_day,
+            p.last_update,
+            t.stocks,
+            ue.USERNAME AS seller_name
+         FROM Product p
+         JOIN Category c ON p.category_id = c.category_id
+         JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
+         JOIN USER_GROUP_MEMBERSHIP ugm ON ue.ID = ugm.USER_ID
+         JOIN KEYCLOAK_GROUP kg ON ugm.GROUP_ID = kg.ID
+         JOIN Stock t ON p.product_id = t.product_id
+         WHERE p.product_id = ? AND kg.NAME = 'Seller'
+      `
 		var detail ProductDetail
 		err := db.QueryRow(query, productID).Scan(
 			&detail.ProductID,
 			&detail.ProductName,
 			&detail.Price,
-			&detail.Category,
+			&detail.CategoryID,
+			&detail.CategoryName,
 			&detail.Summary,
 			&detail.RegistDay,
 			&detail.LastUpdate,
-			&detail.SellerName,
 			&detail.Stocks,
+			&detail.SellerName,
 		)
 
 		switch {
 		case err == sql.ErrNoRows:
-			// 400 error
 			c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 		case err != nil:
 			logger.Error("DB Scan error: ", zap.Error(err))
@@ -247,7 +218,7 @@ func getItemDetailHandler(db *sql.DB) gin.HandlerFunc {
 			logger.Debug("No error scanning db")
 		}
 
-		responseJson := ConvertToResponse(&detail, categoryMap)
+		responseJson := ConvertToResponse(&detail)
 		c.JSON(http.StatusOK, responseJson)
 	}
 }
@@ -278,16 +249,6 @@ func main() {
 
 	defer logger.Sync()
 
-	// read config file
-	jsonData, err := os.ReadFile("category.json")
-	if err != nil {
-		panic(err)
-	}
-
-	if err := json.Unmarshal(jsonData, &categoryMap); err != nil {
-		panic(err)
-	}
-
 	// set-up meilisearch to register products json(documents) to index.
 	meiliBackend := os.Getenv("MEILI_SVC")
 	if meiliBackend == "" {
@@ -297,7 +258,7 @@ func main() {
 
 	meiliclient = meilisearch.NewClient(meilisearch.ClientConfig{
 		// expect meilisearch sidecar container
-		Host:   "http://" + meiliBackend + ":7700",
+		Host: "http://" + meiliBackend + ":7700",
 		// APIKey: os.Getenv("MEILISEARCH_MASTERKEY"),
 	})
 
@@ -308,12 +269,8 @@ func main() {
 		logger.Error("can not connect to mysql.")
 		log.Fatalf("DB open error: %v", err)
 	}
-
-	if err := db.Ping(); err != nil {
-		log.Fatalf("DB connection failed: %v", err)
-	}
+	waitForMySQL(db, logger)
 	defer db.Close()
-
 
 	// expose /metrics endpoint for observer(by default Prometheus).
 	go exportMetrics()
