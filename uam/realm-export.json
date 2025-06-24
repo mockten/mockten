@@ -129,7 +129,10 @@
       ],
       "realmRoles": [
         "seller"
-      ]
+      ],
+      "attributes": {
+        "description": ["Sells health and wellness products"]
+      }
     },
     {
       "username": "Sports company",
@@ -149,7 +152,10 @@
       ],
       "realmRoles": [
         "seller"
-      ]
+      ],
+      "attributes": {
+        "description": ["Provider of sports and fitness gear"]
+      }
     },
     {
       "username": "Toy company",
@@ -169,7 +175,10 @@
       ],
       "realmRoles": [
         "seller"
-      ]
+      ],
+      "attributes": {
+        "description": ["Distributor of children's toys and games"]
+      }
     },
     {
       "username": "Headphone company",
@@ -189,7 +198,10 @@
       ],
       "realmRoles": [
         "seller"
-      ]
+      ],
+      "attributes": {
+        "description": ["Manufacturer of high-quality audio equipment"]
+      }
     },
     {
       "username": "Greengrocer",
@@ -209,7 +221,10 @@
       ],
       "realmRoles": [
         "seller"
-      ]
-    }    
+      ],
+      "attributes": {
+        "description": ["Fresh produce and organic food supplier"]
+      }
+    }
   ]
 }
