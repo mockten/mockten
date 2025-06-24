@@ -24,7 +24,8 @@ SELECT
   p.product_name,
   ue.USERNAME AS seller_name,
   p.price,
-  c.category_name
+  c.category_name,
+  p.product_condition
 FROM Product p
 JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
 JOIN USER_GROUP_MEMBERSHIP ugm ON ue.ID = ugm.USER_ID
@@ -40,18 +41,19 @@ current_line=0
 # Convert CSV to JSON array
 {
   echo "["
-  while IFS=$'\t' read -r id name seller price category
+  while IFS=$'\t' read -r id name seller price category condition
   do
     current_line=$((current_line + 1))
     id_clean=$(echo "$id" | tr -d '\000-\037' | sed 's/"/\\"/g')
     name_clean=$(echo "$name" | tr -d '\000-\037' | sed 's/"/\\"/g')
     seller_clean=$(echo "$seller" | tr -d '\000-\037' | sed 's/"/\\"/g')
     category_clean=$(echo "$category" | tr -d '\000-\037' | sed 's/"/\\"/g')
+    condition_clean=$(echo "$condition" | tr -d '\000-\037' | sed 's/"/\\"/g')
 
     if [ "$current_line" -eq "$total_lines" ]; then
-      echo "  {\"product_id\":\"$id_clean\", \"product_name\":\"$name_clean\", \"seller_name\":\"$seller_clean\", \"price\":$price, \"category_name\":\"$category_clean\"}"
+      echo "  {\"product_id\":\"$id_clean\", \"product_name\":\"$name_clean\", \"seller_name\":\"$seller_clean\", \"price\":$price, \"category_name\":\"$category_clean\", \"condition\":\"$condition_clean\"}"
     else
-      echo "  {\"product_id\":\"$id_clean\", \"product_name\":\"$name_clean\", \"seller_name\":\"$seller_clean\", \"price\":$price, \"category_name\":\"$category_clean\"},"
+      echo "  {\"product_id\":\"$id_clean\", \"product_name\":\"$name_clean\", \"seller_name\":\"$seller_clean\", \"price\":$price, \"category_name\":\"$category_clean\", \"condition\":\"$condition_clean\"},"
     fi
   done < /tmp/products.csv
   echo "]"
@@ -61,7 +63,6 @@ current_line=0
 curl -X POST 'http://localhost:7700/indexes/products/documents' \
   -H 'Content-Type: application/json' \
   --data-binary @/tmp/products.json
-
 # Set searchableAttributes to restrict searchable fields
 curl -X PUT 'http://localhost:7700/indexes/products/settings/searchable-attributes' \
   -H 'Content-Type: application/json' \
