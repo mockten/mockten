@@ -20,7 +20,8 @@ SELECT
   ue.USERNAME AS seller_name, 
   p.price, 
   c.category_id, 
-  c.category_name
+  c.category_name,
+  p.product_condition
 FROM Product p
 JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
 JOIN USER_GROUP_MEMBERSHIP ugm ON ue.ID = ugm.USER_ID
@@ -34,7 +35,19 @@ WHERE kg.NAME = 'Seller'
 " > /tmp/updated_products.csv
 
 if [ -s /tmp/updated_products.csv ]; then
-  jq -R -s -f <(echo 'split("\n")[:-1] | map(split("\t")) | map({product_id:.[0], product_name:.[1], seller_name:.[2], price:(.[3]|tonumber), category_id:.[4], category_name:.[5]})') /tmp/updated_products.csv > /tmp/updated_products.json
+  jq -R -s -f <(echo '
+    split("\n")[:-1] |
+    map(split("\t")) |
+    map({
+      product_id: .[0],
+      product_name: .[1],
+      seller_name: .[2],
+      price: (.[3] | tonumber),
+      category_id: .[4],
+      category_name: .[5],
+      condition: .[6]
+    })
+  ') /tmp/updated_products.csv > /tmp/updated_products.json
 
   curl -X POST 'http://meilisearch-service.default.svc.cluster.local:7700/indexes/products/documents' \
     -H 'Content-Type: application/json' \
