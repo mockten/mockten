@@ -97,8 +97,8 @@ INSERT INTO Stock (product_id, stocks) VALUES
 
 -- Insert ShippingRate data
 INSERT INTO ShippingRate (rate_id, name, rate) VALUES
-('rate1', 'Standard', 0.50),
-('rate2', 'Express', 1.50);
+('rate1', 'Standard', 0.02),
+('rate2', 'Express', 0.05);
 
 -- Insert Geo data
 INSERT INTO Geo (user_id, postal_code, prefecture, city, town, building_name, latitude, longitude) VALUES
