@@ -18,6 +18,17 @@ Before proceeding, ensure you have the following tool installed on your system:
 
 - [gotask](https://taskfile.dev/#/installation)
 
+## Google Authentication Setup
+To use Goole SignUp/SignIn, please create Google auth client like below.
+<img width="1594" height="1292" alt="CleanShot 2025-07-22 at 13 16 15@2x" src="https://github.com/user-attachments/assets/0769cb4f-53b3-4558-be68-53ddffb899ce" />
+| Setting                   | Value                                                |
+|---------------------------|------------------------------------------------------|
+| Application type          | Web application                                    |
+| Authorized Redirect URIs | http://localhost/api/uam/broker/google/endpoint     |
+
+Once you get Client ID/secret, please replace the value in uam/config.json
+<img width="1186" height="266" alt="CleanShot 2025-07-22 at 13 21 03@2x" src="https://github.com/user-attachments/assets/a7b12227-23ff-4807-9256-62e660a1a36f" />
+
 ## Testing your code
 
 To confirm that `gotask` is correctly installed, run the following command:
