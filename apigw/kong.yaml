@@ -1,7 +1,7 @@
 _format_version: "3.0"
 services:
   - name: keycloak-token
-    url: http://uam-service.default.svc.cluster.local:8080/realms/mockten-realm-dev/protocol/openid-connect/token
+    url: http://uam-service.default.svc.cluster.local/realms/mockten-realm-dev/protocol/openid-connect/token
     routes:
       - name: keycloak-token-route
         paths:
@@ -18,9 +18,8 @@ services:
               - client_secret:mockten-client-secret
               - grant_type:password
               - scope:openid profile
-
   - name: keycloak-creation-token
-    url: http://uam-service.default.svc.cluster.local:8080/realms/mockten-realm-dev/protocol/openid-connect/token
+    url: http://uam-service.default.svc.cluster.local/realms/mockten-realm-dev/protocol/openid-connect/token
     routes:
       - name: keycloak-creation-token-route
         paths:
@@ -41,7 +40,7 @@ services:
               - password:superadmin
 
   - name: keycloak-userinfo
-    url: http://uam-service.default.svc.cluster.local:8080/realms/mockten-realm-dev/protocol/openid-connect/userinfo
+    url: http://uam-service.default.svc.cluster.local/realms/mockten-realm-dev/protocol/openid-connect/userinfo
     routes:
       - name: keycloak-userinfo-route
         paths:
@@ -50,8 +49,34 @@ services:
         methods:
           - GET
           - OPTIONS
+  - name: keycloak-oauth
+    url: http://uam-service.default.svc.cluster.local/realms/mockten-realm-dev/protocol/openid-connect/auth
+    routes:
+      - name: keycloak-oauth
+        paths:
+          - /api/uam/auth
+        strip_path: true
+        methods:
+          - GET
+          - OPTIONS
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            querystring:
+              - client_id:mockten-react-client
+  - name: keycloak-broker-google-endpoint
+    url: http://uam-service.default.svc.cluster.local/realms/mockten-realm-dev/broker/google/endpoint
+    routes:
+      - name: keycloak-broker-google-endpoint-route
+        paths:
+          - /api/uam/broker/google/endpoint
+        strip_path: true
+        methods:
+          - GET
+          - POST
   - name: keycloak-admin-users
-    url: http://uam-service.default.svc.cluster.local:8080/admin/realms/mockten-realm-dev/users
+    url: http://uam-service.default.svc.cluster.local/admin/realms/mockten-realm-dev/users
     routes:
       - name: keycloak-admin-users-route
         paths:
@@ -78,7 +103,7 @@ services:
           credentials: true
 
   - name: keycloak-admin-roles
-    url: http://uam-service.default.svc.cluster.local:8080/admin/realms/mockten-realm-dev/roles
+    url: http://uam-service.default.svc.cluster.local/admin/realms/mockten-realm-dev/roles
     routes:
       - name: keycloak-admin-roles-route
         paths:

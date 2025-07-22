@@ -7,20 +7,48 @@
   "verifyEmail": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
+
+  "identityProviders": [
+    {
+      "alias": "google",
+      "providerId": "google",
+      "enabled": true,
+      "trustEmail": true,
+      "storeToken": true,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "clientId": "GOOGLE_CLIENT_ID",
+        "clientSecret": "GOOGLE_CLIENT_SECRET",
+        "defaultScope": "openid profile email"
+      }
+    }
+  ],
+
   "clients": [
     {
       "clientId": "mockten-react-client",
       "enabled": true,
-      "secret": "mockten-client-secret",
-      "redirectUris": ["http://localhost:5173/*"],
-      "publicClient": false,
       "protocol": "openid-connect",
+      "publicClient": true,
+      "redirectUris": [
+        "http://localhost/*"
+      ],
+      "webOrigins": [
+        "http://localhost"
+      ],
       "directAccessGrantsEnabled": true,
+      "defaultClientScopes": [
+        "web-origins",
+        "role_list",
+        "profile",
+        "email"
+      ],
       "attributes": {
-        "client_credentials": "true",
         "access.token": "true"
-      },
-      "defaultClientScopes": ["web-origins", "role_list", "profile"]
+      }
     }
   ],
   "clientScopes": [
@@ -62,8 +90,48 @@
           }
         }
       ]
+    },
+    {
+      "name": "email",
+      "description": "email scope",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "email",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "email",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "email_verified",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "emailVerified",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "email_verified",
+            "jsonType.label": "boolean"
+          }
+        }
+      ]
     }
   ],
+
   "roles": {
     "realm": [
       {
@@ -76,6 +144,7 @@
       }
     ]
   },
+
   "groups": [
     {
       "name": "Seller"
@@ -93,6 +162,7 @@
       }
     }
   ],
+
   "users": [
     {
       "username": "superadmin",

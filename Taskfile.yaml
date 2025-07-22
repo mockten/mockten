@@ -5,7 +5,7 @@ tasks:
       - (docker network inspect mockten_nw > /dev/null 2>&1 || docker network create mockten_nw)
       - (cd mysql && docker run --rm -d --name mysql-service.default.svc.cluster.local -e MYSQL_ROOT_PASSWORD=rootpassword -e MYSQL_DATABASE=mocktendb -e MYSQL_USER=mocktenusr -e MYSQL_PASSWORD=mocktenpassword --network mockten_nw -p 3306:3306 mockten-mysql)
       - (cd redis && docker run --rm -d --name redis-service.default.svc.cluster.local --network mockten_nw -p 6379:6379 mockten-redis)
-      - (cd uam && docker run --rm --platform linux/amd64 --name uam-service.default.svc.cluster.local --network mockten_nw -p 8080:8080 -dit uam)
+      - (cd uam && docker run --rm --platform linux/amd64 --name uam-service.default.svc.cluster.local --network mockten_nw -e KC_HOSTNAME=localhost -dit uam)
       - (cd minio && docker run --rm --name minio-service.default.svc.cluster.local --network mockten_nw -p 9000:9000 -p 9001:9001 -dit minio)
       - (cd apigw && docker run --rm --name apigw --network mockten_nw -p 8082:8082 -p 8001:8001 -p 8002:8002 -dit apigw)
       - (cd meilisearch && docker run --rm --name meilisearch-service.default.svc.cluster.local --network mockten_nw -p 7700:7700 -dit meilisearch)
