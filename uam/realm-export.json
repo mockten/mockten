@@ -24,6 +24,22 @@
         "clientSecret": "GOOGLE_CLIENT_SECRET",
         "defaultScope": "openid profile email"
       }
+    },
+    {
+      "alias": "facebook",
+      "providerId": "facebook",
+      "enabled": true,
+      "trustEmail": true,
+      "storeToken": true,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "clientId": "FACEBOOK_APP_ID",
+        "clientSecret": "FACEBOOK_APP_SECRET",
+        "defaultScope": "email public_profile"
+      }
     }
   ],
 
