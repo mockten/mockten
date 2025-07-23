@@ -17,6 +17,6 @@ ENV QUARKUS_HTTP_ACCESS_LOG_ENABLED=true
 COPY --from=builder /tmp/realm-export.json /opt/keycloak/data/import/realm-export.json
 COPY docker-entrypoint.sh /opt/keycloak/docker-entrypoint.sh
 
-EXPOSE 8080
+EXPOSE 80
 
 ENTRYPOINT ["/opt/keycloak/docker-entrypoint.sh"]
