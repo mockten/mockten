@@ -17,7 +17,7 @@
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.15.4",
     "@mui/material": "^5.15.4",
-    "@mui/styled-engine": "^5.15.4",
+    "@mui/styled-engine": "^5.18.0",
     "@stripe/react-stripe-js": "^2.5.0",
     "@stripe/stripe-js": "^3.0.3",
     "axios": "^1.10.0",
