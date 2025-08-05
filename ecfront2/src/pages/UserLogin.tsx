@@ -49,6 +49,16 @@ const UserLogin: React.FC = () => {
     });
     window.location.href = `/api/uam/auth?${qs.toString()}`;
   };
+  const startFacebookAuth = (prompt: 'login') => {
+    const qs = new URLSearchParams({
+      response_type: 'code',
+      scope: 'openid profile email',
+      redirect_uri: REDIRECT_URI,
+      kc_idp_hint: 'facebook',
+      prompt,
+    });
+    window.location.href = `/api/uam/auth?${qs.toString()}`;
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -138,6 +148,16 @@ const UserLogin: React.FC = () => {
             fullWidth
           >
             SIGN IN WITH GOOGLE
+          </Button>
+        </Grid>
+        <Grid item>
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={() => startFacebookAuth('login')}
+            fullWidth
+          >
+            SIGN IN WITH FACEBOOK
           </Button>
         </Grid>
       </Grid>

@@ -12,7 +12,7 @@ until mysqladmin ping -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" --silent
 done
 
 # Wait for Keycloak readiness
-until curl -sf http://uam-service.default.svc.cluster.local:8080/realms/mockten-realm-dev; do
+until curl -sf http://uam-service.default.svc.cluster.local/realms/mockten-realm-dev; do
   echo "Waiting for Keycloak to be ready..."
   sleep 2
 done
