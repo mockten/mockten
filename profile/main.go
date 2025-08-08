@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-sql-driver/mysql"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 type Config struct {
@@ -68,7 +68,7 @@ func loadConfig(path string) {
 	}
 }
 
-func initDBForever() {
+func initDBWait() {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s?%s",
 		cfg.MySQL.User,
 		cfg.MySQL.Pass,
@@ -87,7 +87,6 @@ func initDBForever() {
 	db.SetMaxOpenConns(10)
 	db.SetMaxIdleConns(5)
 
-	// Infinite retry with exponential backoff (1s -> 10s cap) + jitter
 	rand.Seed(time.Now().UnixNano())
 	delay := time.Second
 	maxDelay := 10 * time.Second
@@ -147,7 +146,6 @@ func buildParams(req GeocodeRequest) url.Values {
 
 	city := strings.TrimSpace(req.City)
 	if cc == "jp" {
-		// JP: county=ward, city handling for Tokyo
 		if city != "" {
 			p.Set("county", strings.TrimSuffix(city, " City"))
 		}
@@ -156,7 +154,6 @@ func buildParams(req GeocodeRequest) url.Values {
 		} else if city != "" {
 			p.Set("city", strings.TrimSuffix(city, " City"))
 		}
-		// Do not send postal on first try for JP
 	} else {
 		if city != "" {
 			p.Set("city", city)
@@ -211,7 +208,17 @@ func insertGeo(in GeocodeRequest, latStr, lonStr string) error {
 	q := `
 INSERT INTO Geo (
   user_id, country_code, postal_code, prefecture, city, town, building_name, room_number, latitude, longitude
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE
+  country_code = VALUES(country_code),
+  postal_code  = VALUES(postal_code),
+  prefecture   = VALUES(prefecture),
+  city         = VALUES(city),
+  town         = VALUES(town),
+  building_name= VALUES(building_name),
+  room_number  = VALUES(room_number),
+  latitude     = VALUES(latitude),
+  longitude    = VALUES(longitude);
 `
 	_, err := db.ExecContext(ctx, q,
 		in.UserID,
@@ -224,14 +231,7 @@ INSERT INTO Geo (
 		in.RoomNumber,
 		lat, lon,
 	)
-	if err != nil {
-		if me, ok := err.(*mysql.MySQLError); ok && me.Number == 1062 {
-			log.Printf("Duplicate user_id %q; skipping insert.", in.UserID)
-			return nil
-		}
-		return err
-	}
-	return nil
+	return err
 }
 
 func geocodeHandler(w http.ResponseWriter, r *http.Request) {
@@ -275,7 +275,7 @@ func geocodeHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	loadConfig("config.json")
-	initDBForever()
+	initDBWait()
 
 	http.HandleFunc("/profile", geocodeHandler)
 	fmt.Println("Server started at :8080")
