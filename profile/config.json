@@ -1,0 +1,18 @@
+{
+    "nominatim_url": "https://nominatim.openstreetmap.org/search",
+    "user_agent": "mockten/1.0 (mockten@mockten.com)",
+    "country_mapping": {
+      "jp": "Japan",
+      "sg": "Singapore",
+      "us": "United States",
+      "fr": "France",
+      "br": "Brazil"
+    },
+    "mysql": {
+      "host": "mysql-service.default.svc.cluster.local",
+      "user": "mocktenusr",
+      "pass": "mocktenpassword",
+      "db": "mocktendb",
+      "params": "parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci"
+    }
+}
