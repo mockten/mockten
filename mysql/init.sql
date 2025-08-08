@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS ShippingRate (
 -- Create Geo table
 CREATE TABLE IF NOT EXISTS Geo (
   user_id VARCHAR(36)PRIMARY KEY,
+  country_code VARCHAR(2),
   postal_code VARCHAR(36),
   prefecture VARCHAR(50),
   city VARCHAR(100),
@@ -101,5 +102,5 @@ INSERT INTO ShippingRate (rate_id, name, rate) VALUES
 ('rate2', 'Express', 0.05);
 
 -- Insert Geo data
-INSERT INTO Geo (user_id, postal_code, prefecture, city, town, building_name, latitude, longitude) VALUES
-('mocktenHub@mail.com', '143-0006', 'Tokyo', 'Ota-ku', 'Heiwajima', 'Mockten Hub', 35.5774, 139.7516);
+INSERT INTO Geo (user_id, country_code, postal_code, prefecture, city, town, building_name, latitude, longitude) VALUES
+('mocktenHub@mail.com','jp','143-0006', 'Tokyo', 'Ota-ku', 'Heiwajima', 'Mockten Hub', 35.5774, 139.7516);
