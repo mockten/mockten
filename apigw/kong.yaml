@@ -153,3 +153,12 @@ services:
         strip_path: true
         methods:
           - GET
+  - name: profile-geocode
+    url: http://profile-service.default.svc.cluster.local:8080/profile
+    routes:
+      - name: profile-geocode-route
+        paths:
+          - /api/profile
+        strip_path: true
+        methods:
+          - POST
