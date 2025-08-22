@@ -162,3 +162,12 @@ services:
         strip_path: true
         methods:
           - POST
+  - name: shipping-fee-calculator
+    url: http://profile-service.default.svc.cluster.local:8080/shipping
+    routes:
+      - name: shipping-fee-calculator
+        paths:
+          - /api/shipping
+        strip_path: true
+        methods:
+          - GET
