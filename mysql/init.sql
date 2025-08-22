@@ -65,10 +65,10 @@ CREATE TABLE IF NOT EXISTS SeaCost (
 
 -- Create AirCost table
 CREATE TABLE IF NOT EXISTS AirCost (
-origin_airport_code VARCHAR(10),
-destination_airport_code VARCHAR(10),
+origin VARCHAR(10),
+destination VARCHAR(10),
 cost_usd DECIMAL(10,2),
-PRIMARY KEY (origin_airport_code, destination_airport_code)
+PRIMARY KEY (origin, destination)
 );
 
 -- Create Geo table
@@ -153,7 +153,7 @@ INSERT INTO SeaCost (origin_country_code, destination_country_code, cost_usd) VA
 ('SG', 'JP', 4.50);
 
 -- Insert AirCost data (IATA codes only where direct flights exist)
-INSERT INTO AirCost (origin_airport_code, destination_airport_code, cost_usd) VALUES
+INSERT INTO AirCost (origin, destination, cost_usd) VALUES
 ('SIN', 'NRT', 12.00),
 ('SIN', 'HND', 11.50),
 ('SIN', 'KIX', 10.80),

@@ -423,7 +423,7 @@ func getInternationalAirFee(originAirport, destAirport string) (float64, error) 
 	q := `
 SELECT cost_usd
 FROM AirCost
-WHERE origin_airport_code = ? AND destination_airport_code = ?
+WHERE origin = ? AND destination = ?
 `
 	var fee float64
 	err := db.QueryRow(q, strings.ToUpper(originAirport), strings.ToUpper(destAirport)).Scan(&fee)
