@@ -154,7 +154,7 @@ services:
         methods:
           - GET
   - name: profile-geocode
-    url: http://profile-service.default.svc.cluster.local:8080/profile
+    url: http://geocoding-service.default.svc.cluster.local:8080/profile
     routes:
       - name: profile-geocode-route
         paths:
@@ -163,7 +163,7 @@ services:
         methods:
           - POST
   - name: shipping-fee-calculator
-    url: http://profile-service.default.svc.cluster.local:8080/shipping
+    url: http://geocoding-service.default.svc.cluster.local:8080/shipping
     routes:
       - name: shipping-fee-calculator
         paths:

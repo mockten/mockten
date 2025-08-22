@@ -504,15 +504,17 @@ func handleDomestic(w http.ResponseWriter, product *Product, user *UserGeo) {
 	fmt.Printf("Origin nearest airport: %s (%.2f km)\n", origA.ID, round2(dOrigA))
 	fmt.Printf("Destination nearest airport: %s (%.2f km)\n", destA.ID, round2(dDestA))
 
-	roadStd, roadExp, _ := getShippingRates(product.Country, direct)
+	// Road-only fees
+	roadStd, roadExp, _ := getShippingRates(dbCountry(product.Country), direct)
 	fmt.Printf("Road only standard fee: %.2f USD\n", roadStd)
 	fmt.Printf("Road only express fee: %.2f USD\n", roadExp)
 
+	// Domestic air: disable if same airport (no domestic flight)
 	hasDomestic := true
 	var dAir float64
 	if strings.EqualFold(origA.ID, destA.ID) {
-		dAir = 0
-		fmt.Printf("Domestic Flight Fee (%s-%s): %.2f USD\n", origA.ID, destA.ID, dAir)
+		hasDomestic = false
+		fmt.Printf("Domestic air not applicable (same airport: %s)\n", origA.ID)
 	} else {
 		df, err := getDomesticFlightFee(origA.ID, destA.ID)
 		if err != nil {
@@ -524,8 +526,9 @@ func handleDomestic(w http.ResponseWriter, product *Product, user *UserGeo) {
 		}
 	}
 
-	origStd, origExp, _ := getShippingRates(product.Country, dOrigA)
-	destStd, destExp, _ := getShippingRates(user.Country, dDestA)
+	// First/last-mile road legs to/from airport
+	origStd, origExp, _ := getShippingRates(dbCountry(product.Country), dOrigA)
+	destStd, destExp, _ := getShippingRates(dbCountry(user.Country), dDestA)
 
 	var airStd, airExp float64
 	if hasDomestic {
@@ -549,6 +552,8 @@ func handleDomestic(w http.ResponseWriter, product *Product, user *UserGeo) {
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
+
+func dbCountry(cc string) string { return strings.ToUpper(cc) }
 
 func handleInternational(w http.ResponseWriter, product *Product, user *UserGeo) {
 	fmt.Println("Cross-border delivery")
