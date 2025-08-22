@@ -49,8 +49,8 @@ CREATE TABLE IF NOT EXISTS ShippingRate (
 
 -- Create DomesicAirCost table
 CREATE TABLE IF NOT EXISTS DomesticAirCost (
-  origin VARCHAR(100),
-  destination VARCHAR(100),
+  origin VARCHAR(10),
+  destination VARCHAR(10),
   cost_usd DECIMAL(10,2),
   PRIMARY KEY (origin, destination)
 );
