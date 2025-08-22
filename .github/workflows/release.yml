@@ -327,11 +327,11 @@ jobs:
         export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/redis"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
-  release-profile:
+  release-geocoding:
     runs-on: ubuntu-22.04
     defaults:
       run:
-        working-directory: profile
+        working-directory: geocoding
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v2
@@ -344,6 +344,6 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/profile"
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/geocoding"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG

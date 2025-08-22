@@ -11,7 +11,7 @@ tasks:
       - (cd meilisearch && docker run --rm --name meilisearch-service.default.svc.cluster.local --network mockten_nw -p 7700:7700 -dit meilisearch)
       - (cd searchitem && docker run --rm --name searchitem-service.default.svc.cluster.local --network mockten_nw -p 50051:50051 -dit searchitem)
       - (cd sync && docker run --rm --name mockten-sync --network mockten_nw -dit mockten-sync)
-      - (cd profile && docker run --rm -d -v "$PWD/config.json:/app/config.json:ro" --name profile-service.default.svc.cluster.local --network mockten_nw mockten-profile)
+      - (cd geocoding && docker run --rm -d -v "$PWD/config.json:/app/config.json:ro" --name geocoding-service.default.svc.cluster.local --network mockten_nw mockten-geocoding)
       - (docker run --rm --name nginx --network mockten_nw -v $(pwd)/dev_nginx.conf:/etc/nginx/nginx.conf:ro -p 80:80 -dit nginx)
       - (cd ecfront2 && npm run dev -- --host 0.0.0.0 --port 5173)
   destroy: 
@@ -31,4 +31,4 @@ tasks:
       - (cd meilisearch && docker build -t meilisearch .)
       - (cd searchitem && docker build -t searchitem .)
       - (cd sync && docker build -t mockten-sync .)
-      - (cd profile && docker build -t mockten-profile .)
+      - (cd geocoding && docker build -t mockten-geocoding .)
