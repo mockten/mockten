@@ -85,6 +85,77 @@ CREATE TABLE IF NOT EXISTS Geo (
   longitude DECIMAL(10,7)
 );
 
+-- Create Order table
+CREATE TABLE IF NOT EXISTS `Order` (
+  order_id         VARCHAR(36) PRIMARY KEY,
+  user_id    VARCHAR(255) NOT NULL,
+  currency         CHAR(3)      NOT NULL DEFAULT 'USD',
+  subtotal_amount  DECIMAL(12,2) NOT NULL,
+  shipping_amount  DECIMAL(12,2) NOT NULL,
+  total_amount     DECIMAL(12,2) NOT NULL,
+  quantity INT,          
+  status ENUM('created','paid','picking','shipped','delivered','canceled','refunded') NOT NULL DEFAULT 'created',
+  transactions_json JSON NOT NULL,                  
+  created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_order_status ON `Order`(status);
+
+-- Create Transaction table
+CREATE TABLE IF NOT EXISTS `Transaction` (
+  transaction_id VARCHAR(36) PRIMARY KEY,
+  product_id     VARCHAR(36) NOT NULL,
+  user_id        VARCHAR(255) NOT NULL,
+  status         ENUM('quoted','booked','picked_up','in_transit','delayed','delivered','canceled','failed') NOT NULL DEFAULT 'quoted',
+  leg_type       ENUM('road','air','sea') NOT NULL DEFAULT 'road',
+  created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_tx_user    ON `Transaction`(user_id);
+CREATE INDEX idx_tx_product ON `Transaction`(product_id);
+CREATE INDEX idx_tx_legtype ON `Transaction`(leg_type);
+
+-- Create PaymentProfile table
+CREATE TABLE IF NOT EXISTS PaymentProfile (
+  user_id            VARCHAR(255) PRIMARY KEY,       
+  stripe_customer_id VARCHAR(64)  NOT NULL,         
+  created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Create PaymentMethod table
+CREATE TABLE IF NOT EXISTS PaymentMethod (
+  payment_method_id        VARCHAR(36) PRIMARY KEY,  
+  user_id                  VARCHAR(255) NOT NULL,
+  stripe_customer_id       VARCHAR(64)  NOT NULL,   
+  stripe_payment_method_id VARCHAR(64)  NOT NULL,  
+  brand          VARCHAR(20)  NOT NULL,              -- 'visa','mastercard'
+  last4          CHAR(4)      NOT NULL,
+  exp_month      TINYINT      NOT NULL,
+  exp_year       SMALLINT     NOT NULL,
+  is_default     TINYINT(1)   NOT NULL DEFAULT 0,
+  status         ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_user_pm (user_id, stripe_payment_method_id),
+  KEY idx_user_default (user_id, is_default),
+  FOREIGN KEY (user_id) REFERENCES PaymentProfile(user_id)
+);
+
+-- Create Payment table
+CREATE TABLE IF NOT EXISTS Payment (
+  payment_id       VARCHAR(36) PRIMARY KEY,
+  order_id_list    JSON NOT NULL, 
+  payment_method_id VARCHAR(36) NULL,                
+  amount           DECIMAL(12,2) NOT NULL,
+  currency         CHAR(3) NOT NULL,
+  status           ENUM('authorized','captured','failed','canceled','refunded') NOT NULL,
+  idempotency_key  VARCHAR(64),
+  created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_payment_idem (idempotency_key)
+);
+
 -- Insert Category data
 INSERT INTO Category (category_id, category_name) VALUES
 ('01', 'Books'),
@@ -176,3 +247,44 @@ INSERT INTO Geo (user_id, country_code, postal_code, prefecture, city, town, bui
 ('FUK','JP','812-0003','Fukuoka','Fukuoka','Hakata','Fukuoka Airport', 33.5859, 130.4500),
 ('NGO','JP','479-0881','Aichi','Tokoname','Centrair','Chubu Centrair Airport', 34.8584, 136.8054),
 ('TYOP','JP','135-0063','Tokyo','Koto-ku','4-chōme-8 Ariake','Tokyo Port', 35.6329, 139.7966);
+
+-- Dummy PaymentProfile:
+INSERT INTO PaymentProfile (user_id, stripe_customer_id)
+VALUES ('customer1@gmail.com', 'cus_123456789'),
+       ('customer2@gmail.com', 'cus_987654321');
+
+-- Dummy PaymentMethod: 
+INSERT INTO PaymentMethod (
+  payment_method_id, user_id, stripe_customer_id, stripe_payment_method_id,
+  brand, last4, exp_month, exp_year, is_default, status
+) VALUES
+('pm_local_001', 'customer1@gmail.com', 'cus_123456789', 'pm_aaaa1111', 'visa', '4242', 12, 2027, 1, 'active'),
+('pm_local_002', 'customer2@gmail.com', 'cus_987654321', 'pm_bbbb2222', 'mastercard', '4444',  9, 2026, 1, 'active');
+
+-- Transaction: dummy 3 patterns
+INSERT INTO `Transaction` (transaction_id, product_id, user_id, status, leg_type) VALUES
+-- road only
+('tx-rl-001', 'b150d47f-f4fb-40a2-a336-ac8e897af607', 'customer1@gmail.com', 'quoted', 'road'),
+-- road→air→road
+('tx-air-001-road1','b150d47f-f4fb-40a2-a336-ac8e897af607','customer2@gmail.com','quoted','road'),
+('tx-air-001-air',  'b150d47f-f4fb-40a2-a336-ac8e897af607','customer2@gmail.com','quoted','air'),
+('tx-air-001-road2','b150d47f-f4fb-40a2-a336-ac8e897af607','customer2@gmail.com','quoted','road'),
+-- road→sea→road
+('tx-sea-001-road1','580414f1-e962-4f6c-a461-d88d168e7cb1','customer2@gmail.com','quoted','road'),
+('tx-sea-001-sea',  '580414f1-e962-4f6c-a461-d88d168e7cb1','customer2@gmail.com','quoted','sea'),
+('tx-sea-001-road2','580414f1-e962-4f6c-a461-d88d168e7cb1','customer2@gmail.com','quoted','road');
+
+-- Order: 
+INSERT INTO `Order` (order_id, user_id, currency, subtotal_amount, shipping_amount, total_amount, quantity, status, transactions_json) VALUES
+('ord-rl-001','customer1@gmail.com','USD',500.00,0.23,500.23,1,'created',
+ JSON_ARRAY('tx-rl-001')),
+('ord-air-001','customer1@gmail.com','USD',100.00,0.69,100.69,1,'created',
+ JSON_ARRAY('tx-air-001-road1','tx-air-001-air','tx-air-001-road2')),
+('ord-sea-001','customer2@gmail.com','USD',  6.00,4.60, 10.60,1,'created',
+ JSON_ARRAY('tx-sea-001-road1','tx-sea-001-sea','tx-sea-001-road2'));
+
+-- Payment: 
+INSERT INTO Payment (payment_id, order_id_list, payment_method_id, amount, currency, status, idempotency_key) VALUES
+('pay-rl-001',JSON_ARRAY('ord-rl-001'),'pm_local_001',500.23,'USD','authorized','idem-ord-rl-001-1'),
+('pay-air-001',JSON_ARRAY('ord-air-001'),'pm_local_001',100.69,'USD','captured','idem-ord-air-001-1'),
+('pay-sea-001',JSON_ARRAY('ord-sea-001'),'pm_local_002', 10.60,'USD','captured','idem-ord-sea-001-1');
