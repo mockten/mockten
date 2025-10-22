@@ -1,4 +1,4 @@
-FROM debian:12.11-slim
+FROM debian:bookworm-20250929-slim
 
 RUN apt-get update && apt-get install -y curl jq default-mysql-client
 
