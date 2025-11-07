@@ -1,432 +1,488 @@
-import DashboardBottomNavigation from '../components/DashboardBottomNavigation';
-import Appbar from '../components/Appbar';
-import { login } from '../module/login';
-import React, { useState } from 'react';
+import React, { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../Auth';
-import { Box, Container, TextField, Button, IconButton, InputAdornment, Grid, Typography, Snackbar, Alert  } from '@mui/material';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import {
+  Box,
+  Container,
+  TextField,
+  Button,
+  Typography,
+  Paper,
+  IconButton,
+  InputAdornment,
+} from '@mui/material';
+import { Visibility, VisibilityOff, Email, Lock } from '@mui/icons-material';
+import googleIcon from '../assets/google.png';
+import facebookIcon from '../assets/facebook.svg';
+import mocktenIcon from '../assets/mockten.png';
 
-const CreateAccount = () => {
-  const [user, setUser] = useState({
-    displayname: '',
-    firstname: '',
-    lastname: '',
-    password: '',
-    email: '',
-    address1: '',
-    address2: '',
-    address3: '',
-    postcode: 0,
-    birthday: ''
-  });
 
+const UserSignUpNew: React.FC = () => {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [email, setEmail] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
-  const [severity, setSeverity] = useState<'success' | 'error'>('success');
-  const auth = useAuth();
   const navigate = useNavigate();
 
-  const validateEmail = (email: string) => {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(email);
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUser({ ...user, [e.target.name]: e.target.value });
-  };
-
-  const handleClickShowPassword = () => {
-    setShowPassword(!showPassword);
-  };
-
-  const handleClickShowConfirmPassword = () => {
-    setShowConfirmPassword(!showConfirmPassword);
-  };
-
-  const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-  };
-
-  const showSnackbar = (message: string, severity: 'success' | 'error') => {
-    setMessage(message);
-    setSeverity(severity);
-    setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
-    setErrorMessage('');
-  };
-
-  const getToken = async (): Promise<string | null> => {
-    try {
-      const response = await fetch(`/api/uam/creation/token`, { 
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        mode: 'cors',
-      });
-      if (!response.ok) {
-        throw new Error(`Error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      return data.access_token;
-    } catch (error) {
-      console.error(error);
-      return null;
-    }
-  };
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const creationToken = await getToken();
-    console.log("createToken:" + creationToken);
-
+  const handleSignUp = async (e: FormEvent) => {
+    e.preventDefault();
+    
+    // Basic validation
     if (password !== confirmPassword) {
-      setErrorMessage('Passwords do not match');
-    } else if (!validateEmail(email)) {
-      setErrorMessage('Invalid email address'); 
-    } else {
-      setErrorMessage('');
-      user.password = password;
-      user.email = email;
-
-      const userData = {
-        username: user.displayname,
-        email: user.email,
-        enabled: true,
-        emailVerified: true,
-        firstName: user.firstname,
-        lastName: user.lastname,
-        credentials: [
-          {
-            type: 'password',
-            value: user.password,
-            temporary: false,
-          },
-        ],
-        groups: [
-          "Customer"
-        ],
-        attributes: {
-          postcode: user.postcode,
-          address1: user.address1,
-          address2: user.address2,
-          address3: user.address3,
-          birthday: user.birthday,
-        }
-      };
-
-      try {
-        const response = await fetch(`/api/uam/users`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${creationToken}`
-          },
-          body: JSON.stringify(userData),
-          mode: 'cors',
-        });
-        if (!response.ok) {
-          console.error(`Failed to create user:  ${response.status}`);
-          showSnackbar('Request ', 'error');          
-          // throw new Error(`Failed to create user:'  ${response.status}`);
-        }
-
-        const userSearchResponse = await fetch(`/api/uam/users`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${creationToken}`,
-          },
-        });
-
-        if (!userSearchResponse.ok) {
-          console.error(`Failed to fetch users: ${userSearchResponse.status}`);
-          showSnackbar("Failed to fetch users", "error");
-          return;
-        }
-        const users = await userSearchResponse.json();
-        const targetUser = users.find((u: { email: string }) => u.email === user.email);
+      alert('Passwords do not match');
+      return;
+    }
     
-        if (!targetUser) {
-          console.error(`User with email ${user.email} not found`);
-          showSnackbar(`User with email ${user.email} not found`, "error");
-          return;
-        }
-
-        showSnackbar('Request succeeded!', 'success');
-        const rolesResponse = await fetch(`/api/uam/roles`, {
-          method: "GET",
-          headers: { Authorization: `Bearer ${creationToken}` },
-        });
+    if (password.length < 6) {
+      alert('Password must be at least 6 characters long');
+      return;
+    }
     
-        if (!rolesResponse.ok) {
-          console.error(`Failed to fetch roles: ${rolesResponse.status}`);
-          showSnackbar("Failed to fetch roles", "error");
-          return;
-        }
-    
-        const roles = await rolesResponse.json();
-        const customerRole = roles.find((r: { name: string }) => r.name === "customer");
-    
-        if (!customerRole) {
-          console.error(`Role "customer" not found`);
-          showSnackbar(`Role "customer" not found`, "error");
-          return;
-        }
-        const assignRoleRequestBody = [
-          {
-            id: customerRole.id,
-            name: "customer"
-          }
-        ];
-        ;
-        const assignRoleResponse = await fetch(`/api/uam/users/${targetUser.id}/role-mappings/realm`, {
-
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${creationToken}`
-          },
-          body: JSON.stringify(assignRoleRequestBody)
-        });
-
-        if (!assignRoleResponse.ok) {
-          const errorText = await assignRoleResponse.text();
-          console.error(`Failed to assign role: ${assignRoleResponse.status}, Response: ${errorText}`);
-          showSnackbar('Role assignment failed', 'error');
-        } else {
-          console.log('Role assigned successfully');
-        }
-
-        try {
-          // Diffrent token between login_token and token(L92).
-          const { token, userInfo } = await login(user.email, user.password);
-          console.log('User Info:', userInfo);
-    
-          auth.login(token); 
-          navigate('/');
-        } catch (error) {
-          alert(error instanceof Error ? error.message : 'Login failed');
-        }
-      } catch (error) {
-        console.error(error); // Error handling
-        showSnackbar('Request Error', 'error');
-        navigate('/');     
-      }
+    try {
+      // TODO: Implement actual signup API call
+      console.log('Signup attempt:', { email, password });
+      alert('Signup functionality to be implemented');
+    } catch (error) {
+      alert('Signup failed. Please try again.');
     }
   };
 
+  const handleLogin = () => {
+    navigate('/user/login-new');
+  };
+
+  const startGoogleAuth = () => {
+    // TODO: Implement Google OAuth for signup
+    console.log('Google signup');
+    alert('Google signup to be implemented');
+  };
+
+  const startFacebookAuth = () => {
+    // TODO: Implement Facebook OAuth for signup
+    console.log('Facebook signup');
+    alert('Facebook signup to be implemented');
+  };
 
   return (
-    
-    <Container component="main" maxWidth="xs">
-    <Appbar />
-    <h2>Create Your Account!</h2>
-      <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1 }}>
-      <TextField
-          margin="normal"
-          required
-          fullWidth
-          id="displayname"
-          label="Display Name"
-          name="displayname"
-          autoComplete="displayname"
-          autoFocus
-          onChange={handleChange}
-        />
-        <TextField
-          margin="normal"
-          required
-          fullWidth
-          id="firstname"
-          label="First Name"
-          name="firstname"
-          autoComplete="firstname"
-          autoFocus
-          onChange={handleChange}
-        />
-        <TextField
-          margin="normal"
-          required
-          fullWidth
-          id="lastname"
-          label="Last Name"
-          name="lastname"
-          autoComplete="lastname"
-          autoFocus
-          onChange={handleChange}
-        />
-        <TextField
-          margin="normal"
-          label="Password"
-          variant="outlined"
-          type={showPassword ? 'text' : 'password'}
-          fullWidth
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton
-                  aria-label="toggle password visibility"
-                  onClick={handleClickShowPassword}
-                  onMouseDown={handleMouseDownPassword}
-                  edge="end"
-                >
-                  {showPassword ? <VisibilityOff /> : <Visibility />}
-                </IconButton>
-              </InputAdornment>
-            ),
+    <Box
+      sx={{
+        minHeight: '100vh',
+        background: '#CADFFF',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '39px 235px',
+      }}
+    >
+      {/* Mockten Icon Background */}
+      <Box
+        sx={{
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 0,
+        }}
+      >
+        <img
+          src={mocktenIcon}
+          alt="Mockten Logo"
+          style={{
+            width: '662px',
+            height: '662px',
+            objectFit: 'cover',
+            opacity: 0.1,
           }}
         />
-        <TextField
-          margin="normal"
-          label="Confirm Password"
-          variant="outlined"
-          type={showConfirmPassword ? 'text' : 'password'}
-          fullWidth
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton
-                  aria-label="toggle confirm password visibility"
-                  onClick={handleClickShowConfirmPassword}
-                  onMouseDown={handleMouseDownPassword}
-                  edge="end"
-                >
-                  {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-        />
-        {errorMessage && (
-          <Grid item>
-            <Typography variant="body2" color="error">
-              {errorMessage}
-            </Typography>
-          </Grid>
-        )}
-        <TextField
-          margin="normal"
-          required
-          fullWidth
-          id="mail_address"
-          label="Mail Address"
-          name="mail_address1"
-          autoComplete="mail_address1"
-          autoFocus
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <TextField
-          margin="normal"
-          required
-          fullWidth
-          id="phone_number1"
-          inputProps={{
-            pattern: '\\d*',  
-            inputMode: 'tel', 
-            maxLength: 15,  
-          }}
-          label="Phone Number"
-          name="phone_number1"
-          autoComplete="phone_number1"
-          autoFocus
-          type="number"
-          onChange={handleChange}
-        />       
-        <TextField
-          margin="normal"
-          required
-          fullWidth
-          id="address1"
-          label="Address(Prefecture)"
-          name="address1"
-          autoComplete="address1"
-          autoFocus
-          onChange={handleChange}
-        />
-        <TextField
-          margin="normal"
-          required
-          fullWidth
-          id="address2"
-          label="Address(City)"
-          name="address2"
-          autoComplete="address2"
-          autoFocus
-          onChange={handleChange}
-        />
-        <TextField
-          margin="normal"
-          required
-          fullWidth
-          id="address3"
-          label="Address(Street)"
-          name="address3"
-          autoComplete="address3"
-          autoFocus
-          onChange={handleChange}
-        />
-        <TextField
-          margin="normal"
-          required
-          fullWidth
-          id="postcode"
-          inputProps={{
-            pattern: '[0-9]{3}-?[0-9]{4}', 
-            inputMode: 'numeric',        
-            maxLength: 8,               
-          }}
-          label="Postcode"
-          name="postcode"
-          autoComplete="postcode"
-          autoFocus
-          helperText="ex: 123-4567"
-          onChange={handleChange}
-        />
-        <TextField
-          margin="normal"
-          type="date"
-          required
-          fullWidth
-          id="birthday"
-          InputLabelProps={{
-            shrink: true,
-          }}
-          label="Birth Day"
-          name="birthday"
-          autoComplete="birthday"
-          autoFocus
-          onChange={handleChange}
-        />
-      <div>
-    </div>
-      <Button type="submit" fullWidth variant="contained" sx={{ mt: 3, mb: 2 }}>
-        Create
-      </Button>
-      <Snackbar open={open} autoHideDuration={6000} onClose={handleClose}>
-        <Alert onClose={handleClose} severity={severity} sx={{ width: '100%' }}>
-          {message}
-        </Alert>
-      </Snackbar>
       </Box>
-      <DashboardBottomNavigation />
-    </Container>
+
+      {/* Signup Form Container */}
+      <Paper
+        elevation={0}
+        sx={{
+          backgroundColor: 'white',
+          borderRadius: 0,
+          padding: 0,
+          position: 'relative',
+          zIndex: 1,
+          minWidth: 'fit-content',
+        }}
+      >
+        <Container maxWidth={false} sx={{ padding: 0 }}>
+          {/* Header */}
+          <Box sx={{ padding: '32px', paddingBottom: '22px' }}>
+            <Typography
+              variant="h3"
+              sx={{
+                fontFamily: 'Poppins',
+                fontWeight: 500,
+                fontSize: '36px',
+                color: '#2F2F2F',
+                marginBottom: 0,
+                lineHeight: 1.355,
+              }}
+            >
+              SignUp for{' '}
+              <Typography
+                component="span"
+                sx={{
+                  fontFamily: 'Poppins',
+                  fontWeight: 900,
+                  fontSize: '46px',
+                  color: '#6358DC',
+                  lineHeight: 1.355,
+                }}
+              >
+                Mockten
+              </Typography>
+            </Typography>
+          </Box>
+
+          {/* Social Signup Buttons */}
+          <Box sx={{ padding: '12px 0', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Google Signup */}
+            <Button
+              variant="outlined"
+              onClick={startGoogleAuth}
+              sx={{
+                height: '79px',
+                width: '681px',
+                backgroundColor: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.11)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textTransform: 'none',
+                '&:hover': {
+                  backgroundColor: '#f5f5f5',
+                  boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.15)',
+                },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <img src={googleIcon} alt="Google" style={{ width: '32px', height: '33px' }} />
+                <Typography
+                  sx={{
+                    fontFamily: 'Poppins',
+                    fontWeight: 400,
+                    fontSize: '16px',
+                    color: '#2F2F2F',
+                  }}
+                >
+                  SignUp with Google
+                </Typography>
+              </Box>
+            </Button>
+
+            {/* Facebook Signup */}
+            <Button
+              variant="outlined"
+              onClick={startFacebookAuth}
+              sx={{
+                height: '79px',
+                width: '681px',
+                backgroundColor: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.11)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textTransform: 'none',
+                '&:hover': {
+                  backgroundColor: '#f5f5f5',
+                  boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.15)',
+                },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <img src={facebookIcon} alt="Facebook" style={{ width: '16px', height: '34px' }} />
+                <Typography
+                  sx={{
+                    fontFamily: 'Poppins',
+                    fontWeight: 400,
+                    fontSize: '16px',
+                    color: '#2F2F2F',
+                  }}
+                >
+                  SignUp with Facebook
+                </Typography>
+              </Box>
+            </Button>
+          </Box>
+
+          {/* OR Divider */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0 58px',
+              height: '12px',
+            }}
+          >
+            <Box sx={{ flex: 1, height: '1px', backgroundColor: '#D9D9D9' }} />
+            <Typography
+              sx={{
+                fontFamily: 'Poppins',
+                fontWeight: 400,
+                fontSize: '16px',
+                color: '#2F2F2F',
+                whiteSpace: 'nowrap',
+                padding: '0 35px',
+              }}
+            >
+              OR
+            </Typography>
+            <Box sx={{ flex: 1, height: '1px', backgroundColor: '#D9D9D9' }} />
+          </Box>
+
+          {/* Email and Password Form */}
+          <Box component="form" onSubmit={handleSignUp}>
+            <Box sx={{ padding: '0 28px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+              {/* Email Field */}
+              <Box
+                sx={{
+                  backgroundColor: '#ECECEC',
+                  borderRadius: '8px',
+                  height: '77px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0 24px',
+                  position: 'relative',
+                }}
+              >
+                <Email sx={{ color: '#2F2F2F', width: '30px', height: '25px', marginRight: '28px' }} />
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography
+                    sx={{
+                      fontFamily: 'Poppins',
+                      fontWeight: 400,
+                      fontSize: '12px',
+                      color: '#2F2F2F',
+                      marginBottom: '12px',
+                    }}
+                  >
+                    Email
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    variant="standard"
+                    placeholder="example@gmail.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    type="email"
+                    required
+                    InputProps={{
+                      disableUnderline: true,
+                      sx: {
+                        fontFamily: 'Poppins',
+                        fontWeight: 700,
+                        fontSize: '16px',
+                        color: '#2F2F2F',
+                      },
+                    }}
+                  />
+                </Box>
+              </Box>
+
+              {/* Password Field */}
+              <Box
+                sx={{
+                  backgroundColor: '#ECECEC',
+                  borderRadius: '8px',
+                  height: '77px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0 24px',
+                  position: 'relative',
+                }}
+              >
+                <Lock sx={{ color: '#2F2F2F', width: '27px', height: '27px', marginRight: '28px' }} />
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography
+                    sx={{
+                      fontFamily: 'Poppins',
+                      fontWeight: 400,
+                      fontSize: '12px',
+                      color: '#2F2F2F',
+                      marginBottom: '12px',
+                    }}
+                  >
+                    Password
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    variant="standard"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="***********"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    InputProps={{
+                      disableUnderline: true,
+                      sx: {
+                        fontFamily: 'Poppins',
+                        fontWeight: 700,
+                        fontSize: '16px',
+                        color: '#2F2F2F',
+                      },
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            onClick={() => setShowPassword(!showPassword)}
+                            edge="end"
+                            sx={{ color: '#2F2F2F' }}
+                          >
+                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Box>
+              </Box>
+
+              {/* Confirm Password Field */}
+              <Box
+                sx={{
+                  backgroundColor: '#ECECEC',
+                  borderRadius: '8px',
+                  height: '77px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0 24px',
+                  position: 'relative',
+                }}
+              >
+                <Lock sx={{ color: '#2F2F2F', width: '27px', height: '27px', marginRight: '28px' }} />
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography
+                    sx={{
+                      fontFamily: 'Poppins',
+                      fontWeight: 400,
+                      fontSize: '12px',
+                      color: '#2F2F2F',
+                      marginBottom: '12px',
+                    }}
+                  >
+                    Confirm Password
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    variant="standard"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="***********"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    InputProps={{
+                      disableUnderline: true,
+                      sx: {
+                        fontFamily: 'Poppins',
+                        fontWeight: 700,
+                        fontSize: '16px',
+                        color: '#2F2F2F',
+                      },
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            edge="end"
+                            sx={{ color: '#2F2F2F' }}
+                          >
+                            {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Box>
+              </Box>
+            </Box>
+
+            {/* Terms and Conditions */}
+            <Box sx={{ padding: '10px 0', textAlign: 'center' }}>
+              <Typography
+                sx={{
+                  fontFamily: 'Poppins',
+                  fontWeight: 400,
+                  fontSize: '16px',
+                  color: '#2F2F2F',
+                }}
+              >
+                By creating an account, You agree our{' '}
+                <Typography
+                  component="span"
+                  sx={{
+                    color: '#6358DC',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      textDecoration: 'underline',
+                    },
+                  }}
+                >
+                  Terms.
+                </Typography>
+              </Typography>
+            </Box>
+
+            {/* SignUp Button */}
+            <Box sx={{ padding: '10px 0', textAlign: 'center' }}>
+              <Button
+                type="submit"
+                sx={{
+                  height: '77px',
+                  width: '671px',
+                  backgroundColor: '#6358DC',
+                  borderRadius: '8px',
+                  fontFamily: 'Poppins',
+                  fontWeight: 600,
+                  fontSize: '16px',
+                  color: 'white',
+                  textTransform: 'none',
+                  '&:hover': {
+                    backgroundColor: '#5a4bc7',
+                  },
+                }}
+              >
+                SignUp
+              </Button>
+            </Box>
+
+            {/* Login Link */}
+            <Box sx={{ padding: '10px 0', textAlign: 'center' }}>
+              <Typography
+                sx={{
+                  fontFamily: 'Poppins',
+                  fontWeight: 400,
+                  fontSize: '16px',
+                  color: '#2F2F2F',
+                }}
+              >
+                You already have an account?{' '}
+                <Typography
+                  component="span"
+                  sx={{
+                    color: '#6358DC',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      textDecoration: 'underline',
+                    },
+                  }}
+                  onClick={handleLogin}
+                >
+                  Login
+                </Typography>
+              </Typography>
+            </Box>
+          </Box>
+        </Container>
+      </Paper>
+    </Box>
   );
 };
 
-export default CreateAccount;
+export default UserSignUpNew;

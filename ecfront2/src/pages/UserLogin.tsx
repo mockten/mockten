@@ -2,19 +2,32 @@ import React, { useState, useEffect, FormEvent } from 'react';
 import { login } from '../module/login';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../Auth';
+import googleIcon from '../assets/google.png';
+import facebookIcon from '../assets/facebook.svg';
+import mocktenIcon from '../assets/mockten.png';
+
 import {
+  Box,
   Container,
   TextField,
   Button,
-  Grid,
   Typography,
+  Checkbox,
+  FormControlLabel,
+  Divider,
+  Paper,
+  IconButton,
+  InputAdornment,
 } from '@mui/material';
+import { Visibility, VisibilityOff, Email, Lock } from '@mui/icons-material';
 
 const REDIRECT_URI = `${window.location.origin}/user/login`;
 
-const UserLogin: React.FC = () => {
+const UserLoginNew: React.FC = () => {
   const [userID, setUserID] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
   const auth = useAuth();
   const [codeProcessed, setCodeProcessed] = useState(false);
@@ -49,6 +62,7 @@ const UserLogin: React.FC = () => {
     });
     window.location.href = `/api/uam/auth?${qs.toString()}`;
   };
+
   const startFacebookAuth = (prompt: 'login') => {
     const qs = new URLSearchParams({
       response_type: 'code',
@@ -92,77 +106,389 @@ const UserLogin: React.FC = () => {
   }, [auth, navigate, codeProcessed]);
 
   return (
-    <Container maxWidth="sm">
-      <Grid
-        container
-        spacing={3}
-        direction="column"
-        alignItems="center"
-        justifyContent="center"
-        style={{ minHeight: '100vh' }}
+    <Box
+      sx={{
+        minHeight: '100vh',
+        background: '#CADFFF',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '12px',
+      }}
+    >
+      {/* Mockten Icon */}
+      <Box
+        sx={{
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 0,
+        }}
       >
-        <Grid item>
-          <Typography variant="h4">User Login</Typography>
-        </Grid>
-        <Grid item>
-          <TextField
-            label="User ID"
-            variant="outlined"
-            fullWidth
-            value={userID}
-            onChange={(e) => setUserID(e.target.value)}
-          />
-        </Grid>
-        <Grid item>
-          <TextField
-            label="Password"
-            variant="outlined"
-            type="password"
-            fullWidth
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </Grid>
-        <Grid item>
-          <Button variant="contained" color="primary" onClick={handleLogin} fullWidth>
-            Login
-          </Button>
-        </Grid>
-        <Grid item>
-          <Typography variant="body2">登録していないユーザはこちら</Typography>
-          <Button
-            variant="outlined"
-            color="secondary"
-            onClick={handleSignUp}
-            fullWidth
+        <img
+          src={mocktenIcon}
+          alt="Mockten Logo"
+          style={{
+            width: '400px',
+            height: '400px',
+            objectFit: 'cover',
+            opacity: 0.1,
+          }}
+        />
+      </Box>
+
+      {/* Login Form Container */}
+      <Paper
+        elevation={3}
+        sx={{
+          width: '788px',
+          height: '891px',
+          backgroundColor: 'white',
+          padding: '50px 24px',
+          borderRadius: 0,
+          boxShadow: '0px 0px 4px 0px rgba(0,0,0,0.08)',
+          position: 'relative',
+          zIndex: 1,
+        }}
+      >
+        <Container maxWidth={false} sx={{ padding: '28px' }}>
+          {/* Welcome Header */}
+          <Box sx={{ marginBottom: '28px' }}>
+            <Typography
+              variant="h3"
+              sx={{
+                fontFamily: 'Poppins',
+                fontWeight: 500,
+                fontSize: '36px',
+                color: '#2F2F2F',
+                marginBottom: 0,
+                lineHeight: 1.355,
+              }}
+            >
+              Welcome to{' '}
+              <Typography
+                component="span"
+                sx={{
+                  fontFamily: 'Poppins',
+                  fontWeight: 900,
+                  fontSize: '46px',
+                  color: '#6358DC',
+                  lineHeight: 1.355,
+                }}
+              >
+                Mockten
+              </Typography>
+            </Typography>
+          </Box>
+
+          {/* Social Login Buttons */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '28px', marginBottom: '28px' }}>
+            {/* Google Login */}
+            <Button
+              variant="outlined"
+              onClick={() => startGoogleAuth('login')}
+              sx={{
+                height: '82px',
+                width: '681px',
+                backgroundColor: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.11)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '16px',
+                textTransform: 'none',
+                '&:hover': {
+                  backgroundColor: '#f5f5f5',
+                  boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.15)',
+                },
+              }}
+            >
+              <img src={googleIcon} alt="Google" style={{ width: '32px', height: '32px' }} />
+              <Typography
+                sx={{
+                  fontFamily: 'Poppins',
+                  fontWeight: 400,
+                  fontSize: '16px',
+                  color: '#2F2F2F',
+                }}
+              >
+                Login with Google
+              </Typography>
+            </Button>
+
+            {/* Facebook Login */}
+            <Button
+              variant="outlined"
+              onClick={() => startFacebookAuth('login')}
+              sx={{
+                height: '82px',
+                width: '681px',
+                backgroundColor: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.11)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '16px',
+                textTransform: 'none',
+                '&:hover': {
+                  backgroundColor: '#f5f5f5',
+                  boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.15)',
+                },
+              }}
+            >
+              <img src={facebookIcon} alt="Facebook" style={{ width: '34px', height: '34px' }} />
+              <Typography
+                sx={{
+                  fontFamily: 'Poppins',
+                  fontWeight: 400,
+                  fontSize: '16px',
+                  color: '#2F2F2F',
+                }}
+              >
+                Login with Facebook
+              </Typography>
+            </Button>
+          </Box>
+
+          {/* OR Divider */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '35px',
+              marginBottom: '28px',
+              padding: '24px 28px',
+            }}
           >
-            SIGN UP
-          </Button>
-        </Grid>
-        <Grid item>
-          <Typography variant="body2">または</Typography>
-          <Button
-            variant="outlined"
-            color="inherit"
-            onClick={() => startGoogleAuth('login')}
-            fullWidth
+            <Divider sx={{ flex: 1, borderColor: '#D9D9D9' }} />
+            <Typography
+              sx={{
+                fontFamily: 'Poppins',
+                fontWeight: 400,
+                fontSize: '16px',
+                color: '#2F2F2F',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              OR
+            </Typography>
+            <Divider sx={{ flex: 1, borderColor: '#D9D9D9' }} />
+          </Box>
+
+          {/* Email and Password Form */}
+          <Box component="form" onSubmit={handleLogin} sx={{ marginBottom: '28px' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px 32px' }}>
+              {/* Email Field */}
+              <Box
+                sx={{
+                  backgroundColor: '#ECECEC',
+                  borderRadius: '10px',
+                  padding: '16px 32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                }}
+              >
+                <Email sx={{ color: '#2F2F2F', width: '30px', height: '25px' }} />
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography
+                    sx={{
+                      fontFamily: 'Poppins',
+                      fontWeight: 400,
+                      fontSize: '12px',
+                      color: '#2F2F2F',
+                      marginBottom: '12px',
+                    }}
+                  >
+                    Email
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    variant="standard"
+                    placeholder="example@gmail.com"
+                    value={userID}
+                    onChange={(e) => setUserID(e.target.value)}
+                    InputProps={{
+                      disableUnderline: true,
+                      sx: {
+                        fontFamily: 'Poppins',
+                        fontWeight: 700,
+                        fontSize: '16px',
+                        color: '#2F2F2F',
+                      },
+                    }}
+                  />
+                </Box>
+              </Box>
+
+              {/* Password Field */}
+              <Box
+                sx={{
+                  backgroundColor: '#ECECEC',
+                  borderRadius: '10px',
+                  padding: '16px 32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                }}
+              >
+                <Lock sx={{ color: '#2F2F2F', width: '27px', height: '27px' }} />
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography
+                    sx={{
+                      fontFamily: 'Poppins',
+                      fontWeight: 400,
+                      fontSize: '12px',
+                      color: '#2F2F2F',
+                      marginBottom: '12px',
+                    }}
+                  >
+                    Password
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    variant="standard"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="***********"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    InputProps={{
+                      disableUnderline: true,
+                      sx: {
+                        fontFamily: 'Poppins',
+                        fontWeight: 700,
+                        fontSize: '16px',
+                        color: '#2F2F2F',
+                      },
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            onClick={() => setShowPassword(!showPassword)}
+                            edge="end"
+                            sx={{ color: '#2F2F2F' }}
+                          >
+                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Box>
+              </Box>
+            </Box>
+
+            {/* Remember Me */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '0 32px', marginBottom: '28px' }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    sx={{
+                      color: '#D9D9D9',
+                      '&.Mui-checked': {
+                        color: '#6358DC',
+                      },
+                    }}
+                  />
+                }
+                label={
+                  <Typography
+                    sx={{
+                      fontFamily: 'Poppins',
+                      fontWeight: 400,
+                      fontSize: '16px',
+                      color: '#2F2F2F',
+                    }}
+                  >
+                    Remember me
+                  </Typography>
+                }
+                sx={{ margin: 0 }}
+              />
+            </Box>
+
+            {/* Login Button */}
+            <Box sx={{ padding: '16px 32px' }}>
+              <Button
+                type="submit"
+                fullWidth
+                sx={{
+                  height: '54px',
+                  backgroundColor: '#6358DC',
+                  borderRadius: '8px',
+                  fontFamily: 'Poppins',
+                  fontWeight: 600,
+                  fontSize: '16px',
+                  color: 'white',
+                  textTransform: 'none',
+                  '&:hover': {
+                    backgroundColor: '#5a4bc7',
+                  },
+                }}
+              >
+                Login
+              </Button>
+            </Box>
+          </Box>
+
+          {/* Footer Links */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0 32px',
+            }}
           >
-            SIGN IN WITH GOOGLE
-          </Button>
-        </Grid>
-        <Grid item>
-          <Button
-            variant="outlined"
-            color="primary"
-            onClick={() => startFacebookAuth('login')}
-            fullWidth
-          >
-            SIGN IN WITH FACEBOOK
-          </Button>
-        </Grid>
-      </Grid>
-    </Container>
+            <Typography
+              sx={{
+                fontFamily: 'Poppins',
+                fontWeight: 400,
+                fontSize: '16px',
+                color: '#6358DC',
+                cursor: 'pointer',
+                '&:hover': {
+                  textDecoration: 'underline',
+                },
+              }}
+            >
+              Forgot Password?
+            </Typography>
+            <Typography
+              sx={{
+                fontFamily: 'Poppins',
+                fontWeight: 400,
+                fontSize: '16px',
+                color: '#2F2F2F',
+              }}
+            >
+              Don't have an account?{' '}
+              <Typography
+                component="span"
+                sx={{
+                  color: '#6358DC',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    textDecoration: 'underline',
+                  },
+                }}
+                onClick={handleSignUp}
+              >
+                Register
+              </Typography>
+            </Typography>
+          </Box>
+        </Container>
+      </Paper>
+    </Box>
   );
 };
 
-export default UserLogin;
+export default UserLoginNew;
