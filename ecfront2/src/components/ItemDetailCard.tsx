@@ -10,10 +10,10 @@ import {
   Divider,
   Chip,
 } from '@mui/material';
-import FavoriteIcon from './item/FavoriteIcon';
-import AddShoppingCartIcon from './item/AddShoppingCartIcon';
-import PaymentIcon from './item/PaymentIcon';
-import { PrevArrow, NextArrow } from './item/NextIcon';
+import FavoriteIcon from './molecule/FavoriteIcon';
+import AddShoppingCartIcon from './molecule/AddShoppingCartIcon';
+import PaymentIcon from './molecule/PaymentIcon';
+import { PrevArrow, NextArrow } from './molecule/NextIcon';
 import Slider from 'react-slick';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';

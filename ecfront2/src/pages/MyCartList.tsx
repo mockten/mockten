@@ -2,40 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
-  AppBar,
-  Toolbar,
-  TextField,
-  InputAdornment,
   Typography,
   IconButton,
   Container,
   Button,
   Card,
   CardContent,
-  CardMedia,
   Grid,
   Divider,
 } from '@mui/material';
 import {
-  Search,
-  ShoppingCart,
-  History,
-  FavoriteBorder,
-  Person,
-  Close,
   Star,
   StarHalf,
   StarBorder,
   KeyboardArrowRight,
 } from '@mui/icons-material';
+import Appbar from '../components/Appbar';
+import Footer from '../components/Footer';
 
 // Mock image URLs - replace with actual asset URLs from your project
-const searchIcon = "http://localhost:3845/assets/c535b42dcf7e566d2b67967fb9015d1c01b349ee.svg";
-const shoppingCartIcon = "http://localhost:3845/assets/6860db0ced6811a1edcaf770921861e9208e14e7.svg";
-const historyIcon = "http://localhost:3845/assets/127b7362eba9bb3a7b8dedc9f483e2c327967a29.svg";
-const favoriteIcon = "http://localhost:3845/assets/d2ae4d607d49b9c7cb69fc521abc19d44737bd87.svg";
-const personIcon = "http://localhost:3845/assets/dee4618eca47c5877a5dd52eaf0c6b5014b75e35.svg";
-const arrowRightIcon = "http://localhost:3845/assets/ce1540ba1f8cb0bde2e26ff8f9fc566f7be994a6.svg";
 const photoIcon = "http://localhost:3845/assets/3b8e50376eaa12f5e8f94e365596b31206067da6.svg";
 const closeIcon = "http://localhost:3845/assets/7918491eb7e0f27c67545a7abdd2b451c819a811.svg";
 
@@ -61,7 +46,6 @@ interface RecommendedProduct {
 const CartListNew: React.FC = () => {
   const navigate = useNavigate();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Mock data - replace with actual API calls
   const mockCartItems: CartItem[] = [
@@ -143,12 +127,6 @@ const CartListNew: React.FC = () => {
     setCartItems(mockCartItems);
   }, []);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search-new?q=${encodeURIComponent(searchQuery)}`);
-    }
-  };
 
   const handleRemoveItem = (itemId: number) => {
     setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
@@ -156,6 +134,7 @@ const CartListNew: React.FC = () => {
 
   const handleCheckout = () => {
     // TODO: Implement checkout functionality
+    navigate('/cart/shipto');
     console.log('Proceeding to checkout');
   };
 
@@ -193,99 +172,11 @@ const CartListNew: React.FC = () => {
     return calculateSubtotal() + calculateShipping();
   };
 
-  const footerLinks = [
-    'About us', 'careers', 'USER guide',
-    'careers', 'ir', 'CONTACT US'
-  ];
 
   return (
     <Box sx={{ minHeight: '100vh', backgroundColor: 'white' }}>
       {/* App Bar */}
-      <AppBar 
-        position="static" 
-        sx={{ 
-          backgroundColor: '#5856D6',
-          borderBottom: '1px solid #eeeeee',
-        }}
-      >
-        <Toolbar sx={{ padding: '16px', gap: '24px' }}>
-          {/* Logo */}
-          <Typography
-            variant="h6"
-            sx={{
-              fontFamily: 'Noto Sans',
-              fontWeight: 'bold',
-              fontSize: '20px',
-              color: 'black',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            MOCKTEN
-          </Typography>
-
-          {/* Search Bar */}
-          <Box sx={{ flexGrow: 1 }}>
-            <form onSubmit={handleSearch}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                placeholder="Search.."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                sx={{
-                  backgroundColor: 'white',
-                  borderRadius: '4px',
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: '4px',
-                    padding: '8px 16px',
-                    '& fieldset': {
-                      borderColor: '#cccccc',
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#cccccc',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#cccccc',
-                    },
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#aaaaaa',
-                    fontFamily: 'Noto Sans',
-                    fontSize: '16px',
-                    '&::placeholder': {
-                      color: '#aaaaaa',
-                      opacity: 1,
-                    },
-                  },
-                }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <img src={searchIcon} alt="Search" style={{ width: '16px', height: '16px' }} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </form>
-          </Box>
-
-          {/* Navigation Icons */}
-          <Box sx={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <IconButton sx={{ color: 'black' }}>
-              <img src={shoppingCartIcon} alt="Cart" style={{ width: '24px', height: '24px' }} />
-            </IconButton>
-            <IconButton sx={{ color: 'black' }}>
-              <img src={historyIcon} alt="History" style={{ width: '24px', height: '24px' }} />
-            </IconButton>
-            <IconButton sx={{ color: 'black' }}>
-              <img src={favoriteIcon} alt="Favorites" style={{ width: '24px', height: '24px' }} />
-            </IconButton>
-            <IconButton sx={{ color: 'black' }}>
-              <img src={personIcon} alt="Profile" style={{ width: '24px', height: '24px' }} />
-            </IconButton>
-          </Box>
-        </Toolbar>
-      </AppBar>
+      <Appbar />
 
       {/* Main Content */}
       <Container maxWidth="lg" sx={{ padding: '24px 16px' }}>
@@ -326,7 +217,7 @@ const CartListNew: React.FC = () => {
           {/* Cart Items */}
           <Grid item xs={12} md={8}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-              {cartItems.map((item, index) => (
+              {cartItems.map((item, ) => (
                 <Box
                   key={item.id}
                   sx={{
@@ -635,81 +526,7 @@ const CartListNew: React.FC = () => {
       </Container>
 
       {/* Footer */}
-      <Box
-        sx={{
-          backgroundColor: '#5856D6',
-          padding: '40px 16px',
-          marginTop: '48px',
-        }}
-      >
-        <Container maxWidth="lg">
-          <Box sx={{ marginBottom: '24px' }}>
-            <Typography
-              variant="h4"
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontWeight: 'bold',
-                fontSize: '24px',
-                color: 'black',
-                marginBottom: '16px',
-              }}
-            >
-              MOCKTEN
-            </Typography>
-            
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '24px' }}>
-              {footerLinks.map((link, index) => (
-                <Button
-                  key={index}
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '16px 0',
-                    borderBottom: '1px solid #dddddd',
-                    borderRadius: 0,
-                    textTransform: 'uppercase',
-                    minWidth: '300px',
-                    '&:hover': {
-                      backgroundColor: 'transparent',
-                    },
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      fontFamily: 'Noto Sans',
-                      fontSize: '16px',
-                      color: 'black',
-                      textAlign: 'left',
-                    }}
-                  >
-                    {link}
-                  </Typography>
-                  <img src={arrowRightIcon} alt="Arrow" style={{ width: '24px', height: '24px' }} />
-                </Button>
-              ))}
-            </Box>
-          </Box>
-        </Container>
-        
-        <Box
-          sx={{
-            backgroundColor: 'black',
-            padding: '8px',
-            textAlign: 'center',
-          }}
-        >
-          <Typography
-            sx={{
-              fontFamily: 'Noto Sans',
-              fontSize: '12px',
-              color: 'white',
-            }}
-          >
-            © MOCKTEN, Inc.
-          </Typography>
-        </Box>
-      </Box>
+      <Footer />
     </Box>
   );
 };

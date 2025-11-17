@@ -1,4 +1,3 @@
-import DashboardBottomNavigation from '../components/DashboardBottomNavigation';
 import Appbar from '../components/Appbar';
 import React, { useState } from 'react';
 import { Box, Container, TextField, Button, IconButton, InputAdornment, Grid, Typography, Snackbar, Alert  } from '@mui/material';
@@ -410,7 +409,6 @@ const CreateAccount = () => {
         </Alert>
       </Snackbar>
       </Box>
-      <DashboardBottomNavigation />
     </Container>
   );
 };

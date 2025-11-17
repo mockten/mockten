@@ -9,30 +9,20 @@ import {
   Typography,
   Card,
   CardContent,
-  CardMedia,
   IconButton,
   Container,
   Grid,
   Button,
   Checkbox,
   FormControlLabel,
-  FormGroup,
   Chip,
   Pagination,
-  Divider,
 } from '@mui/material';
 import {
-  Search,
-  ShoppingCart,
-  History,
-  FavoriteBorder,
-  Person,
   Star,
   StarHalf,
   StarBorder,
   Sort,
-  KeyboardArrowRight,
-  PhotoOutlined,
 } from '@mui/icons-material';
 
 // Mock image URLs - replace with actual asset URLs from your project
@@ -79,7 +69,6 @@ const SearchResultNew: React.FC = () => {
     freeShipping: false,
   });
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState('relevance');
 
   // Mock data - replace with actual API calls
   const mockProducts: Product[] = Array.from({ length: 20 }, (_, index) => ({

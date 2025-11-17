@@ -1,7 +1,7 @@
 import React, { useState, FormEvent } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../Auth';
+import { useAuth } from '../../Auth';
 import { Container, TextField, Button, Grid, Typography } from '@mui/material';
 
 const SellerLogin: React.FC = () => {

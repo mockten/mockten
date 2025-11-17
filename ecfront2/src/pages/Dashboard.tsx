@@ -1,28 +1,20 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
-  AppBar,
-  Toolbar,
-  TextField,
-  InputAdornment,
   Typography,
   Card,
   CardContent,
-  IconButton,
   Container,
   Grid,
   Button,
 } from '@mui/material';
 import {
-  Search,
-  ShoppingCart,
-  History,
-  FavoriteBorder,
-  Person,
-  KeyboardArrowRight,
   PhotoOutlined,
+  KeyboardArrowRight,
 } from '@mui/icons-material';
+import Appbar from '../components/Appbar';
+import Footer from '../components/Footer';
 
 
 interface Product {
@@ -39,7 +31,6 @@ interface Category {
 }
 
 const DashboardNew: React.FC = () => {
-  const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
   // Mock data - replace with actual API calls
@@ -61,13 +52,6 @@ const DashboardNew: React.FC = () => {
     { id: 6, title: 'Sample', description: 'This is where you enter a description of the product.', image: PhotoOutlined.toString() },
   ];
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
-    }
-  };
-
   const handleCategoryClick = (categoryId: string) => {
     navigate(`/category/${categoryId}`);
   };
@@ -76,100 +60,10 @@ const DashboardNew: React.FC = () => {
     navigate(`/item/${productId}`);
   };
 
-  const footerLinks = [
-    'About us', 'CAREERS', 'user guide',
-    'Careers', 'IR', 'COntact us'
-  ];
-
   return (
     <Box sx={{ minHeight: '100vh', backgroundColor: 'white' }}>
       {/* App Bar */}
-      <AppBar 
-        position="static" 
-        sx={{ 
-          backgroundColor: '#5856D6',
-          borderBottom: '1px solid #eeeeee',
-          padding: '16px',
-        }}
-      >
-        <Toolbar sx={{ gap: '24px', padding: 0 }}>
-          {/* Logo */}
-          <Typography
-            variant="h5"
-            sx={{
-              fontFamily: 'Noto Sans',
-              fontWeight: 'bold',
-              fontSize: '20px',
-              color: 'black',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            MOCKTEN
-          </Typography>
-
-          {/* Search Bar */}
-          <Box sx={{ flexGrow: 1 }}>
-            <form onSubmit={handleSearch}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                placeholder="Search.."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                sx={{
-                  backgroundColor: 'white',
-                  borderRadius: '4px',
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: '4px',
-                    padding: '8px 16px',
-                    '& fieldset': {
-                      borderColor: '#cccccc',
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#cccccc',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#cccccc',
-                    },
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#aaaaaa',
-                    fontFamily: 'Noto Sans',
-                    fontSize: '16px',
-                    '&::placeholder': {
-                      color: '#aaaaaa',
-                      opacity: 1,
-                    },
-                  },
-                }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <Search />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </form>
-          </Box>
-
-          {/* Navigation Icons */}
-          <Box sx={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <IconButton sx={{ color: 'black' }} onClick={() => navigate('/cart/list')}>
-              <ShoppingCart />
-            </IconButton>
-            <IconButton sx={{ color: 'black' }} onClick={() => navigate('/history')}>
-              <History />
-            </IconButton>
-            <IconButton sx={{ color: 'black' }} onClick={() => navigate('/fav/list')}>
-              <FavoriteBorder />
-            </IconButton>
-            <IconButton sx={{ color: 'black' }} onClick={() => navigate('/profile')}>
-              <Person />
-            </IconButton>
-          </Box>
-        </Toolbar>
-      </AppBar>
+      <Appbar />
 
       {/* Main Content */}
       <Container maxWidth="lg" sx={{ padding: '72px 0' }}>
@@ -450,82 +344,7 @@ const DashboardNew: React.FC = () => {
       </Container>
 
       {/* Footer */}
-      <Box
-        sx={{
-          backgroundColor: '#5856D6',
-          padding: '40px 16px',
-          marginTop: 'auto',
-        }}
-      >
-        <Container maxWidth="lg">
-          <Box sx={{ marginBottom: '24px' }}>
-            <Typography
-              variant="h4"
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontWeight: 'bold',
-                fontSize: '24px',
-                color: 'black',
-                marginBottom: '16px',
-              }}
-            >
-              MOCKTEN
-            </Typography>
-            
-            <Grid container spacing={3}>
-              {footerLinks.map((link, index) => (
-                <Grid item xs={12} sm={6} md={4} key={index}>
-                  <Button
-                    fullWidth
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '16px 0',
-                      borderBottom: '1px solid #dddddd',
-                      borderRadius: 0,
-                      textTransform: 'uppercase',
-                      '&:hover': {
-                        backgroundColor: 'transparent',
-                      },
-                    }}
-                  >
-                    <Typography
-                      sx={{
-                        fontFamily: 'Noto Sans',
-                        fontSize: '16px',
-                        color: 'black',
-                        textAlign: 'left',
-                      }}
-                    >
-                      {link}
-                    </Typography>
-                    <KeyboardArrowRight />
-                  </Button>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
-        </Container>
-        
-        <Box
-          sx={{
-            backgroundColor: 'black',
-            padding: '8px',
-            textAlign: 'center',
-          }}
-        >
-          <Typography
-            sx={{
-              fontFamily: 'Noto Sans',
-              fontSize: '12px',
-              color: 'white',
-            }}
-          >
-            © MOCKTEN, Inc.
-          </Typography>
-        </Box>
-      </Box>
+      <Footer />
     </Box>
   );
 };

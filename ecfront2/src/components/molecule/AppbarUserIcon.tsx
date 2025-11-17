@@ -4,7 +4,7 @@ import Badge from '@mui/material/Badge';
 import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
 import Menu from '@mui/material/Menu';
-import { useAuth } from '../Auth';
+import { useAuth } from '../../Auth';
 import { styled } from '@mui/material/styles';
 
 function AppbarUserIcon() {
