@@ -10,8 +10,8 @@ import DialogTitle from '@mui/material/DialogTitle';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid';
-import AddShoppingCartIcon from './item/AddShoppingCartIcon';
-import PaymentIcon from './item/PaymentIcon';
+import AddShoppingCartIcon from './molecule/AddShoppingCartIcon';
+import PaymentIcon from './molecule/PaymentIcon';
 import { Button, CardActionArea, CardActions } from '@mui/material';
 
 interface Product {
