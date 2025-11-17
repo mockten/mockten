@@ -154,6 +154,11 @@ const ItemDetailNew: React.FC = () => {
     console.log('Purchase clicked', { productId: product?.id, quantity });
   };
 
+  const handleAddtocart = () => {
+    // TODO: Implement purchase functionality
+    console.log('Purchase clicked', { productId: product?.id, quantity });
+  };
+
   const relatedProducts = [
     { id: 1, name: 'Sample Product', description: 'Sample Text. Sample TextSample TextSample TextSample TextSample Text', rating: 4.5 },
     { id: 2, name: 'Sample Product', description: 'Sample Text. Sample TextSample TextSample TextSample TextSample Text', rating: 4.5 },
@@ -335,6 +340,28 @@ const ItemDetailNew: React.FC = () => {
               <Button
                 fullWidth
                 variant="contained"
+                onClick={handleAddtocart}
+                sx={{
+                  backgroundColor: 'gray',
+                  color: 'white',
+                  padding: '16px',
+                  borderRadius: '4px',
+                  fontFamily: 'Noto Sans',
+                  fontWeight: 'bold',
+                  fontSize: '16px',
+                  textTransform: 'none',
+                  marginBottom: '16px',
+                  '&:hover': {
+                    backgroundColor: '#333',
+                  },
+                }}
+              >
+                Add to Cart
+              </Button>
+              
+              <Button
+                fullWidth
+                variant="contained"
                 onClick={handlePurchase}
                 sx={{
                   backgroundColor: 'black',
@@ -351,8 +378,9 @@ const ItemDetailNew: React.FC = () => {
                   },
                 }}
               >
-                購入する
+                Buy
               </Button>
+
 
               {/* Product Overview */}
               <Box sx={{ marginBottom: '16px' }}>
