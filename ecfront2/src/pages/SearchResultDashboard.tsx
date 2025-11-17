@@ -2,15 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
-  AppBar,
-  Toolbar,
   TextField,
-  InputAdornment,
   Typography,
   Card,
   CardContent,
   IconButton,
-  Container,
   Grid,
   Button,
   Checkbox,
@@ -24,15 +20,10 @@ import {
   StarBorder,
   Sort,
 } from '@mui/icons-material';
-
-// Mock image URLs - replace with actual asset URLs from your project
-const searchIcon = "http://localhost:3845/assets/c535b42dcf7e566d2b67967fb9015d1c01b349ee.svg";
-const shoppingCartIcon = "http://localhost:3845/assets/cf00e2c65ca28692962425347773c9601b9b0872.svg";
-const historyIcon = "http://localhost:3845/assets/127b7362eba9bb3a7b8dedc9f483e2c327967a29.svg";
-const favoriteIcon = "http://localhost:3845/assets/0da304d80e782560b534fd7a29404144052ed6c2.svg";
-const personIcon = "http://localhost:3845/assets/b8de36d7cafb2c108413879c186f2b787b24aa6c.svg";
-const arrowRightIcon = "http://localhost:3845/assets/ce1540ba1f8cb0bde2e26ff8f9fc566f7be994a6.svg";
-const photoIcon = "http://localhost:3845/assets/3b8e50376eaa12f5e8f94e365596b31206067da6.svg";
+import Appbar from '../components/Appbar';
+import Footer from '../components/Footer';
+// Sample photo icon when a customer does not set prodct image.
+import photoSvg from "../assets/photo.svg";
 
 interface Product {
   id: number;
@@ -77,7 +68,7 @@ const SearchResultNew: React.FC = () => {
     description: 'Product description and price will be included.',
     price: Math.floor(Math.random() * 500) + 10,
     rating: 4.5,
-    image: photoIcon,
+    image: photoSvg,
     inStock: Math.random() > 0.3,
     isNew: Math.random() > 0.7,
     category: ['Toy', 'Game', 'Music', 'Fashion', 'Home', 'Electronics'][Math.floor(Math.random() * 6)],
@@ -92,13 +83,6 @@ const SearchResultNew: React.FC = () => {
     // Mock API call for search results
     setProducts(mockProducts);
   }, [location.search]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
-    }
-  };
 
   const handleProductClick = (productId: number) => {
     navigate(`/item/${productId}`);
@@ -150,103 +134,11 @@ const SearchResultNew: React.FC = () => {
     return stars;
   };
 
-  const footerLinks = [
-    'About us', 'CAREERS', 'user guide',
-    'Careers', 'IR', 'CONTACT US'
-  ];
 
   return (
     <Box sx={{ minHeight: '100vh', backgroundColor: 'white' }}>
       {/* App Bar */}
-      <AppBar 
-        position="static" 
-        sx={{ 
-          backgroundColor: '#5856D6',
-          borderBottom: '1px solid #eeeeee',
-          height: '72px',
-        }}
-      >
-        <Toolbar sx={{ padding: '16px', gap: '24px' }}>
-          {/* Logo */}
-          <Typography
-            variant="h6"
-            sx={{
-              fontFamily: 'Noto Sans',
-              fontWeight: 'bold',
-              fontSize: '20px',
-              color: 'black',
-              whiteSpace: 'nowrap',
-              width: '100px',
-            }}
-          >
-            MOCKTEN
-          </Typography>
-
-          {/* Search Bar */}
-          <Box sx={{ flexGrow: 1 }}>
-            <form onSubmit={handleSearch}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                placeholder="Search.."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                sx={{
-                  backgroundColor: 'white',
-                  borderRadius: '4px',
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: '4px',
-                    height: '40px',
-                    padding: '0 16px',
-                    '& fieldset': {
-                      borderColor: '#cccccc',
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#cccccc',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#cccccc',
-                    },
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#aaaaaa',
-                    fontFamily: 'Noto Sans',
-                    fontSize: '16px',
-                    padding: '8px 0',
-                    '&::placeholder': {
-                      color: '#aaaaaa',
-                      opacity: 1,
-                    },
-                  },
-                }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <img src={searchIcon} alt="Search" style={{ width: '16px', height: '16px' }} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </form>
-          </Box>
-
-          {/* Navigation Icons */}
-          <Box sx={{ display: 'flex', gap: '16px', alignItems: 'center', width: '144px', height: '24px' }}>
-            <IconButton sx={{ color: 'black', padding: '0' }}>
-              <img src={shoppingCartIcon} alt="Cart" style={{ width: '24px', height: '24px' }} />
-            </IconButton>
-            <IconButton sx={{ color: 'black', padding: '0' }}>
-              <img src={historyIcon} alt="History" style={{ width: '24px', height: '24px' }} />
-            </IconButton>
-            <IconButton sx={{ color: 'black', padding: '0' }}>
-              <img src={favoriteIcon} alt="Favorites" style={{ width: '24px', height: '24px' }} />
-            </IconButton>
-            <IconButton sx={{ color: 'black', padding: '0' }}>
-              <img src={personIcon} alt="Profile" style={{ width: '24px', height: '24px' }} />
-            </IconButton>
-          </Box>
-        </Toolbar>
-      </AppBar>
+      <Appbar />
 
       <Box sx={{ display: 'flex' }}>
         {/* Sidebar Filters */}
@@ -592,82 +484,7 @@ const SearchResultNew: React.FC = () => {
       </Box>
 
       {/* Footer */}
-      <Box
-        sx={{
-          backgroundColor: '#5856D6',
-          padding: '40px 16px',
-          marginTop: 'auto',
-        }}
-      >
-        <Container maxWidth="lg">
-          <Box sx={{ marginBottom: '24px' }}>
-            <Typography
-              variant="h4"
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontWeight: 'bold',
-                fontSize: '24px',
-                color: 'black',
-                marginBottom: '16px',
-              }}
-            >
-              MOCKTEN
-            </Typography>
-            
-            <Grid container spacing={3}>
-              {footerLinks.map((link, index) => (
-                <Grid item xs={12} sm={6} md={4} key={index}>
-                  <Button
-                    fullWidth
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '16px 0',
-                      borderBottom: '1px solid #dddddd',
-                      borderRadius: 0,
-                      textTransform: 'uppercase',
-                      '&:hover': {
-                        backgroundColor: 'transparent',
-                      },
-                    }}
-                  >
-                    <Typography
-                      sx={{
-                        fontFamily: 'Noto Sans',
-                        fontSize: '16px',
-                        color: 'black',
-                        textAlign: 'left',
-                      }}
-                    >
-                      {link}
-                    </Typography>
-                    <img src={arrowRightIcon} alt="Arrow" style={{ width: '24px', height: '24px' }} />
-                  </Button>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
-        </Container>
-        
-        <Box
-          sx={{
-            backgroundColor: 'black',
-            padding: '8px',
-            textAlign: 'center',
-          }}
-        >
-          <Typography
-            sx={{
-              fontFamily: 'Noto Sans',
-              fontSize: '12px',
-              color: 'white',
-            }}
-          >
-            © MOCKTEN, Inc.
-          </Typography>
-        </Box>
-      </Box>
+      <Footer />
     </Box>
   );
 };

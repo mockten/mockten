@@ -30,9 +30,8 @@ import {
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 
-// Mock image URLs - replace with actual asset URLs from your project
-const photoIcon = "http://localhost:3845/assets/a1b0ed7702166474c37dc399310037a954fd840e.svg";
-const photoIcon2 = "http://localhost:3845/assets/3b8e50376eaa12f5e8f94e365596b31206067da6.svg";
+// Sample photo icon when a customer does not set prodct image.
+import photoSvg from "../assets/photo.svg";
 
 interface Product {
   id: number;
@@ -84,7 +83,7 @@ const ItemDetailNew: React.FC = () => {
       weight: '5.3kg',
       content: '1',
     },
-    images: [photoIcon, photoIcon, photoIcon, photoIcon],
+    images: [photoSvg, photoSvg, photoSvg, photoSvg],
     reviews: [
       {
         id: 1,
@@ -532,7 +531,7 @@ const ItemDetailNew: React.FC = () => {
                       backgroundColor: '#f5f5f5',
                     }}
                   >
-                    <img src={photoIcon} alt="User" style={{ width: '22px', height: '22px' }} />
+                    <img src={photoSvg} alt="User" style={{ width: '22px', height: '22px' }} />
                   </Avatar>
                   <Box sx={{ flex: 1 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -637,7 +636,7 @@ const ItemDetailNew: React.FC = () => {
                       justifyContent: 'center',
                     }}
                   >
-                    <img src={photoIcon2} alt="Product" style={{ width: '64px', height: '64px' }} />
+                    <img src={photoSvg} alt="Product" style={{ width: '64px', height: '64px' }} />
                   </Box>
                   <CardContent sx={{ padding: '8px' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '8px' }}>

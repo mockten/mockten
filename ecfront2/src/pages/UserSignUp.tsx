@@ -48,7 +48,7 @@ const UserSignUpNew: React.FC = () => {
   };
 
   const handleLogin = () => {
-    navigate('/user/login-new');
+    navigate('/user/login');
   };
 
   const startGoogleAuth = () => {

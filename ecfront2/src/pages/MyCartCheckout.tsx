@@ -16,9 +16,8 @@ import {
 } from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
-
-// Mock image URLs - replace with actual asset URLs from your project
-const photoIcon = "http://localhost:3845/assets/3b8e50376eaa12f5e8f94e365596b31206067da6.svg";
+// Sample photo icon when a customer does not set prodct image.
+import photoSvg from "../assets/photo.svg";
 
 interface RecommendedProduct {
   id: number;
@@ -39,29 +38,29 @@ const MyCartCheckout: React.FC = () => {
       id: 1,
       name: 'Sample',
       description: 'Product description and price will be included.',
-      rating: 4.5,
-      image: photoIcon,
+      rating: 3.5,
+      image: photoSvg,
     },
     {
       id: 2,
       name: 'Sample',
       description: 'Product description and price will be included.',
       rating: 4.5,
-      image: photoIcon,
+      image: photoSvg,
     },
     {
       id: 3,
       name: 'Sample',
       description: 'Product description and price will be included.',
       rating: 4.5,
-      image: photoIcon,
+      image: photoSvg,
     },
     {
       id: 4,
       name: 'Sample',
       description: 'Product description and price will be included.',
       rating: 4.5,
-      image: photoIcon,
+      image: photoSvg,
     },
   ];
 
