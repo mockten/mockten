@@ -12,8 +12,8 @@ import {
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 
-// Mock image URLs - replace with actual asset URLs from your project
-const photoIcon = "http://localhost:3845/assets/1f82dddabc5a50c79dde3cfd85037ffaa892c936.svg";
+// Sample photo icon when a customer does not set prodct image.
+import photoSvg from "../assets/photo.svg";
 const arrowRightIcon = "http://localhost:3845/assets/ce1540ba1f8cb0bde2e26ff8f9fc566f7be994a6.svg";
 
 interface CartItem {
@@ -47,35 +47,35 @@ const MyCartConfirm: React.FC = () => {
       name: 'Sample',
       description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
       quantity: 1,
-      image: photoIcon,
+      image: photoSvg,
     },
     {
       id: 2,
       name: 'Sample',
       description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
       quantity: 1,
-      image: photoIcon,
+      image: photoSvg,
     },
     {
       id: 3,
       name: 'Sample',
       description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
       quantity: 1,
-      image: photoIcon,
+      image: photoSvg,
     },
     {
       id: 4,
       name: 'Sample',
       description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
       quantity: 1,
-      image: photoIcon,
+      image: photoSvg,
     },
     {
       id: 5,
       name: 'Sample',
       description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
       quantity: 1,
-      image: photoIcon,
+      image: photoSvg,
     },
   ];
 

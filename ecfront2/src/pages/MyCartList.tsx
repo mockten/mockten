@@ -20,8 +20,8 @@ import {
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 
-// Mock image URLs - replace with actual asset URLs from your project
-const photoIcon = "http://localhost:3845/assets/3b8e50376eaa12f5e8f94e365596b31206067da6.svg";
+// Sample photo icon when a customer does not set prodct image.
+import photoSvg from "../assets/photo.svg";
 const closeIcon = "http://localhost:3845/assets/7918491eb7e0f27c67545a7abdd2b451c819a811.svg";
 
 interface CartItem {
@@ -55,7 +55,7 @@ const CartListNew: React.FC = () => {
       description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
       price: 4550,
       quantity: 1,
-      image: photoIcon,
+      image: photoSvg,
       rating: 4.5,
     },
     {
@@ -64,7 +64,7 @@ const CartListNew: React.FC = () => {
       description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
       price: 4550,
       quantity: 1,
-      image: photoIcon,
+      image: photoSvg,
       rating: 4.5,
     },
     {
@@ -73,7 +73,7 @@ const CartListNew: React.FC = () => {
       description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
       price: 4550,
       quantity: 1,
-      image: photoIcon,
+      image: photoSvg,
       rating: 4.5,
     },
     {
@@ -82,7 +82,7 @@ const CartListNew: React.FC = () => {
       description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
       price: 4550,
       quantity: 1,
-      image: photoIcon,
+      image: photoSvg,
       rating: 4.5,
     },
   ];
@@ -94,7 +94,7 @@ const CartListNew: React.FC = () => {
       description: 'Product description and price will be included.',
       price: 2999,
       rating: 4.5,
-      image: photoIcon,
+      image: photoSvg,
     },
     {
       id: 2,
@@ -102,7 +102,7 @@ const CartListNew: React.FC = () => {
       description: 'Product description and price will be included.',
       price: 3999,
       rating: 4.5,
-      image: photoIcon,
+      image: photoSvg,
     },
     {
       id: 3,
@@ -110,7 +110,7 @@ const CartListNew: React.FC = () => {
       description: 'Product description and price will be included.',
       price: 4999,
       rating: 4.5,
-      image: photoIcon,
+      image: photoSvg,
     },
     {
       id: 4,
@@ -118,7 +118,7 @@ const CartListNew: React.FC = () => {
       description: 'Product description and price will be included.',
       price: 5999,
       rating: 4.5,
-      image: photoIcon,
+      image: photoSvg,
     },
   ];
 
