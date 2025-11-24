@@ -50,6 +50,7 @@ const SearchResultNew: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
+
   const [filters, setFilters] = useState<SearchFilters>({
     priceRange: [0, 1000],
     category: [],
@@ -63,12 +64,61 @@ const SearchResultNew: React.FC = () => {
   const [totalResults, setTotalResults] = useState(0);
   const itemsPerPage = 20;
 
-  // Fetch products from backend
+  //
+  // -----------------------------
+  // Fetch Products (MAIN)
+  // -----------------------------
+  //
+  const fetchProducts = async (query: string, page: number, f: SearchFilters) => {
+    try {
+      let url = `/api/search?q=${encodeURIComponent(query)}&p=${page}`;
+
+      // Status (New / Used)
+      f.status.forEach(s => {
+        url += `&status=${encodeURIComponent(s)}`;
+      });
+
+      // Stock filter
+      if (f.stock) {
+        url += `&stock=1`;
+      }
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        setProducts([]);
+        setTotalResults(0);
+        return;
+      }
+
+      const data = await response.json();
+
+      setProducts(data.items || []);
+      setTotalResults(data.total || 0);
+    } catch (err) {
+      console.error(err);
+      setProducts([]);
+      setTotalResults(0);
+    }
+  };
+
+  //
+  // -----------------------------
+  // Handle URL search change
+  // (q or p が変わったとき)
+  // -----------------------------
+  //
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const query = params.get('q') || '';
+    const page = parseInt(params.get('p') || '1', 10);
 
     setSearchQuery(query);
+
+    // 新しい検索ワードなら page=1 に戻す
+    if (query && page !== currentPage) {
+      setCurrentPage(page);
+    }
 
     if (!query) {
       setProducts([]);
@@ -76,39 +126,20 @@ const SearchResultNew: React.FC = () => {
       return;
     }
 
-    const fetchProducts = async () => {
-      try {
-        let url = `/api/search?q=${encodeURIComponent(query)}&p=${currentPage}`;
+    fetchProducts(query, page, filters);
+  }, [location.search]);
 
-        filters.status.forEach(s => {
-          url += `&status=${encodeURIComponent(s)}`;
-        });
-
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          setProducts([]);
-          setTotalResults(0);
-          return;
-        }
-
-        const data = await response.json();
-
-        // items  
-        setProducts(data.items || []);
-
-        // total hits (backend must return this)
-        setTotalResults(data.total || 0);
-
-      } catch (err) {
-        console.error(err);
-        setProducts([]);
-        setTotalResults(0);
-      }
-    };
-
-    fetchProducts();
-  }, [location.search, currentPage, filters.status]); 
+  //
+  // -----------------------------
+  // Handle filter change
+  // (Status / Stock)
+  // URL に乗せずに再検索
+  // -----------------------------
+  //
+  useEffect(() => {
+    if (!searchQuery) return;
+    fetchProducts(searchQuery, currentPage, filters);
+  }, [filters.status, filters.stock]); 
 
   const handleProductClick = (productId: string) => {
     navigate(`/item/${productId}`);
@@ -476,7 +507,11 @@ const SearchResultNew: React.FC = () => {
             <Pagination
               count={totalPages}
               page={currentPage}
-              onChange={(_, page) => setCurrentPage(page)}
+              onChange={(_, page) => {
+                const params = new URLSearchParams(location.search);
+                params.set('p', page.toString());
+                navigate(`?${params.toString()}`);
+              }}
               color="primary"
             />
           </Box>
