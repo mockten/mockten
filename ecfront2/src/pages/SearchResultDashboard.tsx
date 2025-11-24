@@ -78,7 +78,13 @@ const SearchResultNew: React.FC = () => {
 
     const fetchProducts = async () => {
       try {
-        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&p=${currentPage}`);
+        let url = `/api/search?q=${encodeURIComponent(query)}&p=${currentPage}`;
+
+        filters.status.forEach(s => {
+          url += `&status=${encodeURIComponent(s)}`;
+        });
+
+        const response = await fetch(url);
 
         if (!response.ok) {
           setProducts([]);
@@ -102,7 +108,7 @@ const SearchResultNew: React.FC = () => {
     };
 
     fetchProducts();
-  }, [location.search, currentPage]);
+  }, [location.search, currentPage, filters.status]); 
 
   const handleProductClick = (productId: string) => {
     navigate(`/item/${productId}`);

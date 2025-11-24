@@ -28,10 +28,7 @@ JOIN USER_GROUP_MEMBERSHIP ugm ON ue.ID = ugm.USER_ID
 JOIN KEYCLOAK_GROUP kg ON ugm.GROUP_ID = kg.ID
 JOIN Category c ON p.category_id = c.category_id
 WHERE kg.NAME = 'Seller'
-  AND GREATEST(
-    IFNULL(p.last_update, '1970-01-01 00:00:00'),
-    IFNULL(c.last_update, '1970-01-01 00:00:00')
-  ) > '$LAST_SYNC'
+  AND IFNULL(p.last_update, '1970-01-01 00:00:00') > '$LAST_SYNC'
 " > /tmp/updated_products.csv
 
 if [ -s /tmp/updated_products.csv ]; then

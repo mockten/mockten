@@ -70,6 +70,9 @@ func searchHandler(c *gin.Context) {
 	query := c.Query("q")
 	pageStr := c.Query("p")
 
+	// status filter (optional)
+	statusValues := c.QueryArray("status") // e.g. ["new","used"]
+
 	if query == "" || pageStr == "" {
 		logger.Error("Search Query parameter is missing.")
 		c.JSON(http.StatusNoContent, gin.H{"message": "There is no content"})
@@ -88,13 +91,28 @@ func searchHandler(c *gin.Context) {
 	limit := 20
 	offset := (page - 1) * limit
 
-	searchRes, err := meiliclient.Index("products").Search(
-		query,
-		&meilisearch.SearchRequest{
-			Limit:  int64(limit),
-			Offset: int64(offset),
-		},
-	)
+	// build filter only when user selected status
+	var filterExpr string
+	if len(statusValues) > 0 {
+		for i, s := range statusValues {
+			if i == 0 {
+				filterExpr += `condition = "` + s + `"`
+			} else {
+				filterExpr += ` OR condition = "` + s + `"`
+			}
+		}
+	}
+
+	searchRequest := &meilisearch.SearchRequest{
+		Limit:  int64(limit),
+		Offset: int64(offset),
+	}
+
+	if filterExpr != "" {
+		searchRequest.Filter = filterExpr
+	}
+
+	searchRes, err := meiliclient.Index("products").Search(query, searchRequest)
 	if err != nil {
 		logger.Error("failed to search in some reasons.", zap.Error(err))
 		c.JSON(http.StatusNoContent, gin.H{"message": "There is no items"})
