@@ -7,7 +7,6 @@
   "verifyEmail": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
-
   "identityProviders": [
     {
       "alias": "google",
@@ -42,7 +41,6 @@
       }
     }
   ],
-
   "clients": [
     {
       "clientId": "mockten-react-client",
@@ -147,7 +145,6 @@
       ]
     }
   ],
-
   "roles": {
     "realm": [
       {
@@ -160,7 +157,6 @@
       }
     ]
   },
-
   "groups": [
     {
       "name": "Seller"
@@ -178,7 +174,6 @@
       }
     }
   ],
-
   "users": [
     {
       "username": "superadmin",
@@ -193,9 +188,7 @@
           "value": "superadmin"
         }
       ],
-      "groups": [
-        "admin-group"
-      ]
+      "groups": ["admin-group"]
     },
     {
       "username": "Health company",
@@ -210,12 +203,8 @@
           "value": "healthcompany"
         }
       ],
-      "groups": [
-        "Seller"
-      ],
-      "realmRoles": [
-        "seller"
-      ],
+      "groups": ["Seller"],
+      "realmRoles": ["seller"],
       "attributes": {
         "description": ["Sells health and wellness products"]
       }
@@ -233,12 +222,8 @@
           "value": "sportscompany"
         }
       ],
-      "groups": [
-        "Seller"
-      ],
-      "realmRoles": [
-        "seller"
-      ],
+      "groups": ["Seller"],
+      "realmRoles": ["seller"],
       "attributes": {
         "description": ["Provider of sports and fitness gear"]
       }
@@ -256,12 +241,8 @@
           "value": "toycompany"
         }
       ],
-      "groups": [
-        "Seller"
-      ],
-      "realmRoles": [
-        "seller"
-      ],
+      "groups": ["Seller"],
+      "realmRoles": ["seller"],
       "attributes": {
         "description": ["Distributor of children's toys and games"]
       }
@@ -279,12 +260,8 @@
           "value": "headphonecompany"
         }
       ],
-      "groups": [
-        "Seller"
-      ],
-      "realmRoles": [
-        "seller"
-      ],
+      "groups": ["Seller"],
+      "realmRoles": ["seller"],
       "attributes": {
         "description": ["Manufacturer of high-quality audio equipment"]
       }
@@ -302,14 +279,181 @@
           "value": "greengrocer"
         }
       ],
-      "groups": [
-        "Seller"
-      ],
-      "realmRoles": [
-        "seller"
-      ],
+      "groups": ["Seller"],
+      "realmRoles": ["seller"],
       "attributes": {
         "description": ["Fresh produce and organic food supplier"]
+      }
+    },
+    {
+      "username": "cooking",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "cooking@example.com",
+      "firstName": "Cooking",
+      "lastName": "Seller",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "cooking"
+        }
+      ],
+      "groups": ["Seller"],
+      "realmRoles": ["seller"],
+      "attributes": {
+        "description": ["Cooking ingredients and sauces"]
+      }
+    },
+    {
+      "username": "drink",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "drink@example.com",
+      "firstName": "Drink",
+      "lastName": "Seller",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "drink"
+        }
+      ],
+      "groups": ["Seller"],
+      "realmRoles": ["seller"],
+      "attributes": {
+        "description": ["Beverages and canned drinks"]
+      }
+    },
+    {
+      "username": "food",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "food@example.com",
+      "firstName": "Food",
+      "lastName": "Seller",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "food"
+        }
+      ],
+      "groups": ["Seller"],
+      "realmRoles": ["seller"],
+      "attributes": {
+        "description": ["Processed food and ready-to-eat meals"]
+      }
+    },
+    {
+      "username": "vegetable",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "vegetable@example.com",
+      "firstName": "Vegetable",
+      "lastName": "Seller",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "vegetable"
+        }
+      ],
+      "groups": ["Seller"],
+      "realmRoles": ["seller"],
+      "attributes": {
+        "description": ["Fresh and frozen vegetables"]
+      }
+    },
+    {
+      "username": "fruit",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "fruit@example.com",
+      "firstName": "Fruit",
+      "lastName": "Seller",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "fruit"
+        }
+      ],
+      "groups": ["Seller"],
+      "realmRoles": ["seller"],
+      "attributes": {
+        "description": ["Fresh fruit and specialty fruit items"]
+      }
+    },
+    {
+      "username": "jam",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "jam@example.com",
+      "firstName": "Jam",
+      "lastName": "Seller",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "jam"
+        }
+      ],
+      "groups": ["Seller"],
+      "realmRoles": ["seller"],
+      "attributes": {
+        "description": ["Handmade jams and marmalades"]
+      }
+    },
+    {
+      "username": "sweets",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "sweets@example.com",
+      "firstName": "Sweets",
+      "lastName": "Seller",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "sweets"
+        }
+      ],
+      "groups": ["Seller"],
+      "realmRoles": ["seller"],
+      "attributes": {
+        "description": ["Chocolate and confectionery products"]
+      }
+    },
+    {
+      "username": "space",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "space@example.com",
+      "firstName": "Space",
+      "lastName": "Seller",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "space"
+        }
+      ],
+      "groups": ["Seller"],
+      "realmRoles": ["seller"],
+      "attributes": {
+        "description": ["Space-themed foods and packs"]
+      }
+    },
+    {
+      "username": "water",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "water@example.com",
+      "firstName": "Water",
+      "lastName": "Seller",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "water"
+        }
+      ],
+      "groups": ["Seller"],
+      "realmRoles": ["seller"],
+      "attributes": {
+        "description": ["Bottled water and hydration items"]
       }
     }
   ]

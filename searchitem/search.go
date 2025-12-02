@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,23 +21,6 @@ import (
 const (
 	port = ":50051"
 )
-
-/*
-type Item struct {
-	ProductId   string    `json:"product_id"`
-	ProductName string    `json:"product_name"`
-	SellerName  string    `json:"seller_name"`
-	Stocks      int       `json:"stocks"`
-	Category    []int     `json:"category"`
-	Rank        int       `json:"rank"`
-	MainImage   string    `json:"main_image"`
-	ImagePath   []string  `json:"image_path"`
-	Summary     string    `json:"summary"`
-	Price       int       `json:"price"`
-	RegistDay   time.Time `json:"regist_day"`
-	LastUpdate  time.Time `json:"last_update"`
-}
-*/
 
 type Item struct {
 	ProductId   string `json:"product_id"`
@@ -57,54 +41,90 @@ var (
 
 	searchResCount = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "search_res_total",
-		Help: "Total number of response that send from serch-item",
+		Help: "Total number of response that send from search-item",
 	})
 
 	logger      *zap.Logger
 	meiliclient *meilisearch.Client
 )
 
-// Implement SearchItemServer using REST API
 func searchHandler(c *gin.Context) {
 	query := c.Query("q")
-	page := c.Query("p")
+	pageStr := c.Query("p")
 
-	if query == "" || page == "" {
+	// NEW: get status and stock params
+	statusParam := c.QueryArray("status")
+	stockParam := c.Query("stock")
+
+	if query == "" || pageStr == "" {
 		logger.Error("Search Query parameter is missing.")
 		c.JSON(http.StatusNoContent, gin.H{"message": "There is no content"})
 		return
 	}
 
-	// logging request log
-	logger.Debug("Request log", zap.String("query", query), zap.String("page", page))
+	logger.Debug("Request log", zap.String("query", query), zap.String("page", pageStr))
 
-	// increment counter
 	searchReqCount.Inc()
 
-	searchRes, err := meiliclient.Index("products").Search(query,
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	limit := 20
+	offset := (page - 1) * limit
+
+	var filterExpr string
+	statusValues := statusParam
+
+	if len(statusValues) > 0 {
+		for i, s := range statusValues {
+			if i == 0 {
+				filterExpr += `condition = "` + s + `"`
+			} else {
+				filterExpr += ` OR condition = "` + s + `"`
+			}
+		}
+	}
+
+	var filters []string
+	if stockParam == "1" {
+		filters = append(filters, "stocks > 0")
+	}
+
+	var finalFilter interface{}
+	if filterExpr != "" && len(filters) > 0 {
+		finalFilter = []interface{}{filterExpr, filters[0]}
+	} else if filterExpr != "" {
+		finalFilter = filterExpr
+	} else if len(filters) > 0 {
+		finalFilter = filters
+	}
+
+	searchRes, err := meiliclient.Index("products").Search(
+		query,
 		&meilisearch.SearchRequest{
-			Limit: 25,
-		})
+			Limit:  int64(limit),
+			Offset: int64(offset),
+			Filter: finalFilter, // KEEP BOTH STATUS + STOCK
+		},
+	)
 	if err != nil {
 		logger.Error("failed to search in some reasons.", zap.Error(err))
 		c.JSON(http.StatusNoContent, gin.H{"message": "There is no items"})
 		return
 	}
 
-	logger.Debug("searchres:", zap.Any("searchres:", searchRes))
-
 	var items []Item
-	hitsJson, _ := json.Marshal(searchRes.Hits) // []interface{} → []byte
-	json.Unmarshal(hitsJson, &items)            // []byte → []Book
+	hitsJson, _ := json.Marshal(searchRes.Hits)
+	json.Unmarshal(hitsJson, &items)
 
-	// increment counter
 	searchResCount.Inc()
-
-	logger.Debug("message", zap.Any("items", items))
 
 	c.JSON(http.StatusOK, gin.H{
 		"items": items,
-		"total": page,
+		"total": searchRes.EstimatedTotalHits,
+		"page":  page,
 	})
 }
 
@@ -172,8 +192,6 @@ func getItemDetailHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		logger.Debug("Request log", zap.String("id", productID))
-
 		query := `
          SELECT 
             p.product_id,
@@ -208,14 +226,13 @@ func getItemDetailHandler(db *sql.DB) gin.HandlerFunc {
 			&detail.SellerName,
 		)
 
-		switch {
-		case err == sql.ErrNoRows:
-			c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
-		case err != nil:
-			logger.Error("DB Scan error: ", zap.Error(err))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-		default:
-			logger.Debug("No error scanning db")
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+			} else {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			}
+			return
 		}
 
 		responseJson := ConvertToResponse(&detail)
@@ -224,7 +241,6 @@ func getItemDetailHandler(db *sql.DB) gin.HandlerFunc {
 }
 
 func main() {
-	// set-up logging environment using zap
 	var err error
 
 	environment := os.Getenv("MOCKTEN_ENV")
@@ -240,51 +256,39 @@ func main() {
 	}
 
 	if err != nil {
-		log.Println("failed to set-up zap log in searchitem. \n")
+		log.Println("failed to set-up zap log in searchitem.")
 		panic(err)
 	}
 
-	logger.Debug("this is development environment.")
-	logger.Info("success set-up logging function.")
-
 	defer logger.Sync()
 
-	// set-up meilisearch to register products json(documents) to index.
 	meiliBackend := os.Getenv("MEILI_SVC")
 	if meiliBackend == "" {
-		logger.Error("does not exist MEILI_SVC.")
 		meiliBackend = "meilisearch-service.default.svc.cluster.local"
 	}
 
 	meiliclient = meilisearch.NewClient(meilisearch.ClientConfig{
-		// expect meilisearch sidecar container
 		Host: "http://" + meiliBackend + ":7700",
-		// APIKey: os.Getenv("MEILISEARCH_MASTERKEY"),
 	})
 
 	dsn := "mocktenusr:mocktenpassword@tcp(mysql-service.default.svc.cluster.local:3306)/mocktendb?parseTime=true"
 
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
-		logger.Error("can not connect to mysql.")
 		log.Fatalf("DB open error: %v", err)
 	}
 	waitForMySQL(db, logger)
 	defer db.Close()
 
-	// expose /metrics endpoint for observer(by default Prometheus).
 	go exportMetrics()
 
-	// start application
 	router := gin.Default()
 	router.GET("v1/search", searchHandler)
 	router.GET("v1/item/detail", getItemDetailHandler(db))
 
 	router.Run(port)
-
 }
 
-// for goroutin
 func exportMetrics() {
 	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(":9100", nil)
