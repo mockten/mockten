@@ -64,11 +64,9 @@ const SearchResultNew: React.FC = () => {
   const [totalResults, setTotalResults] = useState(0);
   const itemsPerPage = 20;
 
-  //
   // -----------------------------
   // Fetch Products (MAIN)
   // -----------------------------
-  //
   const fetchProducts = async (query: string, page: number, f: SearchFilters) => {
     try {
       let url = `/api/search?q=${encodeURIComponent(query)}&p=${page}`;
@@ -102,12 +100,9 @@ const SearchResultNew: React.FC = () => {
     }
   };
 
-  //
   // -----------------------------
   // Handle URL search change
-  // (q or p が変わったとき)
   // -----------------------------
-  //
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const query = params.get('q') || '';
@@ -115,7 +110,6 @@ const SearchResultNew: React.FC = () => {
 
     setSearchQuery(query);
 
-    // 新しい検索ワードなら page=1 に戻す
     if (query && page !== currentPage) {
       setCurrentPage(page);
     }
@@ -127,19 +121,15 @@ const SearchResultNew: React.FC = () => {
     }
 
     fetchProducts(query, page, filters);
-  }, [location.search]);
+  }, [location.search, filters]);   // ← FIXED (added filters)
 
-  //
   // -----------------------------
   // Handle filter change
-  // (Status / Stock)
-  // URL に乗せずに再検索
   // -----------------------------
-  //
   useEffect(() => {
     if (!searchQuery) return;
     fetchProducts(searchQuery, currentPage, filters);
-  }, [filters.status, filters.stock]); 
+  }, [filters.status, filters.stock]);
 
   const handleProductClick = (productId: string) => {
     navigate(`/item/${productId}`);

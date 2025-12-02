@@ -275,7 +275,7 @@ VALUES
 ('fa55d8e3-291e-4f06-a690-2b0b4f7d8e5b', 54),
 ('65fd3bbd-2743-4e72-9e63-4d5a3eca6f86', 29),
 ('8b7460c3-dc13-4a66-915f-2f64d716c607', 66),
-('aaf4d6ea-61a0-4afb-a386-34a6a91e6e6a', 13),
+('aaf4d6ea-61a0-4afb-a386-34a6a91e6e6a', 0),
 ('c5ec7a88-b4eb-4f47-a832-3fa4c5ca5aa0', 75),
 ('b91a5d68-6acb-48e7-8e5d-3d85b7e76af2', 1),
 ('50cbbe87-385e-4a60-b0d5-99b6ac0a969d', 84),

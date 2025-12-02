@@ -25,12 +25,14 @@ SELECT
   ue.USERNAME AS seller_name,
   p.price,
   c.category_name,
-  p.product_condition
+  p.product_condition,
+  t.stocks
 FROM Product p
 JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
 JOIN USER_GROUP_MEMBERSHIP ugm ON ue.ID = ugm.USER_ID
 JOIN KEYCLOAK_GROUP kg ON ugm.GROUP_ID = kg.ID
 JOIN Category c ON p.category_id = c.category_id
+JOIN Stock t ON p.product_id = t.product_id
 WHERE kg.NAME = 'Seller'
 " > /tmp/products.csv
 
@@ -41,7 +43,7 @@ current_line=0
 # Convert CSV to JSON array
 {
   echo "["
-  while IFS=$'\t' read -r id name seller price category condition
+  while IFS=$'\t' read -r id name seller price category condition stocks
   do
     current_line=$((current_line + 1))
     id_clean=$(echo "$id" | tr -d '\000-\037' | sed 's/"/\\"/g')
@@ -51,9 +53,9 @@ current_line=0
     condition_clean=$(echo "$condition" | tr -d '\000-\037' | sed 's/"/\\"/g')
 
     if [ "$current_line" -eq "$total_lines" ]; then
-      echo "  {\"product_id\":\"$id_clean\", \"product_name\":\"$name_clean\", \"seller_name\":\"$seller_clean\", \"price\":$price, \"category_name\":\"$category_clean\", \"condition\":\"$condition_clean\"}"
+      echo "  {\"product_id\":\"$id_clean\", \"product_name\":\"$name_clean\", \"seller_name\":\"$seller_clean\", \"price\":$price, \"category_name\":\"$category_clean\", \"condition\":\"$condition_clean\", \"stocks\":$stocks}"
     else
-      echo "  {\"product_id\":\"$id_clean\", \"product_name\":\"$name_clean\", \"seller_name\":\"$seller_clean\", \"price\":$price, \"category_name\":\"$category_clean\", \"condition\":\"$condition_clean\"},"
+      echo "  {\"product_id\":\"$id_clean\", \"product_name\":\"$name_clean\", \"seller_name\":\"$seller_clean\", \"price\":$price, \"category_name\":\"$category_clean\", \"condition\":\"$condition_clean\", \"stocks\":$stocks},"
     fi
   done < /tmp/products.csv
   echo "]"
@@ -77,5 +79,6 @@ curl -X PUT 'http://meilisearch-service.default.svc.cluster.local:7700/indexes/p
   --data-binary '[
     "seller_name",
     "category_name",
-    "condition"
+    "condition",
+    "stocks"
   ]'
