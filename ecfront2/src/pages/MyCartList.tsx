@@ -22,7 +22,7 @@ import Footer from '../components/Footer';
 
 // Sample photo icon when a customer does not set prodct image.
 import photoSvg from "../assets/photo.svg";
-const closeIcon = "http://localhost:3845/assets/7918491eb7e0f27c67545a7abdd2b451c819a811.svg";
+import closeIcon from "../assets/close.png";
 
 interface CartItem {
   id: number;
