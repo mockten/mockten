@@ -108,6 +108,7 @@ const UserLoginNew: React.FC = () => {
   return (
     <Box
       sx={{
+        width: '100vw',
         minHeight: '100vh',
         background: '#CADFFF',
         display: 'flex',

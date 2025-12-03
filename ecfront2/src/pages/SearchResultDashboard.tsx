@@ -136,11 +136,11 @@ const SearchResultNew: React.FC = () => {
 
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: 'white' }}>
+    <Box sx={{  width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       {/* App Bar */}
       <Appbar />
 
-      <Box sx={{ display: 'flex' }}>
+      <Box maxWidth="lg" sx={{ display: 'flex' }}>
         {/* Sidebar Filters */}
         <Box
           sx={{

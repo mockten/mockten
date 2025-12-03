@@ -147,7 +147,7 @@ const OrderHistoryNew: React.FC = () => {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: 'white' }}>
+    <Box sx={{  width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       {/* App Bar */}
       <Appbar />
 

@@ -62,12 +62,12 @@ const DashboardNew: React.FC = () => {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: 'white' }}>
+    <Box sx={{  width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       {/* App Bar */}
       <Appbar />
 
       {/* Main Content */}
-      <Container maxWidth="lg" sx={{ padding: '72px 0' }}>
+      <Container maxWidth='lg' sx={{ padding: '72px 0' }}>
         {/* Hero Section */}
         <Box sx={{ display: 'flex', gap: '16px', marginBottom: '64px' }}>
           <Box
