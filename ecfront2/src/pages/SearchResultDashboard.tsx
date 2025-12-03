@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
+  Container,
   TextField,
   Typography,
   Card,
@@ -140,7 +141,7 @@ const SearchResultNew: React.FC = () => {
       {/* App Bar */}
       <Appbar />
 
-      <Box maxWidth="lg" sx={{ display: 'flex' }}>
+      <Container maxWidth="lg" sx={{ display: 'flex' }}>
         {/* Sidebar Filters */}
         <Box
           sx={{
@@ -481,7 +482,7 @@ const SearchResultNew: React.FC = () => {
             />
           </Box>
         </Box>
-      </Box>
+      </Container>
 
       {/* Footer */}
       <Footer />
