@@ -15,6 +15,7 @@ import {
 } from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
+import photoSvg from "../assets/photo.svg";
 
 
 interface Product {
@@ -44,12 +45,12 @@ const DashboardNew: React.FC = () => {
   ];
 
   const products: Product[] = [
-    { id: 1, title: 'Sample', description: 'This is where you enter a description of the product.', image: PhotoOutlined.toString() },
-    { id: 2, title: 'Sample', description: 'This is where you enter a description of the product.', image: PhotoOutlined.toString() },
-    { id: 3, title: 'Sample', description: 'This is where you enter a description of the product.', image: PhotoOutlined.toString() },
-    { id: 4, title: 'Sample', description: 'This is where you enter a description of the product.', image: PhotoOutlined.toString() },
-    { id: 5, title: 'Sample', description: 'This is where you enter a description of the product.', image: PhotoOutlined.toString() },
-    { id: 6, title: 'Sample', description: 'This is where you enter a description of the product.', image: PhotoOutlined.toString() },
+    { id: 1, title: 'Sample', description: 'This is where you enter a description of the product.', image: photoSvg },
+    { id: 2, title: 'Sample', description: 'This is where you enter a description of the product.', image: photoSvg },
+    { id: 3, title: 'Sample', description: 'This is where you enter a description of the product.', image: photoSvg },
+    { id: 4, title: 'Sample', description: 'This is where you enter a description of the product.', image: photoSvg },
+    { id: 5, title: 'Sample', description: 'This is where you enter a description of the product.', image: photoSvg },
+    { id: 6, title: 'Sample', description: 'This is where you enter a description of the product.', image: photoSvg },
   ];
 
   const handleCategoryClick = (categoryId: string) => {
@@ -61,12 +62,12 @@ const DashboardNew: React.FC = () => {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: 'white' }}>
+    <Box sx={{  width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       {/* App Bar */}
       <Appbar />
 
       {/* Main Content */}
-      <Container maxWidth="lg" sx={{ padding: '72px 0' }}>
+      <Container maxWidth='lg' sx={{ padding: '72px 0' }}>
         {/* Hero Section */}
         <Box sx={{ display: 'flex', gap: '16px', marginBottom: '64px' }}>
           <Box
@@ -132,6 +133,7 @@ const DashboardNew: React.FC = () => {
             {Array.from({ length: 7 }, (_, index) => (
               <Box
                 key={index}
+                onClick={() => handleProductClick(index)}
                 sx={{
                   width: '120px',
                   height: '120px',
@@ -170,6 +172,7 @@ const DashboardNew: React.FC = () => {
             {Array.from({ length: 7 }, (_, index) => (
               <Box
                 key={index}
+                onClick={() => handleProductClick(index)}
                 sx={{
                   width: '120px',
                   height: '120px',
@@ -208,6 +211,7 @@ const DashboardNew: React.FC = () => {
             {Array.from({ length: 7 }, (_, index) => (
               <Box
                 key={index}
+                onClick={() => handleProductClick(index)}
                 sx={{
                   width: '120px',
                   height: '120px',

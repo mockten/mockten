@@ -7,7 +7,7 @@ import UserSignUp from './pages/UserSignUp';
 import AccountSettings from './pages/AccountSettings';
 import ItemDetail from './pages/ItemDetail';
 import SellerDashboard from './pages/seller/SellerDashboard';
-import SellerLogin from './pages/seller/SellerLogin';
+import SellerLoginPage from './pages/seller/SellerLogin';
 import MyCartList from './pages/MyCartList';
 import MyCartShipto from './pages/MyCartShipto';
 import MyCartConfirm from './pages/MyCartConfirm';
@@ -43,7 +43,7 @@ const App: React.FC = () => {
           <Route path="/cart/checkout" element={<PrivateRoute><MyCartCheckout /></PrivateRoute>} />
           <Route path="/fav/list" element={<PrivateRoute><MyFavoriteList /></PrivateRoute>} />
           <Route path="/order-history" element={<PrivateRoute><OrderHistory /></PrivateRoute>} />
-          <Route path="/seller/login" element={<PrivateRoute><SellerLogin /></PrivateRoute>} />
+          <Route path="/seller/login" element={<PrivateRoute><SellerLoginPage /></PrivateRoute>} />
           <Route path="/seller/:id" element={<PrivateRoute><SellerDashboard /></PrivateRoute>} />
 
           <Route path="/admin/" element={<Admin />} />

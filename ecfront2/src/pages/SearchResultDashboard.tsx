@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
+  Container,
   TextField,
   Typography,
   Card,
@@ -184,12 +185,12 @@ const SearchResultNew: React.FC = () => {
   const totalPages = Math.ceil(totalResults / itemsPerPage) || 1;
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: 'white' }}>
+    <Box sx={{  width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
+      {/* App Bar */}
       <Appbar />
 
-      <Box sx={{ display: 'flex' }}>
-        
-        {/* Sidebar */}
+      <Container maxWidth="lg" sx={{ display: 'flex' }}>
+        {/* Sidebar Filters */}
         <Box
           sx={{
             width: '240px',
@@ -507,7 +508,7 @@ const SearchResultNew: React.FC = () => {
           </Box>
 
         </Box>
-      </Box>
+      </Container>
 
       <Footer />
     </Box>
