@@ -52,7 +52,6 @@ func searchHandler(c *gin.Context) {
 	query := c.Query("q")
 	pageStr := c.Query("p")
 
-	// NEW: get status and stock params
 	statusParam := c.QueryArray("status")
 	stockParam := c.Query("stock")
 
@@ -74,30 +73,28 @@ func searchHandler(c *gin.Context) {
 	limit := 20
 	offset := (page - 1) * limit
 
-	var filterExpr string
-	statusValues := statusParam
+	var filters []string
 
-	if len(statusValues) > 0 {
-		for i, s := range statusValues {
+	if len(statusParam) > 0 {
+		var statusExpr string
+		for i, s := range statusParam {
 			if i == 0 {
-				filterExpr += `condition = "` + s + `"`
+				statusExpr = `condition = "` + s + `"`
 			} else {
-				filterExpr += ` OR condition = "` + s + `"`
+				statusExpr += ` OR condition = "` + s + `"`
 			}
 		}
+		filters = append(filters, statusExpr)
 	}
 
-	var filters []string
 	if stockParam == "1" {
 		filters = append(filters, "stocks > 0")
 	}
 
 	var finalFilter interface{}
-	if filterExpr != "" && len(filters) > 0 {
-		finalFilter = []interface{}{filterExpr, filters[0]}
-	} else if filterExpr != "" {
-		finalFilter = filterExpr
-	} else if len(filters) > 0 {
+	if len(filters) == 1 {
+		finalFilter = filters[0]
+	} else if len(filters) > 1 {
 		finalFilter = filters
 	}
 
@@ -106,7 +103,7 @@ func searchHandler(c *gin.Context) {
 		&meilisearch.SearchRequest{
 			Limit:  int64(limit),
 			Offset: int64(offset),
-			Filter: finalFilter, // KEEP BOTH STATUS + STOCK
+			Filter: finalFilter,
 		},
 	)
 	if err != nil {
