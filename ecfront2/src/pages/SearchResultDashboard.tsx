@@ -122,7 +122,7 @@ const SearchResultNew: React.FC = () => {
     }
 
     fetchProducts(query, page, filters);
-  }, [location.search, filters]);   // ← FIXED (added filters)
+  }, [location.search, filters]);
 
   // -----------------------------
   // Handle filter change
@@ -343,38 +343,8 @@ const SearchResultNew: React.FC = () => {
             </Box>
           </Box>
 
-          {/* Shipping */}
-          <Box sx={{ marginBottom: '24px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontWeight: 'bold',
-                fontSize: '16px',
-                color: 'black',
-                marginBottom: '16px',
-                paddingLeft: '20px',
-              }}
-            >
-              Shipping
-            </Typography>
-            <Box sx={{ paddingLeft: '20px' }}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={filters.freeShipping}
-                    onChange={(e) => handleFilterChange('freeShipping', e.target.checked)}
-                  />
-                }
-                label="Show only free shipping"
-              />
-            </Box>
-          </Box>
-
           {/* Action Buttons */}
           <Box sx={{ paddingLeft: '20px' }}>
-            <Button variant="outlined" fullWidth sx={{ marginBottom: '8px', textTransform: 'none' }}>
-              Search by these criteria
-            </Button>
             <Button
               variant="text"
               fullWidth
@@ -468,6 +438,10 @@ const SearchResultNew: React.FC = () => {
                         fontSize: '16px',
                         color: 'black',
                         marginBottom: '8px',
+                        // UPDATED: Enforce single line with ellipsis to prevent height misalignment
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                       }}
                     >
                       {product.product_name}
