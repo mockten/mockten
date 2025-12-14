@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -14,6 +14,8 @@ import {
   FormControlLabel,
   Chip,
   Pagination,
+  Menu,
+  MenuItem,
 } from '@mui/material';
 import {
   Star,
@@ -49,6 +51,8 @@ interface SearchFilters {
   freeShipping: boolean;
 }
 
+type SortOrder = 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc';
+
 const SearchResultNew: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -72,6 +76,9 @@ const SearchResultNew: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
   const itemsPerPage = 20;
+
+  const [sortOrder, setSortOrder] = useState<SortOrder>('name_asc');
+  const [sortAnchorEl, setSortAnchorEl] = useState<null | HTMLElement>(null);
 
   const parseNumberOrEmptyToNull = (v: string): number | null => {
     const t = v.trim();
@@ -224,7 +231,32 @@ const SearchResultNew: React.FC = () => {
     return stars;
   };
 
+  const sortedProducts = useMemo(() => {
+    const copied = [...products];
+
+    copied.sort((a, b) => {
+      if (sortOrder === 'price_asc') return (a.price ?? 0) - (b.price ?? 0);
+      if (sortOrder === 'price_desc') return (b.price ?? 0) - (a.price ?? 0);
+
+      const nameA = (a.product_name ?? '').toString();
+      const nameB = (b.product_name ?? '').toString();
+
+      if (sortOrder === 'name_desc') {
+        return nameB.localeCompare(nameA, undefined, { sensitivity: 'base' });
+      }
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+    });
+
+    return copied;
+  }, [products, sortOrder]);
+
   const totalPages = Math.ceil(totalResults / itemsPerPage) || 1;
+
+  const sortLabel =
+    sortOrder === 'name_asc' ? 'Name (A→Z)'
+      : sortOrder === 'name_desc' ? 'Name (Z→A)'
+        : sortOrder === 'price_asc' ? 'Price (Low→High)'
+          : 'Price (High→Low)';
 
   return (
     <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
@@ -411,6 +443,7 @@ const SearchResultNew: React.FC = () => {
               onClick={() => {
                 setPriceMinInput('');
                 setPriceMaxInput('');
+                setSortOrder('name_asc');
                 setFilters({
                   priceRange: [0, 1000],
                   category: [],
@@ -448,19 +481,62 @@ const SearchResultNew: React.FC = () => {
               >
                 Showing results for "{searchQuery}"
               </Typography>
+
               <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black' }}>
-                  Sort
+                  {sortLabel}
                 </Typography>
-                <IconButton size="small">
+                <IconButton size="small" onClick={(e) => setSortAnchorEl(e.currentTarget)}>
                   <Sort sx={{ fontSize: '16px' }} />
                 </IconButton>
+                <Menu
+                  anchorEl={sortAnchorEl}
+                  open={Boolean(sortAnchorEl)}
+                  onClose={() => setSortAnchorEl(null)}
+                >
+                  <MenuItem
+                    selected={sortOrder === 'name_asc'}
+                    onClick={() => {
+                      setSortOrder('name_asc');
+                      setSortAnchorEl(null);
+                    }}
+                  >
+                    Name (A→Z)
+                  </MenuItem>
+                  <MenuItem
+                    selected={sortOrder === 'name_desc'}
+                    onClick={() => {
+                      setSortOrder('name_desc');
+                      setSortAnchorEl(null);
+                    }}
+                  >
+                    Name (Z→A)
+                  </MenuItem>
+                  <MenuItem
+                    selected={sortOrder === 'price_asc'}
+                    onClick={() => {
+                      setSortOrder('price_asc');
+                      setSortAnchorEl(null);
+                    }}
+                  >
+                    Price (Low→High)
+                  </MenuItem>
+                  <MenuItem
+                    selected={sortOrder === 'price_desc'}
+                    onClick={() => {
+                      setSortOrder('price_desc');
+                      setSortAnchorEl(null);
+                    }}
+                  >
+                    Price (High→Low)
+                  </MenuItem>
+                </Menu>
               </Box>
             </Box>
           </Box>
 
           <Grid container spacing={2} sx={{ marginBottom: '32px' }}>
-            {products.map((product) => (
+            {sortedProducts.map((product) => (
               <Grid item xs={12} sm={6} md={4} lg={3} key={product.product_id}>
                 <Card
                   sx={{
