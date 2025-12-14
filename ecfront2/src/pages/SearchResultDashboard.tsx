@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -51,7 +51,7 @@ interface SearchFilters {
   freeShipping: boolean;
 }
 
-type SortOrder = 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc';
+type SortOrder = 'default' | 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc';
 
 const SearchResultNew: React.FC = () => {
   const location = useLocation();
@@ -77,8 +77,14 @@ const SearchResultNew: React.FC = () => {
   const [totalResults, setTotalResults] = useState(0);
   const itemsPerPage = 20;
 
-  const [sortOrder, setSortOrder] = useState<SortOrder>('name_asc');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('default');
   const [sortAnchorEl, setSortAnchorEl] = useState<null | HTMLElement>(null);
+
+  const [sortedDatasetKey, setSortedDatasetKey] = useState<string>('');
+  const [sortedDataset, setSortedDataset] = useState<Product[]>([]);
+  const [sortedDatasetTotal, setSortedDatasetTotal] = useState<number>(0);
+
+  const requestSeqRef = useRef(0);
 
   const parseNumberOrEmptyToNull = (v: string): number | null => {
     const t = v.trim();
@@ -99,46 +105,171 @@ const SearchResultNew: React.FC = () => {
     return [ma, mi];
   };
 
-  const fetchProducts = async (query: string, page: number, f: SearchFilters) => {
+  const parseSortParam = (v: string | null): SortOrder => {
+    if (v === 'name_asc' || v === 'name_desc' || v === 'price_asc' || v === 'price_desc' || v === 'default') {
+      return v;
+    }
+    return 'default';
+  };
+
+  const makeDatasetKey = (q: string, f: SearchFilters, s: SortOrder) => {
+    const keyObj = {
+      q,
+      s,
+      f: {
+        priceRange: f.priceRange,
+        category: [...f.category].sort(),
+        rating: f.rating,
+        status: [...f.status].sort(),
+        stock: f.stock,
+        freeShipping: f.freeShipping,
+      },
+    };
+    return JSON.stringify(keyObj);
+  };
+
+  const buildSearchUrl = (query: string, page: number, f: SearchFilters) => {
+    let url = `/api/search?q=${encodeURIComponent(query)}&p=${page}`;
+
+    f.status.forEach(s => {
+      url += `&status=${encodeURIComponent(s)}`;
+    });
+
+    f.category.forEach(catId => {
+      url += `&category=${encodeURIComponent(catId)}`;
+    });
+
+    if (f.stock) {
+      url += `&stock=1`;
+    }
+
+    const [minPrice, maxPrice] = f.priceRange;
+    if (minPrice !== 0) {
+      url += `&min_price=${encodeURIComponent(String(minPrice))}`;
+    }
+    if (maxPrice !== 1000) {
+      url += `&max_price=${encodeURIComponent(String(maxPrice))}`;
+    }
+
+    return url;
+  };
+
+  const sortAll = (items: Product[], order: SortOrder) => {
+    const copied = [...items];
+
+    copied.sort((a, b) => {
+      if (order === 'price_asc') return (a.price ?? 0) - (b.price ?? 0);
+      if (order === 'price_desc') return (b.price ?? 0) - (a.price ?? 0);
+
+      const nameA = (a.product_name ?? '').toString();
+      const nameB = (b.product_name ?? '').toString();
+
+      if (order === 'name_desc') {
+        return nameB.localeCompare(nameA, undefined, { sensitivity: 'base' });
+      }
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+    });
+
+    return copied;
+  };
+
+  const fetchProducts = async (query: string, page: number, f: SearchFilters, s: SortOrder) => {
+    const seq = ++requestSeqRef.current;
+
+    const applyIfLatest = (fn: () => void) => {
+      if (requestSeqRef.current !== seq) return;
+      fn();
+    };
+
     try {
-      let url = `/api/search?q=${encodeURIComponent(query)}&p=${page}`;
+      if (s === 'default') {
+        const url = buildSearchUrl(query, page, f);
+        const response = await fetch(url);
 
-      f.status.forEach(s => {
-        url += `&status=${encodeURIComponent(s)}`;
-      });
+        if (!response.ok) {
+          applyIfLatest(() => {
+            setProducts([]);
+            setTotalResults(0);
+          });
+          return;
+        }
 
-      f.category.forEach(catId => {
-        url += `&category=${encodeURIComponent(catId)}`;
-      });
+        const data = await response.json();
 
-      if (f.stock) {
-        url += `&stock=1`;
-      }
-
-      const [minPrice, maxPrice] = f.priceRange;
-      if (minPrice !== 0) {
-        url += `&min_price=${encodeURIComponent(String(minPrice))}`;
-      }
-      if (maxPrice !== 1000) {
-        url += `&max_price=${encodeURIComponent(String(maxPrice))}`;
-      }
-
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        setProducts([]);
-        setTotalResults(0);
+        applyIfLatest(() => {
+          setProducts(data.items || []);
+          setTotalResults(data.total || 0);
+          setSortedDatasetKey('');
+          setSortedDataset([]);
+          setSortedDatasetTotal(0);
+        });
         return;
       }
 
-      const data = await response.json();
+      const key = makeDatasetKey(query, f, s);
 
-      setProducts(data.items || []);
-      setTotalResults(data.total || 0);
+      if (key === sortedDatasetKey && sortedDataset.length > 0 && sortedDatasetTotal > 0) {
+        const start = (page - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const slice = sortedDataset.slice(start, end);
+
+        applyIfLatest(() => {
+          setProducts(slice);
+          setTotalResults(sortedDatasetTotal);
+        });
+        return;
+      }
+
+      const firstRes = await fetch(buildSearchUrl(query, 1, f));
+      if (!firstRes.ok) {
+        applyIfLatest(() => {
+          setProducts([]);
+          setTotalResults(0);
+          setSortedDatasetKey('');
+          setSortedDataset([]);
+          setSortedDatasetTotal(0);
+        });
+        return;
+      }
+
+      const firstData = await firstRes.json();
+      const total = Number(firstData.total || 0);
+      const pages = Math.max(1, Math.ceil(total / itemsPerPage));
+      const allItems: Product[] = Array.isArray(firstData.items) ? [...firstData.items] : [];
+
+      if (pages > 1) {
+        for (let p = 2; p <= pages; p++) {
+          const res = await fetch(buildSearchUrl(query, p, f));
+          if (!res.ok) continue;
+
+          const d = await res.json();
+          if (Array.isArray(d.items)) {
+            allItems.push(...d.items);
+          }
+        }
+      }
+
+      const allSorted = sortAll(allItems, s);
+
+      const start = (page - 1) * itemsPerPage;
+      const end = start + itemsPerPage;
+      const slice = allSorted.slice(start, end);
+
+      applyIfLatest(() => {
+        setSortedDatasetKey(key);
+        setSortedDataset(allSorted);
+        setSortedDatasetTotal(total);
+        setProducts(slice);
+        setTotalResults(total);
+      });
     } catch (err) {
       console.error(err);
+      if (requestSeqRef.current !== seq) return;
       setProducts([]);
       setTotalResults(0);
+      setSortedDatasetKey('');
+      setSortedDataset([]);
+      setSortedDatasetTotal(0);
     }
   };
 
@@ -165,8 +296,13 @@ const SearchResultNew: React.FC = () => {
     const params = new URLSearchParams(location.search);
     const query = params.get('q') || '';
     const page = parseInt(params.get('p') || '1', 10);
+    const s = parseSortParam(params.get('sort'));
 
     setSearchQuery(query);
+
+    if (s !== sortOrder) {
+      setSortOrder(s);
+    }
 
     if (query && page !== currentPage) {
       setCurrentPage(page);
@@ -175,10 +311,13 @@ const SearchResultNew: React.FC = () => {
     if (!query) {
       setProducts([]);
       setTotalResults(0);
+      setSortedDatasetKey('');
+      setSortedDataset([]);
+      setSortedDatasetTotal(0);
       return;
     }
 
-    fetchProducts(query, page, filters);
+    fetchProducts(query, page, filters, s);
   }, [location.search, filters]);
 
   const handleProductClick = (productId: string) => {
@@ -231,32 +370,23 @@ const SearchResultNew: React.FC = () => {
     return stars;
   };
 
-  const sortedProducts = useMemo(() => {
-    const copied = [...products];
-
-    copied.sort((a, b) => {
-      if (sortOrder === 'price_asc') return (a.price ?? 0) - (b.price ?? 0);
-      if (sortOrder === 'price_desc') return (b.price ?? 0) - (a.price ?? 0);
-
-      const nameA = (a.product_name ?? '').toString();
-      const nameB = (b.product_name ?? '').toString();
-
-      if (sortOrder === 'name_desc') {
-        return nameB.localeCompare(nameA, undefined, { sensitivity: 'base' });
-      }
-      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
-    });
-
-    return copied;
-  }, [products, sortOrder]);
-
   const totalPages = Math.ceil(totalResults / itemsPerPage) || 1;
 
-  const sortLabel =
-    sortOrder === 'name_asc' ? 'Name (A→Z)'
-      : sortOrder === 'name_desc' ? 'Name (Z→A)'
-        : sortOrder === 'price_asc' ? 'Price (Low→High)'
-          : 'Price (High→Low)';
+  const sortLabel = useMemo(() => {
+    if (sortOrder === 'default') return 'Default';
+    if (sortOrder === 'name_asc') return 'Name (A→Z)';
+    if (sortOrder === 'name_desc') return 'Name (Z→A)';
+    if (sortOrder === 'price_asc') return 'Price (Low→High)';
+    return 'Price (High→Low)';
+  }, [sortOrder]);
+
+  const applySortToUrl = (next: SortOrder) => {
+    const params = new URLSearchParams(location.search);
+    if (next === 'default') params.delete('sort');
+    else params.set('sort', next);
+    params.set('p', '1');
+    navigate(`?${params.toString()}`);
+  };
 
   return (
     <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
@@ -443,7 +573,6 @@ const SearchResultNew: React.FC = () => {
               onClick={() => {
                 setPriceMinInput('');
                 setPriceMaxInput('');
-                setSortOrder('name_asc');
                 setFilters({
                   priceRange: [0, 1000],
                   category: [],
@@ -452,6 +581,11 @@ const SearchResultNew: React.FC = () => {
                   stock: false,
                   freeShipping: false,
                 });
+
+                const params = new URLSearchParams(location.search);
+                params.delete('sort');
+                params.set('p', '1');
+                navigate(`?${params.toString()}`);
               }}
             >
               Clear
@@ -495,10 +629,19 @@ const SearchResultNew: React.FC = () => {
                   onClose={() => setSortAnchorEl(null)}
                 >
                   <MenuItem
+                    selected={sortOrder === 'default'}
+                    onClick={() => {
+                      setSortAnchorEl(null);
+                      applySortToUrl('default');
+                    }}
+                  >
+                    Default
+                  </MenuItem>
+                  <MenuItem
                     selected={sortOrder === 'name_asc'}
                     onClick={() => {
-                      setSortOrder('name_asc');
                       setSortAnchorEl(null);
+                      applySortToUrl('name_asc');
                     }}
                   >
                     Name (A→Z)
@@ -506,8 +649,8 @@ const SearchResultNew: React.FC = () => {
                   <MenuItem
                     selected={sortOrder === 'name_desc'}
                     onClick={() => {
-                      setSortOrder('name_desc');
                       setSortAnchorEl(null);
+                      applySortToUrl('name_desc');
                     }}
                   >
                     Name (Z→A)
@@ -515,8 +658,8 @@ const SearchResultNew: React.FC = () => {
                   <MenuItem
                     selected={sortOrder === 'price_asc'}
                     onClick={() => {
-                      setSortOrder('price_asc');
                       setSortAnchorEl(null);
+                      applySortToUrl('price_asc');
                     }}
                   >
                     Price (Low→High)
@@ -524,8 +667,8 @@ const SearchResultNew: React.FC = () => {
                   <MenuItem
                     selected={sortOrder === 'price_desc'}
                     onClick={() => {
-                      setSortOrder('price_desc');
                       setSortAnchorEl(null);
+                      applySortToUrl('price_desc');
                     }}
                   >
                     Price (High→Low)
@@ -536,7 +679,7 @@ const SearchResultNew: React.FC = () => {
           </Box>
 
           <Grid container spacing={2} sx={{ marginBottom: '32px' }}>
-            {sortedProducts.map((product) => (
+            {products.map((product) => (
               <Grid item xs={12} sm={6} md={4} lg={3} key={product.product_id}>
                 <Card
                   sx={{
