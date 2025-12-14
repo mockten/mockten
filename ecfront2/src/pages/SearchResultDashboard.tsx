@@ -25,7 +25,6 @@ import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 import photoSvg from "../assets/photo.svg";
 
-// Product interface that matches backend response
 interface Product {
   product_id: string;
   product_name: string;
@@ -61,25 +60,50 @@ const SearchResultNew: React.FC = () => {
     freeShipping: false,
   });
 
+  const [priceMinInput, setPriceMinInput] = useState<string>('');
+  const [priceMaxInput, setPriceMaxInput] = useState<string>('');
+
   const [currentPage, setCurrentPage] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
   const itemsPerPage = 20;
 
-  // -----------------------------
-  // Fetch Products (MAIN)
-  // -----------------------------
+  const parseNumberOrEmptyToNull = (v: string): number | null => {
+    const t = v.trim();
+    if (t === '') return null;
+    const n = Number(t);
+    if (!Number.isFinite(n)) return null;
+    return n;
+  };
+
+  const normalizePriceRange = (min: number | null, max: number | null): [number, number] => {
+    const defaultMin = 0;
+    const defaultMax = 1000;
+
+    const mi = min == null ? defaultMin : Math.max(0, Math.floor(min));
+    const ma = max == null ? defaultMax : Math.max(0, Math.floor(max));
+
+    if (mi <= ma) return [mi, ma];
+    return [ma, mi];
+  };
+
   const fetchProducts = async (query: string, page: number, f: SearchFilters) => {
     try {
       let url = `/api/search?q=${encodeURIComponent(query)}&p=${page}`;
 
-      // Status (New / Used)
       f.status.forEach(s => {
         url += `&status=${encodeURIComponent(s)}`;
       });
 
-      // Stock filter
       if (f.stock) {
         url += `&stock=1`;
+      }
+
+      const [minPrice, maxPrice] = f.priceRange;
+      if (minPrice !== 0) {
+        url += `&min_price=${encodeURIComponent(String(minPrice))}`;
+      }
+      if (maxPrice !== 1000) {
+        url += `&max_price=${encodeURIComponent(String(maxPrice))}`;
       }
 
       const response = await fetch(url);
@@ -101,9 +125,6 @@ const SearchResultNew: React.FC = () => {
     }
   };
 
-  // -----------------------------
-  // Handle URL search change
-  // -----------------------------
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const query = params.get('q') || '';
@@ -123,14 +144,6 @@ const SearchResultNew: React.FC = () => {
 
     fetchProducts(query, page, filters);
   }, [location.search, filters]);
-
-  // -----------------------------
-  // Handle filter change
-  // -----------------------------
-  useEffect(() => {
-    if (!searchQuery) return;
-    fetchProducts(searchQuery, currentPage, filters);
-  }, [filters.status, filters.stock]);
 
   const handleProductClick = (productId: string) => {
     navigate(`/item/${productId}`);
@@ -185,12 +198,10 @@ const SearchResultNew: React.FC = () => {
   const totalPages = Math.ceil(totalResults / itemsPerPage) || 1;
 
   return (
-    <Box sx={{  width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
-      {/* App Bar */}
+    <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       <Appbar />
 
       <Container maxWidth="lg" sx={{ display: 'flex' }}>
-        {/* Sidebar Filters */}
         <Box
           sx={{
             width: '240px',
@@ -200,7 +211,6 @@ const SearchResultNew: React.FC = () => {
             borderRight: '1px solid #dddddd',
           }}
         >
-          {/* Price */}
           <Box sx={{ marginBottom: '24px' }}>
             <Typography
               sx={{
@@ -215,12 +225,39 @@ const SearchResultNew: React.FC = () => {
               Price
             </Typography>
             <Box sx={{ paddingLeft: '20px' }}>
-              <TextField size="small" placeholder="Min" type="number" sx={{ width: '120px', marginBottom: '8px' }} />
-              <TextField size="small" placeholder="Max" type="number" sx={{ width: '120px' }} />
+              <TextField
+                size="small"
+                placeholder="Min"
+                type="number"
+                sx={{ width: '120px', marginBottom: '8px' }}
+                value={priceMinInput}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPriceMinInput(v);
+                  const min = parseNumberOrEmptyToNull(v);
+                  const max = parseNumberOrEmptyToNull(priceMaxInput);
+                  const next = normalizePriceRange(min, max);
+                  setFilters(prev => ({ ...prev, priceRange: next }));
+                }}
+              />
+              <TextField
+                size="small"
+                placeholder="Max"
+                type="number"
+                sx={{ width: '120px' }}
+                value={priceMaxInput}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPriceMaxInput(v);
+                  const min = parseNumberOrEmptyToNull(priceMinInput);
+                  const max = parseNumberOrEmptyToNull(v);
+                  const next = normalizePriceRange(min, max);
+                  setFilters(prev => ({ ...prev, priceRange: next }));
+                }}
+              />
             </Box>
           </Box>
 
-          {/* Category */}
           <Box sx={{ marginBottom: '24px' }}>
             <Typography
               sx={{
@@ -250,7 +287,6 @@ const SearchResultNew: React.FC = () => {
             </Box>
           </Box>
 
-          {/* Review */}
           <Box sx={{ marginBottom: '24px' }}>
             <Typography
               sx={{
@@ -288,7 +324,6 @@ const SearchResultNew: React.FC = () => {
             </Box>
           </Box>
 
-          {/* Status */}
           <Box sx={{ marginBottom: '24px' }}>
             <Typography
               sx={{
@@ -316,7 +351,6 @@ const SearchResultNew: React.FC = () => {
             </Box>
           </Box>
 
-          {/* Stocks */}
           <Box sx={{ marginBottom: '24px' }}>
             <Typography
               sx={{
@@ -343,30 +377,30 @@ const SearchResultNew: React.FC = () => {
             </Box>
           </Box>
 
-          {/* Action Buttons */}
           <Box sx={{ paddingLeft: '20px' }}>
             <Button
               variant="text"
               fullWidth
               sx={{ textTransform: 'none' }}
-              onClick={() => setFilters({
-                priceRange: [0, 1000],
-                category: [],
-                rating: 0,
-                status: [],
-                stock: false,
-                freeShipping: false,
-              })}
+              onClick={() => {
+                setPriceMinInput('');
+                setPriceMaxInput('');
+                setFilters({
+                  priceRange: [0, 1000],
+                  category: [],
+                  rating: 0,
+                  status: [],
+                  stock: false,
+                  freeShipping: false,
+                });
+              }}
             >
               Clear
             </Button>
           </Box>
         </Box>
 
-        {/* Main Content */}
         <Box sx={{ flexGrow: 1, padding: '24px' }}>
-          
-          {/* Search Header */}
           <Box sx={{ marginBottom: '16px' }}>
             <Typography
               sx={{
@@ -399,7 +433,6 @@ const SearchResultNew: React.FC = () => {
             </Box>
           </Box>
 
-          {/* Product Grid */}
           <Grid container spacing={2} sx={{ marginBottom: '32px' }}>
             {products.map((product) => (
               <Grid item xs={12} sm={6} md={4} lg={3} key={product.product_id}>
@@ -438,7 +471,6 @@ const SearchResultNew: React.FC = () => {
                         fontSize: '16px',
                         color: 'black',
                         marginBottom: '8px',
-                        // UPDATED: Enforce single line with ellipsis to prevent height misalignment
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -467,7 +499,6 @@ const SearchResultNew: React.FC = () => {
             ))}
           </Grid>
 
-          {/* Pagination */}
           <Box sx={{ display: 'flex', justifyContent: 'center', marginBottom: '32px' }}>
             <Pagination
               count={totalPages}
@@ -480,7 +511,6 @@ const SearchResultNew: React.FC = () => {
               color="primary"
             />
           </Box>
-
         </Box>
       </Container>
 

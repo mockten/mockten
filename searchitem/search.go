@@ -55,6 +55,9 @@ func searchHandler(c *gin.Context) {
 	statusParam := c.QueryArray("status")
 	stockParam := c.Query("stock")
 
+	minPriceStr := c.Query("min_price")
+	maxPriceStr := c.Query("max_price")
+
 	if query == "" || pageStr == "" {
 		logger.Error("Search Query parameter is missing.")
 		c.JSON(http.StatusNoContent, gin.H{"message": "There is no content"})
@@ -89,6 +92,18 @@ func searchHandler(c *gin.Context) {
 
 	if stockParam == "1" {
 		filters = append(filters, "stocks > 0")
+	}
+
+	if minPriceStr != "" {
+		if v, err := strconv.Atoi(minPriceStr); err == nil {
+			filters = append(filters, "price >= "+strconv.Itoa(v))
+		}
+	}
+
+	if maxPriceStr != "" {
+		if v, err := strconv.Atoi(maxPriceStr); err == nil {
+			filters = append(filters, "price <= "+strconv.Itoa(v))
+		}
 	}
 
 	var finalFilter interface{}
