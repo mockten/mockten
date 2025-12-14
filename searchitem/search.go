@@ -181,6 +181,38 @@ func ConvertToResponse(detail *ProductDetail) ProductDetailResponse {
 	}
 }
 
+type Category struct {
+	CategoryID   string `json:"category_id"`
+	CategoryName string `json:"category_name"`
+}
+
+func getCategoryListHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		rows, err := db.Query(`
+			SELECT category_id, category_name
+			FROM Category
+			ORDER BY category_id
+		`)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories"})
+			return
+		}
+		defer rows.Close()
+
+		var categories []Category
+		for rows.Next() {
+			var cat Category
+			if err := rows.Scan(&cat.CategoryID, &cat.CategoryName); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan category"})
+				return
+			}
+			categories = append(categories, cat)
+		}
+
+		c.JSON(http.StatusOK, categories)
+	}
+}
+
 func waitForMySQL(db *sql.DB, logger *zap.Logger) {
 	maxAttempts := 20
 	for i := 1; i <= maxAttempts; i++ {
@@ -296,6 +328,7 @@ func main() {
 
 	router := gin.Default()
 	router.GET("v1/search", searchHandler)
+	router.GET("v1/categories", getCategoryListHandler(db))
 	router.GET("v1/item/detail", getItemDetailHandler(db))
 
 	router.Run(port)

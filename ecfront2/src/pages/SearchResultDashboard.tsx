@@ -35,6 +35,11 @@ interface Product {
   stocks: number;
 }
 
+interface Category {
+  category_id: string;
+  category_name: string;
+}
+
 interface SearchFilters {
   priceRange: [number, number];
   category: string[];
@@ -50,6 +55,7 @@ const SearchResultNew: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const [filters, setFilters] = useState<SearchFilters>({
     priceRange: [0, 1000],
@@ -124,6 +130,25 @@ const SearchResultNew: React.FC = () => {
       setTotalResults(0);
     }
   };
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch('/api/categories');
+        if (!res.ok) {
+          setCategories([]);
+          return;
+        }
+        const data = await res.json();
+        setCategories(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error(err);
+        setCategories([]);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -272,18 +297,15 @@ const SearchResultNew: React.FC = () => {
               Category
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '8px', paddingLeft: '20px' }}>
-              <Chip
-                label="Toy"
-                onClick={() => handleCategoryToggle('Toy')}
-                color={filters.category.includes('Toy') ? 'primary' : 'default'}
-                size="small"
-              />
-              <Chip
-                label="Game"
-                onClick={() => handleCategoryToggle('Game')}
-                color={filters.category.includes('Game') ? 'primary' : 'default'}
-                size="small"
-              />
+              {categories.map((cat) => (
+                <Chip
+                  key={cat.category_id}
+                  label={cat.category_name}
+                  onClick={() => handleCategoryToggle(cat.category_id)}
+                  color={filters.category.includes(cat.category_id) ? 'primary' : 'default'}
+                  size="small"
+                />
+              ))}
             </Box>
           </Box>
 
