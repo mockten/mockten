@@ -52,7 +52,8 @@ func searchHandler(c *gin.Context) {
 	query := c.Query("q")
 	pageStr := c.Query("p")
 
-	statusParam := c.QueryArray("status")
+	statusParams := c.QueryArray("status")
+	categoryParams := c.QueryArray("category")
 	stockParam := c.Query("stock")
 
 	minPriceStr := c.Query("min_price")
@@ -64,7 +65,16 @@ func searchHandler(c *gin.Context) {
 		return
 	}
 
-	logger.Debug("Request log", zap.String("query", query), zap.String("page", pageStr))
+	logger.Debug(
+		"Request log",
+		zap.String("query", query),
+		zap.String("page", pageStr),
+		zap.Strings("status", statusParams),
+		zap.Strings("category", categoryParams),
+		zap.String("stock", stockParam),
+		zap.String("min_price", minPriceStr),
+		zap.String("max_price", maxPriceStr),
+	)
 
 	searchReqCount.Inc()
 
@@ -78,28 +88,45 @@ func searchHandler(c *gin.Context) {
 
 	var filters []string
 
-	if len(statusParam) > 0 {
-		var statusExpr string
-		for i, s := range statusParam {
+	// Status filter (New / Used)
+	if len(statusParams) > 0 {
+		var expr string
+		for i, s := range statusParams {
 			if i == 0 {
-				statusExpr = `condition = "` + s + `"`
+				expr = `condition = "` + s + `"`
 			} else {
-				statusExpr += ` OR condition = "` + s + `"`
+				expr += ` OR condition = "` + s + `"`
 			}
 		}
-		filters = append(filters, statusExpr)
+		filters = append(filters, expr)
 	}
 
+	// Category filter (multiple allowed)
+	if len(categoryParams) > 0 {
+		var expr string
+		for i, cID := range categoryParams {
+			if i == 0 {
+				expr = `category_name = "` + cID + `"`
+			} else {
+				expr += ` OR category_name = "` + cID + `"`
+			}
+		}
+		filters = append(filters, expr)
+	}
+
+	// Stock filter
 	if stockParam == "1" {
 		filters = append(filters, "stocks > 0")
 	}
 
+	// Min price filter
 	if minPriceStr != "" {
 		if v, err := strconv.Atoi(minPriceStr); err == nil {
 			filters = append(filters, "price >= "+strconv.Itoa(v))
 		}
 	}
 
+	// Max price filter
 	if maxPriceStr != "" {
 		if v, err := strconv.Atoi(maxPriceStr); err == nil {
 			filters = append(filters, "price <= "+strconv.Itoa(v))
@@ -122,14 +149,14 @@ func searchHandler(c *gin.Context) {
 		},
 	)
 	if err != nil {
-		logger.Error("failed to search in some reasons.", zap.Error(err))
+		logger.Error("failed to search in MeiliSearch.", zap.Error(err))
 		c.JSON(http.StatusNoContent, gin.H{"message": "There is no items"})
 		return
 	}
 
 	var items []Item
 	hitsJson, _ := json.Marshal(searchRes.Hits)
-	json.Unmarshal(hitsJson, &items)
+	_ = json.Unmarshal(hitsJson, &items)
 
 	searchResCount.Inc()
 

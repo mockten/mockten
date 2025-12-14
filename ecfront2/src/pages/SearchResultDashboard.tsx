@@ -100,6 +100,10 @@ const SearchResultNew: React.FC = () => {
         url += `&status=${encodeURIComponent(s)}`;
       });
 
+      f.category.forEach(catId => {
+        url += `&category=${encodeURIComponent(catId)}`;
+      });
+
       if (f.stock) {
         url += `&stock=1`;
       }
@@ -181,12 +185,12 @@ const SearchResultNew: React.FC = () => {
     }));
   };
 
-  const handleCategoryToggle = (category: string) => {
+  const handleCategoryToggle = (categoryId: string) => {
     setFilters(prev => ({
       ...prev,
-      category: prev.category.includes(category)
-        ? prev.category.filter(c => c !== category)
-        : [...prev.category, category],
+      category: prev.category.includes(categoryId)
+        ? prev.category.filter(c => c !== categoryId)
+        : [...prev.category, categoryId],
     }));
   };
 
@@ -301,8 +305,8 @@ const SearchResultNew: React.FC = () => {
                 <Chip
                   key={cat.category_id}
                   label={cat.category_name}
-                  onClick={() => handleCategoryToggle(cat.category_id)}
-                  color={filters.category.includes(cat.category_id) ? 'primary' : 'default'}
+                  onClick={() => handleCategoryToggle(cat.category_name)}
+                  color={filters.category.includes(cat.category_name) ? 'primary' : 'default'}
                   size="small"
                 />
               ))}
