@@ -35,6 +35,7 @@ interface Product {
   price: number;
   ranking: number;
   stocks: number;
+  avg_review?: number;
 }
 
 interface Category {
@@ -755,7 +756,7 @@ const SearchResultNew: React.FC = () => {
                     </Typography>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '8px' }}>
-                      {renderStars(product.ranking || 4.0)}
+                      {renderStars(product.avg_review ?? product.ranking ?? 0)}
                     </Box>
 
                     <Typography
