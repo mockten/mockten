@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -23,14 +24,16 @@ const (
 )
 
 type Item struct {
-	ProductId   string `json:"product_id"`
-	ProductName string `json:"product_name"`
-	SellerName  string `json:"seller_name"`
-	Category    int    `json:"category"`
-	Price       int    `json:"price"`
-	Rank        int    `json:"ranking"`
-	Stocks      int    `json:"stocks"`
-	MainURL     string `json:"main_url"`
+	ProductId   string  `json:"product_id"`
+	ProductName string  `json:"product_name"`
+	SellerName  string  `json:"seller_name"`
+	Category    int     `json:"category"`
+	Price       int     `json:"price"`
+	Rank        int     `json:"ranking"`
+	Stocks      int     `json:"stocks"`
+	MainURL     string  `json:"main_url"`
+	AvgReview   float64 `json:"avg_review"`
+	ReviewCount int     `json:"review_count"`
 }
 
 var (
@@ -58,6 +61,7 @@ func searchHandler(c *gin.Context) {
 
 	minPriceStr := c.Query("min_price")
 	maxPriceStr := c.Query("max_price")
+	minReviewStr := c.Query("min_review")
 
 	if query == "" || pageStr == "" {
 		logger.Error("Search Query parameter is missing.")
@@ -74,6 +78,7 @@ func searchHandler(c *gin.Context) {
 		zap.String("stock", stockParam),
 		zap.String("min_price", minPriceStr),
 		zap.String("max_price", maxPriceStr),
+		zap.String("min_review", minReviewStr),
 	)
 
 	searchReqCount.Inc()
@@ -92,10 +97,20 @@ func searchHandler(c *gin.Context) {
 	if len(statusParams) > 0 {
 		var expr string
 		for i, s := range statusParams {
-			if i == 0 {
-				expr = `condition = "` + s + `"`
+			val := strings.ToLower(strings.TrimSpace(s))
+			if val == "new" || val == "used" {
+			} else if s == "New" {
+				val = "new"
+			} else if s == "Used" {
+				val = "used"
 			} else {
-				expr += ` OR condition = "` + s + `"`
+				val = strings.ToLower(s)
+			}
+
+			if i == 0 {
+				expr = `condition = "` + val + `"`
+			} else {
+				expr += ` OR condition = "` + val + `"`
 			}
 		}
 		filters = append(filters, expr)
@@ -130,6 +145,13 @@ func searchHandler(c *gin.Context) {
 	if maxPriceStr != "" {
 		if v, err := strconv.Atoi(maxPriceStr); err == nil {
 			filters = append(filters, "price <= "+strconv.Itoa(v))
+		}
+	}
+
+	// Min review filter
+	if minReviewStr != "" {
+		if v, err := strconv.ParseFloat(minReviewStr, 64); err == nil {
+			filters = append(filters, "avg_review >= "+strconv.FormatFloat(v, 'f', -1, 64))
 		}
 	}
 
@@ -178,6 +200,8 @@ type ProductDetail struct {
 	LastUpdate   time.Time `json:"last_update"`
 	SellerName   string    `json:"seller_name"`
 	Stocks       int       `json:"stocks"`
+	AvgReview    float64   `json:"avg_review"`
+	ReviewCount  int       `json:"review_count"`
 }
 
 type ProductDetailResponse struct {
@@ -191,6 +215,8 @@ type ProductDetailResponse struct {
 	LastUpdate   time.Time `json:"last_update"`
 	SellerName   string    `json:"seller_name"`
 	Stocks       int       `json:"stocks"`
+	AvgReview    float64   `json:"avg_review"`
+	ReviewCount  int       `json:"review_count"`
 }
 
 func ConvertToResponse(detail *ProductDetail) ProductDetailResponse {
@@ -205,6 +231,8 @@ func ConvertToResponse(detail *ProductDetail) ProductDetailResponse {
 		LastUpdate:   detail.LastUpdate,
 		SellerName:   detail.SellerName,
 		Stocks:       detail.Stocks,
+		AvgReview:    detail.AvgReview,
+		ReviewCount:  detail.ReviewCount,
 	}
 }
 
@@ -274,7 +302,9 @@ func getItemDetailHandler(db *sql.DB) gin.HandlerFunc {
             p.regist_day,
             p.last_update,
             t.stocks,
-            ue.USERNAME AS seller_name
+            ue.USERNAME AS seller_name,
+            p.avg_review,
+            p.review_count
          FROM Product p
          JOIN Category c ON p.category_id = c.category_id
          JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
@@ -295,6 +325,8 @@ func getItemDetailHandler(db *sql.DB) gin.HandlerFunc {
 			&detail.LastUpdate,
 			&detail.Stocks,
 			&detail.SellerName,
+			&detail.AvgReview,
+			&detail.ReviewCount,
 		)
 
 		if err != nil {
