@@ -144,6 +144,15 @@ services:
         strip_path: true
         methods:
           - GET
+  - name: categories
+    url: http://searchitem-service.default.svc.cluster.local:50051/v1/categories
+    routes:
+      - name: categories
+        paths:
+          - /api/categories
+        strip_path: true
+        methods:
+          - GET
   - name: item-detail
     url: http://searchitem-service.default.svc.cluster.local:50051/v1/item/detail
     routes:

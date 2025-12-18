@@ -80,5 +80,6 @@ curl -X PUT 'http://meilisearch-service.default.svc.cluster.local:7700/indexes/p
     "seller_name",
     "category_name",
     "condition",
-    "stocks"
+    "stocks",
+    "price"
   ]'

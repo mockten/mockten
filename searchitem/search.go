@@ -52,9 +52,12 @@ func searchHandler(c *gin.Context) {
 	query := c.Query("q")
 	pageStr := c.Query("p")
 
-	// NEW: get status and stock params
-	statusParam := c.QueryArray("status")
+	statusParams := c.QueryArray("status")
+	categoryParams := c.QueryArray("category")
 	stockParam := c.Query("stock")
+
+	minPriceStr := c.Query("min_price")
+	maxPriceStr := c.Query("max_price")
 
 	if query == "" || pageStr == "" {
 		logger.Error("Search Query parameter is missing.")
@@ -62,7 +65,16 @@ func searchHandler(c *gin.Context) {
 		return
 	}
 
-	logger.Debug("Request log", zap.String("query", query), zap.String("page", pageStr))
+	logger.Debug(
+		"Request log",
+		zap.String("query", query),
+		zap.String("page", pageStr),
+		zap.Strings("status", statusParams),
+		zap.Strings("category", categoryParams),
+		zap.String("stock", stockParam),
+		zap.String("min_price", minPriceStr),
+		zap.String("max_price", maxPriceStr),
+	)
 
 	searchReqCount.Inc()
 
@@ -74,30 +86,57 @@ func searchHandler(c *gin.Context) {
 	limit := 20
 	offset := (page - 1) * limit
 
-	var filterExpr string
-	statusValues := statusParam
+	var filters []string
 
-	if len(statusValues) > 0 {
-		for i, s := range statusValues {
+	// Status filter (New / Used)
+	if len(statusParams) > 0 {
+		var expr string
+		for i, s := range statusParams {
 			if i == 0 {
-				filterExpr += `condition = "` + s + `"`
+				expr = `condition = "` + s + `"`
 			} else {
-				filterExpr += ` OR condition = "` + s + `"`
+				expr += ` OR condition = "` + s + `"`
 			}
 		}
+		filters = append(filters, expr)
 	}
 
-	var filters []string
+	// Category filter (multiple allowed)
+	if len(categoryParams) > 0 {
+		var expr string
+		for i, cID := range categoryParams {
+			if i == 0 {
+				expr = `category_name = "` + cID + `"`
+			} else {
+				expr += ` OR category_name = "` + cID + `"`
+			}
+		}
+		filters = append(filters, expr)
+	}
+
+	// Stock filter
 	if stockParam == "1" {
 		filters = append(filters, "stocks > 0")
 	}
 
+	// Min price filter
+	if minPriceStr != "" {
+		if v, err := strconv.Atoi(minPriceStr); err == nil {
+			filters = append(filters, "price >= "+strconv.Itoa(v))
+		}
+	}
+
+	// Max price filter
+	if maxPriceStr != "" {
+		if v, err := strconv.Atoi(maxPriceStr); err == nil {
+			filters = append(filters, "price <= "+strconv.Itoa(v))
+		}
+	}
+
 	var finalFilter interface{}
-	if filterExpr != "" && len(filters) > 0 {
-		finalFilter = []interface{}{filterExpr, filters[0]}
-	} else if filterExpr != "" {
-		finalFilter = filterExpr
-	} else if len(filters) > 0 {
+	if len(filters) == 1 {
+		finalFilter = filters[0]
+	} else if len(filters) > 1 {
 		finalFilter = filters
 	}
 
@@ -106,18 +145,18 @@ func searchHandler(c *gin.Context) {
 		&meilisearch.SearchRequest{
 			Limit:  int64(limit),
 			Offset: int64(offset),
-			Filter: finalFilter, // KEEP BOTH STATUS + STOCK
+			Filter: finalFilter,
 		},
 	)
 	if err != nil {
-		logger.Error("failed to search in some reasons.", zap.Error(err))
+		logger.Error("failed to search in MeiliSearch.", zap.Error(err))
 		c.JSON(http.StatusNoContent, gin.H{"message": "There is no items"})
 		return
 	}
 
 	var items []Item
 	hitsJson, _ := json.Marshal(searchRes.Hits)
-	json.Unmarshal(hitsJson, &items)
+	_ = json.Unmarshal(hitsJson, &items)
 
 	searchResCount.Inc()
 
@@ -166,6 +205,38 @@ func ConvertToResponse(detail *ProductDetail) ProductDetailResponse {
 		LastUpdate:   detail.LastUpdate,
 		SellerName:   detail.SellerName,
 		Stocks:       detail.Stocks,
+	}
+}
+
+type Category struct {
+	CategoryID   string `json:"category_id"`
+	CategoryName string `json:"category_name"`
+}
+
+func getCategoryListHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		rows, err := db.Query(`
+			SELECT category_id, category_name
+			FROM Category
+			ORDER BY category_id
+		`)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories"})
+			return
+		}
+		defer rows.Close()
+
+		var categories []Category
+		for rows.Next() {
+			var cat Category
+			if err := rows.Scan(&cat.CategoryID, &cat.CategoryName); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan category"})
+				return
+			}
+			categories = append(categories, cat)
+		}
+
+		c.JSON(http.StatusOK, categories)
 	}
 }
 
@@ -284,6 +355,7 @@ func main() {
 
 	router := gin.Default()
 	router.GET("v1/search", searchHandler)
+	router.GET("v1/categories", getCategoryListHandler(db))
 	router.GET("v1/item/detail", getItemDetailHandler(db))
 
 	router.Run(port)
