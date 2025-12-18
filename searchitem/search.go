@@ -24,16 +24,18 @@ const (
 )
 
 type Item struct {
-	ProductId   string  `json:"product_id"`
-	ProductName string  `json:"product_name"`
-	SellerName  string  `json:"seller_name"`
-	Category    int     `json:"category"`
-	Price       int     `json:"price"`
-	Rank        int     `json:"ranking"`
-	Stocks      int     `json:"stocks"`
-	MainURL     string  `json:"main_url"`
-	AvgReview   float64 `json:"avg_review"`
-	ReviewCount int     `json:"review_count"`
+	ProductId    string  `json:"product_id"`
+	ProductName  string  `json:"product_name"`
+	SellerName   string  `json:"seller_name"`
+	Category     int     `json:"category"`
+	Price        int     `json:"price"`
+	Rank         int     `json:"ranking"`
+	Stocks       int     `json:"stocks"`
+	MainURL      string  `json:"main_url"`
+	AvgReview    float64 `json:"avg_review"`
+	ReviewCount  int     `json:"review_count"`
+	Condition    string  `json:"condition"`
+	CategoryName string  `json:"category_name"`
 }
 
 var (
@@ -61,7 +63,7 @@ func searchHandler(c *gin.Context) {
 
 	minPriceStr := c.Query("min_price")
 	maxPriceStr := c.Query("max_price")
-	minReviewStr := c.Query("min_review")
+	minRatingStr := c.Query("min_rating")
 
 	if query == "" || pageStr == "" {
 		logger.Error("Search Query parameter is missing.")
@@ -78,7 +80,7 @@ func searchHandler(c *gin.Context) {
 		zap.String("stock", stockParam),
 		zap.String("min_price", minPriceStr),
 		zap.String("max_price", maxPriceStr),
-		zap.String("min_review", minReviewStr),
+		zap.String("min_rating", minRatingStr),
 	)
 
 	searchReqCount.Inc()
@@ -93,30 +95,43 @@ func searchHandler(c *gin.Context) {
 
 	var filters []string
 
-	// Status filter (New / Used)
 	if len(statusParams) > 0 {
 		var expr string
 		for i, s := range statusParams {
-			val := strings.ToLower(strings.TrimSpace(s))
-			if val == "new" || val == "used" {
-			} else if s == "New" {
-				val = "new"
-			} else if s == "Used" {
-				val = "used"
-			} else {
-				val = strings.ToLower(s)
+			sn := strings.ToLower(strings.TrimSpace(s))
+			if sn == "new" || sn == "used" {
+				if i == 0 {
+					expr = `condition = "` + sn + `"`
+				} else {
+					expr += ` OR condition = "` + sn + `"`
+				}
+				continue
 			}
-
-			if i == 0 {
-				expr = `condition = "` + val + `"`
+			if sn == "new" {
+				if i == 0 {
+					expr = `condition = "new"`
+				} else {
+					expr += ` OR condition = "new"`
+				}
+			} else if sn == "used" {
+				if i == 0 {
+					expr = `condition = "used"`
+				} else {
+					expr += ` OR condition = "used"`
+				}
 			} else {
-				expr += ` OR condition = "` + val + `"`
+				if i == 0 {
+					expr = `condition = "` + sn + `"`
+				} else {
+					expr += ` OR condition = "` + sn + `"`
+				}
 			}
 		}
-		filters = append(filters, expr)
+		if expr != "" {
+			filters = append(filters, expr)
+		}
 	}
 
-	// Category filter (multiple allowed)
 	if len(categoryParams) > 0 {
 		var expr string
 		for i, cID := range categoryParams {
@@ -129,28 +144,24 @@ func searchHandler(c *gin.Context) {
 		filters = append(filters, expr)
 	}
 
-	// Stock filter
 	if stockParam == "1" {
 		filters = append(filters, "stocks > 0")
 	}
 
-	// Min price filter
 	if minPriceStr != "" {
 		if v, err := strconv.Atoi(minPriceStr); err == nil {
 			filters = append(filters, "price >= "+strconv.Itoa(v))
 		}
 	}
 
-	// Max price filter
 	if maxPriceStr != "" {
 		if v, err := strconv.Atoi(maxPriceStr); err == nil {
 			filters = append(filters, "price <= "+strconv.Itoa(v))
 		}
 	}
 
-	// Min review filter
-	if minReviewStr != "" {
-		if v, err := strconv.ParseFloat(minReviewStr, 64); err == nil {
+	if minRatingStr != "" {
+		if v, err := strconv.ParseFloat(minRatingStr, 64); err == nil {
 			filters = append(filters, "avg_review >= "+strconv.FormatFloat(v, 'f', -1, 64))
 		}
 	}

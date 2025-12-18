@@ -35,8 +35,6 @@ interface Product {
   price: number;
   ranking: number;
   stocks: number;
-  avg_review?: number;
-  review_count?: number;
 }
 
 interface Category {
@@ -130,6 +128,12 @@ const SearchResultNew: React.FC = () => {
     return JSON.stringify(keyObj);
   };
 
+  const navigateWithPageReset = () => {
+    const params = new URLSearchParams(location.search);
+    params.set('p', '1');
+    navigate(`?${params.toString()}`);
+  };
+
   const buildSearchUrl = (query: string, page: number, f: SearchFilters) => {
     let url = `/api/search?q=${encodeURIComponent(query)}&p=${page}`;
 
@@ -154,7 +158,7 @@ const SearchResultNew: React.FC = () => {
     }
 
     if (f.rating && f.rating > 0) {
-      url += `&min_review=${encodeURIComponent(String(f.rating))}`;
+      url += `&min_rating=${encodeURIComponent(String(f.rating))}`;
     }
 
     return url;
@@ -335,6 +339,7 @@ const SearchResultNew: React.FC = () => {
       ...prev,
       [filterType]: value,
     }));
+    navigateWithPageReset();
   };
 
   const handleCategoryToggle = (categoryId: string) => {
@@ -344,6 +349,7 @@ const SearchResultNew: React.FC = () => {
         ? prev.category.filter(c => c !== categoryId)
         : [...prev.category, categoryId],
     }));
+    navigateWithPageReset();
   };
 
   const handleStatusToggle = (status: string) => {
@@ -353,13 +359,21 @@ const SearchResultNew: React.FC = () => {
         ? prev.status.filter(s => s !== status)
         : [...prev.status, status],
     }));
+    navigateWithPageReset();
+  };
+
+  const handleRatingToggle = (rating: number) => {
+    setFilters(prev => ({
+      ...prev,
+      rating: prev.rating === rating ? 0 : rating,
+    }));
+    navigateWithPageReset();
   };
 
   const renderStars = (rating: number) => {
     const stars = [];
-    const safeRating = Number.isFinite(rating) ? Math.max(0, Math.min(5, rating)) : 0;
-    const fullStars = Math.floor(safeRating);
-    const hasHalfStar = safeRating % 1 !== 0;
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 !== 0;
 
     for (let i = 0; i < fullStars; i++) {
       stars.push(<Star key={i} sx={{ color: '#ffc107', fontSize: '16px' }} />);
@@ -369,7 +383,7 @@ const SearchResultNew: React.FC = () => {
       stars.push(<StarHalf key="half" sx={{ color: '#ffc107', fontSize: '16px' }} />);
     }
 
-    const emptyStars = 5 - Math.ceil(safeRating);
+    const emptyStars = 5 - Math.ceil(rating);
     for (let i = 0; i < emptyStars; i++) {
       stars.push(<StarBorder key={`empty-${i}`} sx={{ color: '#ffc107', fontSize: '16px' }} />);
     }
@@ -436,6 +450,7 @@ const SearchResultNew: React.FC = () => {
                   const max = parseNumberOrEmptyToNull(priceMaxInput);
                   const next = normalizePriceRange(min, max);
                   setFilters(prev => ({ ...prev, priceRange: next }));
+                  navigateWithPageReset();
                 }}
               />
               <TextField
@@ -451,6 +466,7 @@ const SearchResultNew: React.FC = () => {
                   const max = parseNumberOrEmptyToNull(v);
                   const next = normalizePriceRange(min, max);
                   setFilters(prev => ({ ...prev, priceRange: next }));
+                  navigateWithPageReset();
                 }}
               />
             </Box>
@@ -498,7 +514,6 @@ const SearchResultNew: React.FC = () => {
             <Box sx={{ paddingLeft: '20px' }}>
               {[4.5, 4.0, 3.5].map((rating) => {
                 const selected = filters.rating === rating;
-
                 return (
                   <Box
                     key={rating}
@@ -508,16 +523,12 @@ const SearchResultNew: React.FC = () => {
                       gap: '8px',
                       marginBottom: '16px',
                       cursor: 'pointer',
-                      padding: '6px 10px',
-                      borderRadius: '8px',
-                      border: selected ? '1px solid #1976d2' : '1px solid transparent',
+                      borderRadius: '6px',
+                      padding: '6px 8px',
+                      border: selected ? '1px solid rgba(25, 118, 210, 0.65)' : '1px solid transparent',
                       backgroundColor: selected ? 'rgba(25, 118, 210, 0.10)' : 'transparent',
-                      transition: 'background-color 120ms ease, border-color 120ms ease',
-                      '&:hover': {
-                        backgroundColor: selected ? 'rgba(25, 118, 210, 0.14)' : 'rgba(0, 0, 0, 0.04)',
-                      },
                     }}
-                    onClick={() => handleFilterChange('rating', selected ? 0 : rating)}
+                    onClick={() => handleRatingToggle(rating)}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <Star sx={{ color: '#ffc107', fontSize: '16px' }} />
@@ -528,8 +539,6 @@ const SearchResultNew: React.FC = () => {
                   </Box>
                 );
               })}
-
-
             </Box>
           </Box>
 
@@ -746,11 +755,7 @@ const SearchResultNew: React.FC = () => {
                     </Typography>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '8px' }}>
-                      {renderStars(
-                        typeof product.avg_review === 'number'
-                          ? product.avg_review
-                          : (product.ranking ?? 0)
-                      )}
+                      {renderStars(product.ranking || 4.0)}
                     </Box>
 
                     <Typography
