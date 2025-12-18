@@ -36,6 +36,7 @@ interface Product {
   ranking: number;
   stocks: number;
   avg_review?: number;
+  review_count?: number;
 }
 
 interface Category {
@@ -52,7 +53,14 @@ interface SearchFilters {
   freeShipping: boolean;
 }
 
-type SortOrder = 'default' | 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc';
+type SortOrder =
+  | 'default'
+  | 'name_asc'
+  | 'name_desc'
+  | 'price_asc'
+  | 'price_desc'
+  | 'review_desc'
+  | 'review_asc';
 
 const SearchResultNew: React.FC = () => {
   const location = useLocation();
@@ -107,7 +115,15 @@ const SearchResultNew: React.FC = () => {
   };
 
   const parseSortParam = (v: string | null): SortOrder => {
-    if (v === 'name_asc' || v === 'name_desc' || v === 'price_asc' || v === 'price_desc' || v === 'default') {
+    if (
+      v === 'name_asc' ||
+      v === 'name_desc' ||
+      v === 'price_asc' ||
+      v === 'price_desc' ||
+      v === 'review_desc' ||
+      v === 'review_asc' ||
+      v === 'default'
+    ) {
       return v;
     }
     return 'default';
@@ -171,6 +187,21 @@ const SearchResultNew: React.FC = () => {
     copied.sort((a, b) => {
       if (order === 'price_asc') return (a.price ?? 0) - (b.price ?? 0);
       if (order === 'price_desc') return (b.price ?? 0) - (a.price ?? 0);
+
+      if (order === 'review_desc' || order === 'review_asc') {
+        const ar = (a.avg_review ?? a.ranking ?? 0);
+        const br = (b.avg_review ?? b.ranking ?? 0);
+
+        if (ar !== br) {
+          return order === 'review_desc' ? (br - ar) : (ar - br);
+        }
+
+        const ac = (a.review_count ?? 0);
+        const bc = (b.review_count ?? 0);
+        if (ac !== bc) {
+          return order === 'review_desc' ? (bc - ac) : (ac - bc);
+        }
+      }
 
       const nameA = (a.product_name ?? '').toString();
       const nameB = (b.product_name ?? '').toString();
@@ -399,7 +430,9 @@ const SearchResultNew: React.FC = () => {
     if (sortOrder === 'name_asc') return 'Name (A→Z)';
     if (sortOrder === 'name_desc') return 'Name (Z→A)';
     if (sortOrder === 'price_asc') return 'Price (Low→High)';
-    return 'Price (High→Low)';
+    if (sortOrder === 'price_desc') return 'Price (High→Low)';
+    if (sortOrder === 'review_desc') return 'Review (High→Low)';
+    return 'Review (Low→High)';
   }, [sortOrder]);
 
   const applySortToUrl = (next: SortOrder) => {
@@ -703,6 +736,24 @@ const SearchResultNew: React.FC = () => {
                     }}
                   >
                     Price (High→Low)
+                  </MenuItem>
+                  <MenuItem
+                    selected={sortOrder === 'review_desc'}
+                    onClick={() => {
+                      setSortAnchorEl(null);
+                      applySortToUrl('review_desc');
+                    }}
+                  >
+                    Review (High→Low)
+                  </MenuItem>
+                  <MenuItem
+                    selected={sortOrder === 'review_asc'}
+                    onClick={() => {
+                      setSortAnchorEl(null);
+                      applySortToUrl('review_asc');
+                    }}
+                  >
+                    Review (Low→High)
                   </MenuItem>
                 </Menu>
               </Box>
