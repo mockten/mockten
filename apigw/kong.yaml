@@ -154,7 +154,7 @@ services:
         methods:
           - GET
   - name: item-detail
-    url: http://searchitem-service.default.svc.cluster.local:50051/v1/item/detail
+    url: http://product-service.default.svc.cluster.local:50052/v1/item/detail
     routes:
       - name: get-item-detail
         paths:

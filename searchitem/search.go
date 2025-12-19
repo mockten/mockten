@@ -293,67 +293,6 @@ func waitForMySQL(db *sql.DB, logger *zap.Logger) {
 	logger.Fatal("MySQL did not become ready in time.")
 }
 
-func getItemDetailHandler(db *sql.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		productID := c.Query("id")
-
-		if productID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing id parameter"})
-			return
-		}
-
-		query := `
-         SELECT 
-            p.product_id,
-            p.product_name,
-            p.price,
-            c.category_id,
-            c.category_name,
-            p.summary,
-            p.regist_day,
-            p.last_update,
-            t.stocks,
-            ue.USERNAME AS seller_name,
-            p.avg_review,
-            p.review_count
-         FROM Product p
-         JOIN Category c ON p.category_id = c.category_id
-         JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
-         JOIN USER_GROUP_MEMBERSHIP ugm ON ue.ID = ugm.USER_ID
-         JOIN KEYCLOAK_GROUP kg ON ugm.GROUP_ID = kg.ID
-         JOIN Stock t ON p.product_id = t.product_id
-         WHERE p.product_id = ? AND kg.NAME = 'Seller'
-      `
-		var detail ProductDetail
-		err := db.QueryRow(query, productID).Scan(
-			&detail.ProductID,
-			&detail.ProductName,
-			&detail.Price,
-			&detail.CategoryID,
-			&detail.CategoryName,
-			&detail.Summary,
-			&detail.RegistDay,
-			&detail.LastUpdate,
-			&detail.Stocks,
-			&detail.SellerName,
-			&detail.AvgReview,
-			&detail.ReviewCount,
-		)
-
-		if err != nil {
-			if err == sql.ErrNoRows {
-				c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
-			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-			}
-			return
-		}
-
-		responseJson := ConvertToResponse(&detail)
-		c.JSON(http.StatusOK, responseJson)
-	}
-}
-
 func main() {
 	var err error
 
@@ -399,7 +338,6 @@ func main() {
 	router := gin.Default()
 	router.GET("v1/search", searchHandler)
 	router.GET("v1/categories", getCategoryListHandler(db))
-	router.GET("v1/item/detail", getItemDetailHandler(db))
 
 	router.Run(port)
 }
