@@ -242,7 +242,7 @@ const ItemReview: React.FC = () => {
                   fullWidth
                   value={reviewComment}
                   onChange={(e) => setReviewComment(e.target.value)}
-                  placeholder="レビューを入力してください..."
+                  placeholder="Enter your review here..."
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       fontFamily: 'Noto Sans',
@@ -290,7 +290,7 @@ const ItemReview: React.FC = () => {
                     },
                   }}
                 >
-                  レビューする
+                  Review Submit
                 </Button>
               </Box>
             </Box>
