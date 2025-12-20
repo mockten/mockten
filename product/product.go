@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -513,37 +514,16 @@ func fetchUserDisplayName(tx *sql.Tx, userID string) (string, error) {
 	return name, nil
 }
 
-func recalcAndUpdateProductRating(tx *sql.Tx, productID string) (float64, int, error) {
-	q := `
-SELECT
-  COALESCE(ROUND(AVG(rating), 1), 0.0) AS avg_review,
-  COALESCE(COUNT(*), 0) AS review_count
-FROM Review
-WHERE product_id = ?
-  AND status = 'active'
-`
-	var avg float64
-	var cnt int
-	if err := tx.QueryRow(q, productID).Scan(&avg, &cnt); err != nil {
-		return 0.0, 0, err
-	}
-
-	upd := `UPDATE Product SET avg_review = ?, review_count = ? WHERE product_id = ?`
-	if _, err := tx.Exec(upd, avg, cnt, productID); err != nil {
-		return 0.0, 0, err
-	}
-
-	return avg, cnt, nil
-}
-
-func upsertReview(tx *sql.Tx, reviewID string, productID string, userID string, rating int, comment string) (string, time.Time, error) {
+func upsertReview(tx *sql.Tx, reviewID string, productID string, userID string, rating int, comment string) (string, time.Time, int, bool, bool, error) {
 	var existingID string
 	var createdAt time.Time
+	var prevRating int
+	var prevStatus string
 
-	sel := `SELECT review_id, created_at FROM Review WHERE product_id = ? AND user_id = ? LIMIT 1`
-	err := tx.QueryRow(sel, productID, userID).Scan(&existingID, &createdAt)
+	sel := `SELECT review_id, created_at, rating, status FROM Review WHERE product_id = ? AND user_id = ? LIMIT 1 FOR UPDATE`
+	err := tx.QueryRow(sel, productID, userID).Scan(&existingID, &createdAt, &prevRating, &prevStatus)
 	if err != nil && err != sql.ErrNoRows {
-		return "", time.Time{}, err
+		return "", time.Time{}, 0, false, false, err
 	}
 
 	if err == sql.ErrNoRows {
@@ -553,13 +533,13 @@ VALUES (?, ?, ?, ?, ?, 'active')
 `
 		_, err := tx.Exec(ins, reviewID, productID, userID, rating, comment)
 		if err != nil {
-			return "", time.Time{}, err
+			return "", time.Time{}, 0, false, false, err
 		}
 		sel2 := `SELECT created_at FROM Review WHERE review_id = ? LIMIT 1`
 		if err := tx.QueryRow(sel2, reviewID).Scan(&createdAt); err != nil {
-			return "", time.Time{}, err
+			return "", time.Time{}, 0, false, false, err
 		}
-		return reviewID, createdAt, nil
+		return reviewID, createdAt, 0, false, true, nil
 	}
 
 	upd := `
@@ -569,9 +549,47 @@ WHERE review_id = ?
 `
 	_, err = tx.Exec(upd, rating, comment, existingID)
 	if err != nil {
-		return "", time.Time{}, err
+		return "", time.Time{}, 0, false, false, err
 	}
-	return existingID, createdAt, nil
+
+	wasActive := strings.EqualFold(strings.TrimSpace(prevStatus), "active")
+	return existingID, createdAt, prevRating, wasActive, false, nil
+}
+
+func updateProductRatingIncremental(tx *sql.Tx, productID string, newRating int, prevRating int, wasActive bool, isNew bool) (float64, int, error) {
+	var oldAvg float64
+	var oldCnt int
+
+	sel := `SELECT CAST(avg_review AS DECIMAL(10,4)) + 0.0, review_count FROM Product WHERE product_id = ? LIMIT 1 FOR UPDATE`
+	if err := tx.QueryRow(sel, productID).Scan(&oldAvg, &oldCnt); err != nil {
+		return 0.0, 0, err
+	}
+
+	var newAvg float64
+	var newCnt int
+
+	if isNew || !wasActive {
+		newCnt = oldCnt + 1
+		if newCnt <= 0 {
+			newCnt = 1
+		}
+		newAvg = (oldAvg*float64(oldCnt) + float64(newRating)) / float64(newCnt)
+	} else {
+		newCnt = oldCnt
+		if newCnt <= 0 {
+			newCnt = 1
+		}
+		newAvg = (oldAvg*float64(oldCnt) - float64(prevRating) + float64(newRating)) / float64(newCnt)
+	}
+
+	newAvg = math.Round(newAvg*10.0) / 10.0
+
+	upd := `UPDATE Product SET avg_review = ?, review_count = ? WHERE product_id = ?`
+	if _, err := tx.Exec(upd, newAvg, newCnt, productID); err != nil {
+		return 0.0, 0, err
+	}
+
+	return newAvg, newCnt, nil
 }
 
 func postItemReviewHandler(db *sql.DB) gin.HandlerFunc {
@@ -624,16 +642,16 @@ func postItemReviewHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		newReviewID := uuid.NewString()
-		reviewID, createdAt, err := upsertReview(tx, newReviewID, req.ProductID, userID, req.Rating, req.Comment)
+		reviewID, createdAt, prevRating, wasActive, isNew, err := upsertReview(tx, newReviewID, req.ProductID, userID, req.Rating, req.Comment)
 		if err != nil {
 			logger.Error("DB upsert failed (review)", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 			return
 		}
 
-		avg, cnt, err := recalcAndUpdateProductRating(tx, req.ProductID)
+		avg, cnt, err := updateProductRatingIncremental(tx, req.ProductID, req.Rating, prevRating, wasActive, isNew)
 		if err != nil {
-			logger.Error("DB update failed (product rating)", zap.Error(err))
+			logger.Error("DB update failed (product rating incremental)", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 			return
 		}

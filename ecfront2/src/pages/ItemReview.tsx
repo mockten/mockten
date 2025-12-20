@@ -596,7 +596,7 @@ const ItemReview: React.FC = () => {
                     },
                   }}
                 >
-                  Review Submit
+                  Submit
                 </Button>
               </Box>
             </Box>
