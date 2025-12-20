@@ -56,7 +56,7 @@ interface Product {
   specifications: {
     area: string;
     vendor: string;
-    weight: string;
+    condition: string;
     content: string;
   };
   vendorDescription: string;
@@ -775,56 +775,82 @@ const ItemDetailNew: React.FC = () => {
           </Typography>
         </Box>
 
-        {hasReviews ? (
-          <Box sx={{ marginTop: '48px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontWeight: 'bold',
-                fontSize: '20px',
-                color: 'black',
-                borderLeft: '5px solid black',
-                paddingLeft: '20px',
-                paddingY: '8px',
-                marginBottom: '24px',
-              }}
-            >
-              Customer Review
-            </Typography>
+        {/* Customer Review (always visible) */}
+        <Box sx={{ marginTop: '48px' }}>
+          <Typography
+            sx={{
+              fontFamily: 'Noto Sans',
+              fontWeight: 'bold',
+              fontSize: '20px',
+              color: 'black',
+              borderLeft: '5px solid black',
+              paddingLeft: '20px',
+              paddingY: '8px',
+              marginBottom: '24px',
+            }}
+          >
+            Customer Review
+          </Typography>
 
-            <Grid container spacing={4}>
-              {product.reviews.map((review) => (
-                <Grid item xs={12} md={6} key={review.id}>
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                    <Avatar sx={{ width: '40px', height: '40px', backgroundColor: '#f5f5f5' }}>
-                      <img src={photoSvg} alt="User" style={{ width: '22px', height: '22px' }} />
-                    </Avatar>
-                    <Box sx={{ flex: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', fontWeight: 'bold' }}>
-                          {review.rating}
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                          {renderStarsSmall(review.rating)}
+          {hasReviews ? (
+            <>
+              <Grid container spacing={4}>
+                {product.reviews.map((review) => (
+                  <Grid item xs={12} md={6} key={review.id}>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                      <Avatar sx={{ width: '40px', height: '40px', backgroundColor: '#f5f5f5' }}>
+                        <img src={photoSvg} alt="User" style={{ width: '22px', height: '22px' }} />
+                      </Avatar>
+                      <Box sx={{ flex: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                          <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', fontWeight: 'bold' }}>
+                            {review.rating}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                            {renderStarsSmall(review.rating)}
+                          </Box>
                         </Box>
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', marginBottom: '8px' }}>
+                          {review.userName}
+                        </Typography>
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', lineHeight: 1.8, textAlign: 'left' }}>
+                          {review.comment}
+                        </Typography>
                       </Box>
-                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', marginBottom: '8px' }}>
-                        {review.userName}
-                      </Typography>
-                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', lineHeight: 1.8, textAlign: 'left' }}>
-                        {review.comment}
-                      </Typography>
                     </Box>
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
+                  </Grid>
+                ))}
+              </Grid>
 
-            {product.reviewCount > 0 ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center', marginTop: '24px' }}>
+                {product.reviewCount > 0 ? (
+                  <Button
+                    variant="outlined"
+                    onClick={openAllReviews}
+                    sx={{
+                      border: '1px solid #cccccc',
+                      borderRadius: '4px',
+                      padding: '16px',
+                      fontFamily: 'Noto Sans',
+                      fontWeight: 'bold',
+                      fontSize: '16px',
+                      color: 'black',
+                      textTransform: 'none',
+                      width: '400px',
+                      backgroundColor: 'white',
+                      '&:hover': {
+                        borderColor: '#5856D6',
+                        color: '#5856D6',
+                      },
+                    }}
+                  >
+                    See all reviews
+                  </Button>
+                ) : null}
+
                 <Button
                   variant="outlined"
-                  onClick={openAllReviews}
+                  onClick={() => navigate(`/item/${encodeURIComponent(product.product_id)}/review`)}
                   sx={{
                     border: '1px solid #cccccc',
                     borderRadius: '4px',
@@ -842,34 +868,41 @@ const ItemDetailNew: React.FC = () => {
                     },
                   }}
                 >
-                  See all reviews
+                  Write review
                 </Button>
-              <Button
-              variant="outlined"
-              onClick={() => navigate(`/item/${encodeURIComponent(product.product_id)}/review`)}
-              sx={{
-                border: '1px solid #cccccc',
-                borderRadius: '4px',
-                padding: '16px',
-                fontFamily: 'Noto Sans',
-                fontWeight: 'bold',
-                fontSize: '16px',
-                color: 'black',
-                textTransform: 'none',
-                width: '400px',
-                backgroundColor: 'white',
-                '&:hover': {
-                  borderColor: '#5856D6',
-                  color: '#5856D6',
-                },
-              }}
-            >
-              Write review
-            </Button>
               </Box>
-            ) : null}
-          </Box>
-        ) : null}
+            </>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+              <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: '#666666' }}>
+                No reviews yet
+              </Typography>
+
+              <Button
+                variant="outlined"
+                onClick={() => navigate(`/item/${encodeURIComponent(product.product_id)}/review`)}
+                sx={{
+                  border: '1px solid #cccccc',
+                  borderRadius: '4px',
+                  padding: '16px',
+                  fontFamily: 'Noto Sans',
+                  fontWeight: 'bold',
+                  fontSize: '16px',
+                  color: 'black',
+                  textTransform: 'none',
+                  width: '400px',
+                  backgroundColor: 'white',
+                  '&:hover': {
+                    borderColor: '#5856D6',
+                    color: '#5856D6',
+                  },
+                }}
+              >
+                Write review
+              </Button>
+            </Box>
+          )}
+        </Box>
 
         <Box sx={{ marginTop: '48px' }}>
           <Typography
