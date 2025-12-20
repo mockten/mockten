@@ -55,6 +55,31 @@ type ProductData = {
   description: string;
 };
 
+type CreateReviewRequest = {
+  productId: string;
+  rating: number;
+  comment: string;
+};
+
+const ACCESS_TOKEN_STORAGE_KEYS = [
+  'access_token',
+  'kc_access_token',
+  'keycloak_access_token',
+  'mockten_access_token',
+];
+
+const getAccessTokenFromStorage = (): string => {
+  for (const k of ACCESS_TOKEN_STORAGE_KEYS) {
+    const v = localStorage.getItem(k);
+    if (v && v.trim().length > 0) return v.trim();
+  }
+  for (const k of ACCESS_TOKEN_STORAGE_KEYS) {
+    const v = sessionStorage.getItem(k);
+    if (v && v.trim().length > 0) return v.trim();
+  }
+  return '';
+};
+
 const parseS3ListXmlKeys = (xmlText: string): string[] => {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlText, 'application/xml');
@@ -108,6 +133,10 @@ const ItemReview: React.FC = () => {
   const [images, setImages] = useState<string[]>([]);
   const [selectedImage, setSelectedImage] = useState(0);
   const [imgErrorMap, setImgErrorMap] = useState<Record<string, boolean>>({});
+
+  const [submitError, setSubmitError] = useState<string>('');
+  const [submitOk, setSubmitOk] = useState<string>('');
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
   const productIdForFetch = useMemo(() => id || '', [id]);
   const productIdForImages = useMemo(() => productData?.id || id || '', [productData?.id, id]);
@@ -188,8 +217,53 @@ const ItemReview: React.FC = () => {
     setRating(value);
   };
 
-  const handleSubmitReview = () => {
-    console.log('Submitting review:', { rating, reviewComment, productId: productData?.id });
+  const handleSubmitReview = async () => {
+    setSubmitError('');
+    setSubmitOk('');
+
+    const productId = productData?.id || '';
+    if (!productId) {
+      setSubmitError('Missing product id.');
+      return;
+    }
+
+    const token = getAccessTokenFromStorage();
+    if (!token) {
+      setSubmitError('Missing access token. Please login again.');
+      return;
+    }
+
+    const payload: CreateReviewRequest = {
+      productId,
+      rating,
+      comment: reviewComment.trim(),
+    };
+
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/review', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const t = await res.text().catch(() => '');
+        setSubmitError(`Failed to submit review. status=${res.status}${t ? ` body=${t}` : ''}`);
+        return;
+      }
+
+      setSubmitOk('Review submitted.');
+      setRating(0);
+      setReviewComment('');
+    } catch {
+      setSubmitError('Failed to submit review.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const renderStars = (currentRating: number) => {
@@ -447,11 +521,22 @@ const ItemReview: React.FC = () => {
                 />
               </Box>
 
+              {submitError && (
+                <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: '#d32f2f' }}>
+                  {submitError}
+                </Typography>
+              )}
+              {submitOk && (
+                <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: '#2e7d32' }}>
+                  {submitOk}
+                </Typography>
+              )}
+
               <Box sx={{ display: 'flex', justifyContent: 'center', marginTop: '16px', width: '960px' }}>
                 <Button
                   variant="contained"
                   onClick={handleSubmitReview}
-                  disabled={rating === 0 || reviewComment.trim() === ''}
+                  disabled={submitting || rating === 0 || reviewComment.trim() === ''}
                   sx={{
                     backgroundColor: '#5856D6',
                     color: 'white',
