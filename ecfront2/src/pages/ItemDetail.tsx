@@ -55,9 +55,7 @@ interface Product {
   description: string;
   specifications: {
     area: string;
-    size: string;
     vendor: string;
-    material: string;
     weight: string;
     content: string;
   };
@@ -208,10 +206,8 @@ const mapApiToProduct = (api: ApiItemDetailResponse, fallbackId: string): Produc
     description: api.summary || '',
     specifications: {
       area: countryLabel(api.geo?.countryCode || ''),
-      size: 'Approximately 45cm ✕ 100cm',
       vendor: vendorName || 'N/A',
-      material: api.productCondition || 'new',
-      weight: '5.3kg',
+      condition: api.productCondition || 'new',
       content: '1',
     },
     vendorDescription: vendorDesc,
@@ -573,9 +569,6 @@ const ItemDetailNew: React.FC = () => {
                   <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black' }}>$</Typography>
                   <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '22px', color: 'black' }}>
                     {product.price.toLocaleString()}
-                  </Typography>
-                  <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black' }}>
-                    Free shipping
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
