@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Box,
   Container,
   Typography,
+  TextField,
+  Button,
+  IconButton,
 } from '@mui/material';
 import {
   Star,
@@ -17,6 +20,8 @@ import photoSvg from '../assets/photo.svg';
 
 const ItemReview: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const [rating, setRating] = useState<number>(0);
+  const [reviewComment, setReviewComment] = useState<string>('');
 
   // Mock data - replace with actual API calls
   const productData = {
@@ -24,28 +29,54 @@ const ItemReview: React.FC = () => {
     category: 'Category Name',
     name: 'Sample Product Name',
     description: 'Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. ',
-    rating: 4.5,
-    reviewComment: 'Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, Sample Text, ',
   };
 
-  const renderStars = (rating: number) => {
+  const handleStarClick = (value: number) => {
+    setRating(value);
+  };
+
+  const handleSubmitReview = () => {
+    // TODO: Implement API call to submit review
+    console.log('Submitting review:', { rating, reviewComment, productId: productData.id });
+    // You can add navigation or success message here
+  };
+
+  const renderStars = (currentRating: number) => {
     const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(<Star key={i} sx={{ color: '#f1bd02', fontSize: '24px' }} />);
+    for (let i = 1; i <= 5; i++) {
+      const starValue = i;
+      if (starValue <= currentRating) {
+        stars.push(
+          <IconButton
+            key={i}
+            onClick={() => handleStarClick(starValue)}
+            sx={{ padding: 0 }}
+          >
+            <Star sx={{ color: '#f1bd02', fontSize: '24px' }} />
+          </IconButton>
+        );
+      } else if (starValue - 0.5 <= currentRating) {
+        stars.push(
+          <IconButton
+            key={i}
+            onClick={() => handleStarClick(starValue)}
+            sx={{ padding: 0 }}
+          >
+            <StarHalf sx={{ color: '#f1bd02', fontSize: '24px' }} />
+          </IconButton>
+        );
+      } else {
+        stars.push(
+          <IconButton
+            key={i}
+            onClick={() => handleStarClick(starValue)}
+            sx={{ padding: 0 }}
+          >
+            <StarBorder sx={{ color: '#f1bd02', fontSize: '24px' }} />
+          </IconButton>
+        );
+      }
     }
-
-    if (hasHalfStar) {
-      stars.push(<StarHalf key="half" sx={{ color: '#f1bd02', fontSize: '24px' }} />);
-    }
-
-    const emptyStars = 5 - Math.ceil(rating);
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push(<StarBorder key={`empty-${i}`} sx={{ color: '#f1bd02', fontSize: '24px' }} />);
-    }
-
     return stars;
   };
 
@@ -178,7 +209,7 @@ const ItemReview: React.FC = () => {
 
               {/* Stars */}
               <Box sx={{ display: 'flex', gap: '3.364px', alignItems: 'center' }}>
-                {renderStars(productData.rating)}
+                {renderStars(rating)}
               </Box>
 
               {/* Review Comment Section */}
@@ -205,26 +236,62 @@ const ItemReview: React.FC = () => {
 
               {/* Review Comment Text */}
               <Box sx={{ padding: '8px 10px', width: '635px' }}>
-                <Box
+                <TextField
+                  multiline
+                  rows={6}
+                  fullWidth
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="レビューを入力してください..."
                   sx={{
-                    border: '1px solid #ccc',
-                    borderRadius: '2px',
-                    padding: '16px 8px',
-                    width: '625px',
-                  }}
-                >
-                  <Typography
-                    sx={{
+                    '& .MuiOutlinedInput-root': {
                       fontFamily: 'Noto Sans',
                       fontSize: '16px',
                       color: 'black',
-                      lineHeight: 1.5,
-                      width: '601px',
-                    }}
-                  >
-                    {productData.reviewComment}
-                  </Typography>
-                </Box>
+                      '& fieldset': {
+                        borderColor: '#ccc',
+                        borderRadius: '2px',
+                      },
+                      '&:hover fieldset': {
+                        borderColor: '#ccc',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#5856D6',
+                      },
+                    },
+                    '& .MuiInputBase-input': {
+                      padding: '16px 8px',
+                    },
+                  }}
+                />
+              </Box>
+
+              {/* Submit Button */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', marginTop: '16px', width: '960px' }}>
+                <Button
+                  variant="contained"
+                  onClick={handleSubmitReview}
+                  disabled={rating === 0 || reviewComment.trim() === ''}
+                  sx={{
+                    backgroundColor: '#5856D6',
+                    color: 'white',
+                    padding: '16px 32px',
+                    borderRadius: '4px',
+                    fontFamily: 'Noto Sans',
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                    textTransform: 'none',
+                    '&:hover': {
+                      backgroundColor: '#4846C6',
+                    },
+                    '&:disabled': {
+                      backgroundColor: '#cccccc',
+                      color: '#999999',
+                    },
+                  }}
+                >
+                  レビューする
+                </Button>
               </Box>
             </Box>
 
