@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -124,6 +124,7 @@ const sortObjectKeys = (keys: string[]): string[] => {
 };
 
 const ItemReview: React.FC = () => {
+  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [rating, setRating] = useState<number>(0);
   const [reviewComment, setReviewComment] = useState<string>('');
@@ -363,11 +364,50 @@ const ItemReview: React.FC = () => {
                   color: '#8c8c8c',
                   lineHeight: 1.5,
                   width: '335px',
+                  display: 'flex',
+                  gap: '6px',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
                 }}
               >
-                Home &gt; {productData.name} &gt; Review
-              </Typography>
+                <Box
+                  component="span"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate('/')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') navigate('/');
+                  }}
+                  sx={{
+                    cursor: 'pointer',
+                    '&:hover': { textDecoration: 'underline' },
+                  }}
+                >
+                  Home
+                </Box>
 
+                <Box component="span">&gt;</Box>
+
+                <Box
+                  component="span"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/item/${encodeURIComponent(productData.id)}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') navigate(`/item/${encodeURIComponent(productData.id)}`);
+                  }}
+                  sx={{
+                    cursor: 'pointer',
+                    '&:hover': { textDecoration: 'underline' },
+                  }}
+                >
+                  {productData.name}
+                </Box>
+
+                <Box component="span">&gt;</Box>
+
+                <Box component="span">Review</Box>
+              </Typography>
               <Box sx={{ display: 'flex', gap: '10px', height: '233px' }}>
                 <Box sx={{ width: '645px', display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px' }}>
                   <Typography

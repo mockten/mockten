@@ -470,15 +470,39 @@ const ItemDetailNew: React.FC = () => {
 
       <Container maxWidth="lg" sx={{ padding: '24px 16px' }}>
         <Typography
+        sx={{
+          fontFamily: 'Noto Sans',
+          fontSize: '14px',
+          color: '#8c8c8c',
+          marginBottom: '16px',
+        }}
+        >
+        <Box
+          component="span"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            navigate('/');
+          }}
           sx={{
-            fontFamily: 'Noto Sans',
-            fontSize: '14px',
-            color: '#8c8c8c',
-            marginBottom: '16px',
+            cursor: 'pointer',
+            '&:hover': { textDecoration: 'underline' },
+          }}
+          role="link"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              navigate('/');
+            }
           }}
         >
-          Home &gt; {product.name}
+          Home
+        </Box>
+        {' > '}
+        {product.name}
         </Typography>
+
 
         <Grid container spacing={4}>
           <Grid item xs={12} md={8}>
