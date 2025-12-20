@@ -18,6 +18,12 @@ import {
   MenuItem,
   FormControl,
   Avatar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  CircularProgress,
+  Pagination,
 } from '@mui/material';
 import {
   Star,
@@ -29,10 +35,10 @@ import {
 } from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
-import photoSvg from "../assets/photo.svg";
+import photoSvg from '../assets/photo.svg';
 
 interface Review {
-  id: number;
+  id: string;
   userName: string;
   rating: number;
   comment: string;
@@ -45,6 +51,7 @@ interface Product {
   category: string;
   price: number;
   rating: number;
+  reviewCount: number;
   description: string;
   specifications: {
     area: string;
@@ -54,7 +61,56 @@ interface Product {
     weight: string;
     content: string;
   };
+  vendorDescription: string;
   reviews: Review[];
+}
+
+interface ApiReview {
+  reviewId: string;
+  userId: string;
+  userName?: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
+interface ApiItemDetailResponse {
+  productId: string;
+  productName: string;
+  sellerName: string;
+  price: number;
+  categoryName: string;
+  productCondition: string;
+  inStock: boolean;
+  stocks: number;
+  summary: string;
+  geo: {
+    geoId: string;
+    countryCode: string;
+    postalCode: string;
+    prefecture: string;
+    city: string;
+    town: string;
+    buildingName: string;
+    roomNumber: string;
+    latitude: number | null;
+    longitude: number | null;
+  };
+  registDay: string;
+  lastUpdate: string;
+  avgReview?: number;
+  reviewCount?: number;
+  vendorUserName?: string;
+  vendorDescription?: string;
+  reviews?: ApiReview[];
+}
+
+interface ApiItemReviewsResponse {
+  productId: string;
+  total: number;
+  limit: number;
+  offset: number;
+  reviews: ApiReview[];
 }
 
 const parseS3ListXmlKeys = (xmlText: string): string[] => {
@@ -92,20 +148,75 @@ const sortObjectKeys = (keys: string[]): string[] => {
     const na = getNumericPrefix(fa);
     const nb = getNumericPrefix(fb);
 
-    if (na !== null && nb !== null) {
-      return na - nb;
-    }
-
-    if (na !== null && nb === null) {
-      return -1;
-    }
-
-    if (na === null && nb !== null) {
-      return 1;
-    }
-
+    if (na !== null && nb !== null) return na - nb;
+    if (na !== null && nb === null) return -1;
+    if (na === null && nb !== null) return 1;
     return fa.localeCompare(fb);
   });
+};
+
+const countryLabel = (code: string): string => {
+  const c = (code || '').toUpperCase();
+  if (c === 'JP') return 'Japan';
+  if (c === 'SG') return 'Singapore';
+  if (c.length > 0) return c;
+  return 'N/A';
+};
+
+const safeUserName = (s?: string): string => {
+  const t = (s || '').trim();
+  return t.length > 0 ? t : 'Anonymous';
+};
+
+const mapApiReviewsToUi = (apiReviews: ApiReview[] | undefined): Review[] => {
+  if (!apiReviews || apiReviews.length === 0) return [];
+  return apiReviews.map((r) => ({
+    id: r.reviewId,
+    userName: safeUserName(r.userName),
+    rating: typeof r.rating === 'number' ? r.rating : 0,
+    comment: r.comment || '',
+    date: r.createdAt || '',
+  }));
+};
+
+const mapApiToProduct = (api: ApiItemDetailResponse, fallbackId: string): Product => {
+  const rating = typeof api.avgReview === 'number' ? api.avgReview : 0.0;
+
+  const vendorName =
+    (api.vendorUserName && api.vendorUserName.trim().length > 0)
+      ? api.vendorUserName
+      : (api.sellerName || '');
+
+  const vendorDesc =
+    (api.vendorDescription && api.vendorDescription.trim().length > 0)
+      ? api.vendorDescription
+      : 'Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text.';
+
+  const reviews = mapApiReviewsToUi(api.reviews);
+  const reviewCount =
+    typeof api.reviewCount === 'number'
+      ? api.reviewCount
+      : reviews.length;
+
+  return {
+    product_id: api.productId || fallbackId,
+    name: api.productName || 'Sample Product Name',
+    category: api.categoryName || 'Category Name',
+    price: typeof api.price === 'number' ? api.price : 0,
+    rating,
+    reviewCount,
+    description: api.summary || '',
+    specifications: {
+      area: countryLabel(api.geo?.countryCode || ''),
+      size: 'Approximately 45cm ✕ 100cm',
+      vendor: vendorName || 'N/A',
+      material: api.productCondition || 'new',
+      weight: '5.3kg',
+      content: '1',
+    },
+    vendorDescription: vendorDesc,
+    reviews,
+  };
 };
 
 const ItemDetailNew: React.FC = () => {
@@ -117,53 +228,47 @@ const ItemDetailNew: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState(0);
   const [images, setImages] = useState<string[]>([]);
   const [imgErrorMap, setImgErrorMap] = useState<Record<string, boolean>>({});
+  const [loadError, setLoadError] = useState<string>('');
+
+  const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState('');
+  const [allReviews, setAllReviews] = useState<Review[]>([]);
+  const [reviewsTotal, setReviewsTotal] = useState(0);
+  const [reviewsPage, setReviewsPage] = useState(1);
+
+  const reviewsPageSize = 20;
 
   const productIdForImages = useMemo(() => {
     if (product?.product_id) return product.product_id;
     return id || '';
   }, [product?.product_id, id]);
 
-  const mockProduct: Product = useMemo(() => {
-    return {
-      product_id: id || 'unknown-product',
-      name: 'Sample Product Name',
-      category: 'Category Name',
-      price: 3880,
-      rating: 4.5,
-      description:
-        'Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text.',
-      specifications: {
-        area: 'Japan',
-        size: 'Approximately 45cm ✕ 100cm',
-        vendor: '◯◯◯Co, Ltd.',
-        material: 'wooden',
-        weight: '5.3kg',
-        content: '1',
-      },
-      reviews: [
-        {
-          id: 1,
-          userName: 'Anonymous',
-          rating: 4.5,
-          comment:
-            'Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text.',
-          date: '2024-01-01',
-        },
-        {
-          id: 2,
-          userName: 'Anonymous',
-          rating: 4.5,
-          comment:
-            'Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text. Sample text.',
-          date: '2024-01-02',
-        },
-      ],
-    };
-  }, [id]);
-
   useEffect(() => {
-    setProduct(mockProduct);
-  }, [mockProduct]);
+    const run = async () => {
+      setLoadError('');
+      setProduct(null);
+
+      if (!id) {
+        setLoadError('Missing product id.');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/item/detail/${encodeURIComponent(id)}`, { method: 'GET' });
+        if (!res.ok) {
+          setLoadError(`Failed to load product detail. status=${res.status}`);
+          return;
+        }
+        const api = (await res.json()) as ApiItemDetailResponse;
+        setProduct(mapApiToProduct(api, id));
+      } catch {
+        setLoadError('Failed to load product detail.');
+      }
+    };
+
+    run();
+  }, [id]);
 
   useEffect(() => {
     const run = async () => {
@@ -259,8 +364,106 @@ const ItemDetailNew: React.FC = () => {
     { id: 4, name: 'Sample Product', description: 'Sample Text. Sample TextSample TextSample TextSample TextSample Text', rating: 4.5 },
   ];
 
+  const hasReviews = useMemo(() => {
+    if (!product) return false;
+    if (product.reviewCount > 0) return true;
+    return product.reviews.length > 0;
+  }, [product]);
+
+  const openAllReviews = async () => {
+    if (!product?.product_id) return;
+
+    setReviewsOpen(true);
+    setReviewsError('');
+    setReviewsLoading(true);
+    setAllReviews([]);
+    setReviewsTotal(0);
+    setReviewsPage(1);
+
+    try {
+      const offset = 0;
+      const url = `/api/item/reviews/${encodeURIComponent(product.product_id)}?limit=${reviewsPageSize}&offset=${offset}`;
+      const res = await fetch(url, { method: 'GET' });
+      if (!res.ok) {
+        setReviewsError(`Failed to load reviews. status=${res.status}`);
+        setReviewsLoading(false);
+        return;
+      }
+      const data = (await res.json()) as ApiItemReviewsResponse;
+      setAllReviews(mapApiReviewsToUi(data.reviews));
+      setReviewsTotal(typeof data.total === 'number' ? data.total : 0);
+    } catch {
+      setReviewsError('Failed to load reviews.');
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  const closeAllReviews = () => {
+    setReviewsOpen(false);
+    setReviewsLoading(false);
+    setReviewsError('');
+    setAllReviews([]);
+    setReviewsTotal(0);
+    setReviewsPage(1);
+  };
+
+  const totalReviewPages = useMemo(() => {
+    if (!reviewsTotal) return 1;
+    return Math.max(1, Math.ceil(reviewsTotal / reviewsPageSize));
+  }, [reviewsTotal]);
+
+  const onChangeReviewsPage = async (_: React.ChangeEvent<unknown>, value: number) => {
+    if (!product?.product_id) return;
+    setReviewsPage(value);
+    setReviewsError('');
+    setReviewsLoading(true);
+
+    try {
+      const offset = (value - 1) * reviewsPageSize;
+      const url = `/api/item/reviews/${encodeURIComponent(product.product_id)}?limit=${reviewsPageSize}&offset=${offset}`;
+      const res = await fetch(url, { method: 'GET' });
+      if (!res.ok) {
+        setReviewsError(`Failed to load reviews. status=${res.status}`);
+        setReviewsLoading(false);
+        return;
+      }
+      const data = (await res.json()) as ApiItemReviewsResponse;
+      setAllReviews(mapApiReviewsToUi(data.reviews));
+      setReviewsTotal(typeof data.total === 'number' ? data.total : 0);
+    } catch {
+      setReviewsError('Failed to load reviews.');
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  if (loadError) {
+    return (
+      <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
+        <Appbar />
+        <Container maxWidth="lg" sx={{ padding: '24px 16px' }}>
+          <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black' }}>
+            {loadError}
+          </Typography>
+        </Container>
+        <Footer footerLinks={['About us', 'CAREERS', 'user guide', 'Careers', 'IR', 'CONTACT US']} />
+      </Box>
+    );
+  }
+
   if (!product) {
-    return <div>Loading...</div>;
+    return (
+      <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
+        <Appbar />
+        <Container maxWidth="lg" sx={{ padding: '24px 16px' }}>
+          <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black' }}>
+            Loading...
+          </Typography>
+        </Container>
+        <Footer footerLinks={['About us', 'CAREERS', 'user guide', 'Careers', 'IR', 'CONTACT US']} />
+      </Box>
+    );
   }
 
   const currentMain = images[selectedImage] || images[0] || photoSvg;
@@ -478,6 +681,7 @@ const ItemDetailNew: React.FC = () => {
                     fontSize: '16px',
                     color: 'black',
                     lineHeight: 1.8,
+                    textAlign: 'left',
                   }}
                 >
                   {product.description}
@@ -529,6 +733,7 @@ const ItemDetailNew: React.FC = () => {
               color: 'black',
               lineHeight: 1.8,
               marginBottom: '16px',
+              textAlign: 'left',
             }}
           >
             {product.description}
@@ -549,9 +754,10 @@ const ItemDetailNew: React.FC = () => {
               color: 'black',
               lineHeight: 1.8,
               marginBottom: '16px',
+              textAlign: 'left',
             }}
           >
-            Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text.
+            {product.vendorDescription}
           </Typography>
         </Box>
 
@@ -569,78 +775,84 @@ const ItemDetailNew: React.FC = () => {
               color: 'black',
               lineHeight: 1.8,
               marginBottom: '16px',
+              textAlign: 'left',
             }}
           >
             Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text.
           </Typography>
         </Box>
 
-        <Box sx={{ marginTop: '48px' }}>
-          <Typography
-            sx={{
-              fontFamily: 'Noto Sans',
-              fontWeight: 'bold',
-              fontSize: '20px',
-              color: 'black',
-              borderLeft: '5px solid black',
-              paddingLeft: '20px',
-              paddingY: '8px',
-              marginBottom: '24px',
-            }}
-          >
-            Customer Review
-          </Typography>
-
-          <Grid container spacing={4}>
-            {product.reviews.map((review) => (
-              <Grid item xs={12} md={6} key={review.id}>
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                  <Avatar sx={{ width: '40px', height: '40px', backgroundColor: '#f5f5f5' }}>
-                    <img src={photoSvg} alt="User" style={{ width: '22px', height: '22px' }} />
-                  </Avatar>
-                  <Box sx={{ flex: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', fontWeight: 'bold' }}>
-                        {review.rating}
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                        {renderStarsSmall(review.rating)}
-                      </Box>
-                    </Box>
-                    <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', marginBottom: '8px' }}>
-                      {review.userName}
-                    </Typography>
-                    <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', lineHeight: 1.8 }}>
-                      {review.comment}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Grid>
-            ))}
-          </Grid>
-
-          <Box sx={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
-            <Button
-              variant="outlined"
+        {hasReviews ? (
+          <Box sx={{ marginTop: '48px' }}>
+            <Typography
               sx={{
-                border: '1px solid #cccccc',
-                borderRadius: '4px',
-                padding: '16px',
                 fontFamily: 'Noto Sans',
                 fontWeight: 'bold',
-                fontSize: '16px',
+                fontSize: '20px',
                 color: 'black',
-                textTransform: 'none',
-                '&:hover': {
-                  borderColor: '#5856D6',
-                  color: '#5856D6',
-                },
+                borderLeft: '5px solid black',
+                paddingLeft: '20px',
+                paddingY: '8px',
+                marginBottom: '24px',
               }}
             >
-              See all reviews
-            </Button>
+              Customer Review
+            </Typography>
+
+            <Grid container spacing={4}>
+              {product.reviews.map((review) => (
+                <Grid item xs={12} md={6} key={review.id}>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                    <Avatar sx={{ width: '40px', height: '40px', backgroundColor: '#f5f5f5' }}>
+                      <img src={photoSvg} alt="User" style={{ width: '22px', height: '22px' }} />
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', fontWeight: 'bold' }}>
+                          {review.rating}
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          {renderStarsSmall(review.rating)}
+                        </Box>
+                      </Box>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', marginBottom: '8px' }}>
+                        {review.userName}
+                      </Typography>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', lineHeight: 1.8, textAlign: 'left' }}>
+                        {review.comment}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
+
+            {product.reviewCount > 0 ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
+                <Button
+                  variant="outlined"
+                  onClick={openAllReviews}
+                  sx={{
+                    border: '1px solid #cccccc',
+                    borderRadius: '4px',
+                    padding: '16px',
+                    fontFamily: 'Noto Sans',
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                    color: 'black',
+                    textTransform: 'none',
+                    '&:hover': {
+                      borderColor: '#5856D6',
+                      color: '#5856D6',
+                    },
+                  }}
+                >
+                  See all reviews
+                </Button>
+              </Box>
+            ) : null}
           </Box>
-        </Box>
+        ) : null}
 
         <Box sx={{ marginTop: '48px' }}>
           <Typography
@@ -711,9 +923,71 @@ const ItemDetailNew: React.FC = () => {
       <Footer
         footerLinks={[
           'About us', 'CAREERS', 'user guide',
-          'Careers', 'IR', 'CONTACT US'
+          'Careers', 'IR', 'CONTACT US',
         ]}
       />
+
+      <Dialog open={reviewsOpen} onClose={closeAllReviews} fullWidth maxWidth="md">
+        <DialogTitle>All reviews</DialogTitle>
+        <DialogContent dividers>
+          {reviewsLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', padding: '24px' }}>
+              <CircularProgress />
+            </Box>
+          ) : reviewsError ? (
+            <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black' }}>
+              {reviewsError}
+            </Typography>
+          ) : allReviews.length === 0 ? (
+            <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black' }}>
+              No reviews
+            </Typography>
+          ) : (
+            <Box>
+              <Grid container spacing={4}>
+                {allReviews.map((review) => (
+                  <Grid item xs={12} md={6} key={review.id}>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                      <Avatar sx={{ width: '40px', height: '40px', backgroundColor: '#f5f5f5' }}>
+                        <img src={photoSvg} alt="User" style={{ width: '22px', height: '22px' }} />
+                      </Avatar>
+                      <Box sx={{ flex: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                          <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', fontWeight: 'bold' }}>
+                            {review.rating}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                            {renderStarsSmall(review.rating)}
+                          </Box>
+                        </Box>
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', marginBottom: '8px' }}>
+                          {review.userName}
+                        </Typography>
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', lineHeight: 1.8, textAlign: 'left' }}>
+                          {review.comment}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+
+              {reviewsTotal > reviewsPageSize ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
+                  <Pagination
+                    count={totalReviewPages}
+                    page={reviewsPage}
+                    onChange={onChangeReviewsPage}
+                  />
+                </Box>
+              ) : null}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeAllReviews}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
