@@ -828,7 +828,7 @@ const ItemDetailNew: React.FC = () => {
             </Grid>
 
             {product.reviewCount > 0 ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center', marginTop: '24px' }}>
                 <Button
                   variant="outlined"
                   onClick={openAllReviews}
@@ -841,6 +841,8 @@ const ItemDetailNew: React.FC = () => {
                     fontSize: '16px',
                     color: 'black',
                     textTransform: 'none',
+                    width: '400px',
+                    backgroundColor: 'white',
                     '&:hover': {
                       borderColor: '#5856D6',
                       color: '#5856D6',
@@ -849,6 +851,28 @@ const ItemDetailNew: React.FC = () => {
                 >
                   See all reviews
                 </Button>
+              <Button
+              variant="outlined"
+              onClick={() => navigate(`/item/${encodeURIComponent(product.product_id)}/review`)}
+              sx={{
+                border: '1px solid #cccccc',
+                borderRadius: '4px',
+                padding: '16px',
+                fontFamily: 'Noto Sans',
+                fontWeight: 'bold',
+                fontSize: '16px',
+                color: 'black',
+                textTransform: 'none',
+                width: '400px',
+                backgroundColor: 'white',
+                '&:hover': {
+                  borderColor: '#5856D6',
+                  color: '#5856D6',
+                },
+              }}
+            >
+              Write review
+            </Button>
               </Box>
             ) : null}
           </Box>
