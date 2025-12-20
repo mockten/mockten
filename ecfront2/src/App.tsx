@@ -6,6 +6,7 @@ import UserLogin from './pages/UserLogin';
 import UserSignUp from './pages/UserSignUp';
 import AccountSettings from './pages/AccountSettings';
 import ItemDetail from './pages/ItemDetail';
+import ItemReview from './pages/ItemReview';
 import SellerDashboard from './pages/seller/SellerDashboard';
 import SellerLoginPage from './pages/seller/SellerLogin';
 import MyCartList from './pages/MyCartList';
@@ -37,6 +38,7 @@ const App: React.FC = () => {
           <Route path="/user/signup" element={<UserSignUp />} />
           <Route path="/user/account-settings" element={<PrivateRoute><AccountSettings /></PrivateRoute>} />
           <Route path="/item/:id" element={<PrivateRoute><ItemDetail /></PrivateRoute>} />
+          <Route path="/item/:id/review" element={<PrivateRoute><ItemReview /></PrivateRoute>} />
           <Route path="/cart/list" element={<PrivateRoute><MyCartList /></PrivateRoute>} />
           <Route path="/cart/shipto" element={<PrivateRoute><MyCartShipto /></PrivateRoute>} />
           <Route path="/cart/confirm" element={<PrivateRoute><MyCartConfirm /></PrivateRoute>} />
