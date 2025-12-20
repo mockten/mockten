@@ -162,6 +162,24 @@ services:
         strip_path: true
         methods:
           - GET
+  - name: all-reviews
+    url: http://product-service.default.svc.cluster.local:50052/v1/item/reviews
+    routes:
+      - name: all-reviews
+        paths:
+          - /api/item/reviews
+        strip_path: true
+        methods:
+          - GET
+  - name: review-submit
+    url: http://product-service.default.svc.cluster.local:50052/v1/item/review
+    routes:
+      - name: review-submit
+        paths:
+          - /api/item/review
+        strip_path: true
+        methods:
+          - POST
   - name: profile-geocode
     url: http://geocoding-service.default.svc.cluster.local:8080/profile
     routes:

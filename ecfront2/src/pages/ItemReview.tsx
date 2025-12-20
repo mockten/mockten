@@ -62,6 +62,7 @@ type CreateReviewRequest = {
 };
 
 const ACCESS_TOKEN_STORAGE_KEYS = [
+  'accessToken',
   'access_token',
   'kc_access_token',
   'keycloak_access_token',
@@ -241,7 +242,7 @@ const ItemReview: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/review', {
+      const res = await fetch('/api/item/review', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -317,7 +318,7 @@ const ItemReview: React.FC = () => {
         <Footer
           footerLinks={[
             'About us', 'CAREERS', 'user guide',
-            'Careers', 'IR', 'CONTACT US'
+            'Careers', 'IR', 'CONTACT US',
           ]}
         />
       </Box>
@@ -336,7 +337,7 @@ const ItemReview: React.FC = () => {
         <Footer
           footerLinks={[
             'About us', 'CAREERS', 'user guide',
-            'Careers', 'IR', 'CONTACT US'
+            'Careers', 'IR', 'CONTACT US',
           ]}
         />
       </Box>
@@ -568,7 +569,7 @@ const ItemReview: React.FC = () => {
       <Footer
         footerLinks={[
           'About us', 'CAREERS', 'user guide',
-          'Careers', 'IR', 'CONTACT US'
+          'Careers', 'IR', 'CONTACT US',
         ]}
       />
     </Box>

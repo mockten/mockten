@@ -1,15 +1,23 @@
 package main
 
 import (
+	"context"
 	"database/sql"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/MicahParks/keyfunc/v3"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -18,7 +26,9 @@ const (
 )
 
 var (
-	logger *zap.Logger
+	logger     *zap.Logger
+	jwks       keyfunc.Keyfunc
+	jwksCancel context.CancelFunc
 )
 
 type GeoResponse struct {
@@ -71,6 +81,24 @@ type ItemReviewsResponse struct {
 	Reviews   []ReviewResponse `json:"reviews"`
 }
 
+type CreateReviewRequest struct {
+	ProductID string `json:"productId"`
+	Rating    int    `json:"rating"`
+	Comment   string `json:"comment"`
+}
+
+type CreateReviewResponse struct {
+	ProductID   string    `json:"productId"`
+	ReviewID    string    `json:"reviewId"`
+	UserID      string    `json:"userId"`
+	UserName    string    `json:"userName"`
+	Rating      int       `json:"rating"`
+	Comment     string    `json:"comment"`
+	CreatedAt   time.Time `json:"createdAt"`
+	AvgReview   float64   `json:"avgReview"`
+	ReviewCount int       `json:"reviewCount"`
+}
+
 func waitForMySQL(db *sql.DB, logger *zap.Logger) {
 	maxAttempts := 20
 	for i := 1; i <= maxAttempts; i++ {
@@ -83,6 +111,123 @@ func waitForMySQL(db *sql.DB, logger *zap.Logger) {
 		time.Sleep(3 * time.Second)
 	}
 	logger.Fatal("MySQL did not become ready in time.")
+}
+
+func buildJWKSURL() (string, error) {
+	if v := strings.TrimSpace(os.Getenv("KEYCLOAK_JWKS_URL")); v != "" {
+		return v, nil
+	}
+
+	base := strings.TrimSpace(os.Getenv("KEYCLOAK_BASE_URL"))
+	if base == "" {
+		base = "http://uam-service.default.svc.cluster.local"
+	}
+	realm := strings.TrimSpace(os.Getenv("KEYCLOAK_REALM"))
+	if realm == "" {
+		realm = "mockten-realm-dev"
+	}
+
+	base = strings.TrimRight(base, "/")
+	if realm == "" {
+		return "", errors.New("KEYCLOAK_REALM is empty")
+	}
+
+	return base + "/realms/" + realm + "/protocol/openid-connect/certs", nil
+}
+
+func initJWKS(jwksURL string) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	jwksCancel = cancel
+
+	k, err := keyfunc.NewDefaultCtx(ctx, []string{jwksURL})
+	if err != nil {
+		return err
+	}
+	jwks = k
+	return nil
+}
+
+func bearerTokenFromHeader(h string) (string, bool) {
+	v := strings.TrimSpace(h)
+	if v == "" {
+		return "", false
+	}
+	parts := strings.SplitN(v, " ", 2)
+	if len(parts) != 2 {
+		return "", false
+	}
+	if !strings.EqualFold(parts[0], "Bearer") {
+		return "", false
+	}
+	t := strings.TrimSpace(parts[1])
+	if t == "" {
+		return "", false
+	}
+	return t, true
+}
+
+func jwtHeaderInfo(tokenStr string) (string, string) {
+	p := strings.Split(tokenStr, ".")
+	if len(p) < 2 {
+		return "", ""
+	}
+
+	b, err := base64.RawURLEncoding.DecodeString(p[0])
+	if err != nil {
+		return "", ""
+	}
+
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		return "", ""
+	}
+
+	kid, _ := m["kid"].(string)
+	alg, _ := m["alg"].(string)
+	return strings.TrimSpace(kid), strings.TrimSpace(alg)
+}
+
+func getUserIDFromAccessToken(c *gin.Context) (string, error) {
+	tokenStr, ok := bearerTokenFromHeader(c.GetHeader("Authorization"))
+	if !ok {
+		return "", errors.New("missing bearer token")
+	}
+
+	kid, alg := jwtHeaderInfo(tokenStr)
+
+	parser := jwt.NewParser(
+		jwt.WithValidMethods([]string{"RS256", "RS384", "RS512"}),
+		jwt.WithLeeway(30*time.Second),
+	)
+
+	var claims jwt.MapClaims
+	tok, err := parser.ParseWithClaims(tokenStr, &claims, jwks.Keyfunc)
+	if err != nil {
+		logger.Warn("JWT parse failed", zap.String("kid", kid), zap.String("alg", alg), zap.Error(err))
+		return "", err
+	}
+	if !tok.Valid {
+		logger.Warn("JWT invalid", zap.String("kid", kid), zap.String("alg", alg))
+		return "", errors.New("invalid token")
+	}
+
+	if v, ok := claims["email"]; ok {
+		if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+			return strings.TrimSpace(s), nil
+		}
+	}
+	if v, ok := claims["preferred_username"]; ok {
+		if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+			return strings.TrimSpace(s), nil
+		}
+	}
+	if v, ok := claims["sub"]; ok {
+		if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+			return strings.TrimSpace(s), nil
+		}
+	}
+
+	return "", errors.New("no usable user identifier in token claims")
 }
 
 func fetchReviews(db *sql.DB, productID string, limit int, offset int) ([]ReviewResponse, int, error) {
@@ -352,6 +497,174 @@ LIMIT 1
 	}
 }
 
+func fetchUserDisplayName(tx *sql.Tx, userID string) (string, error) {
+	q := `SELECT COALESCE(NULLIF(FIRST_NAME, ''), 'Anonymous') FROM USER_ENTITY WHERE EMAIL = ? LIMIT 1`
+	var name string
+	err := tx.QueryRow(q, userID).Scan(&name)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "Anonymous", nil
+		}
+		return "", err
+	}
+	if strings.TrimSpace(name) == "" {
+		return "Anonymous", nil
+	}
+	return name, nil
+}
+
+func recalcAndUpdateProductRating(tx *sql.Tx, productID string) (float64, int, error) {
+	q := `
+SELECT
+  COALESCE(ROUND(AVG(rating), 1), 0.0) AS avg_review,
+  COALESCE(COUNT(*), 0) AS review_count
+FROM Review
+WHERE product_id = ?
+  AND status = 'active'
+`
+	var avg float64
+	var cnt int
+	if err := tx.QueryRow(q, productID).Scan(&avg, &cnt); err != nil {
+		return 0.0, 0, err
+	}
+
+	upd := `UPDATE Product SET avg_review = ?, review_count = ? WHERE product_id = ?`
+	if _, err := tx.Exec(upd, avg, cnt, productID); err != nil {
+		return 0.0, 0, err
+	}
+
+	return avg, cnt, nil
+}
+
+func upsertReview(tx *sql.Tx, reviewID string, productID string, userID string, rating int, comment string) (string, time.Time, error) {
+	var existingID string
+	var createdAt time.Time
+
+	sel := `SELECT review_id, created_at FROM Review WHERE product_id = ? AND user_id = ? LIMIT 1`
+	err := tx.QueryRow(sel, productID, userID).Scan(&existingID, &createdAt)
+	if err != nil && err != sql.ErrNoRows {
+		return "", time.Time{}, err
+	}
+
+	if err == sql.ErrNoRows {
+		ins := `
+INSERT INTO Review (review_id, product_id, user_id, rating, comment, status)
+VALUES (?, ?, ?, ?, ?, 'active')
+`
+		_, err := tx.Exec(ins, reviewID, productID, userID, rating, comment)
+		if err != nil {
+			return "", time.Time{}, err
+		}
+		sel2 := `SELECT created_at FROM Review WHERE review_id = ? LIMIT 1`
+		if err := tx.QueryRow(sel2, reviewID).Scan(&createdAt); err != nil {
+			return "", time.Time{}, err
+		}
+		return reviewID, createdAt, nil
+	}
+
+	upd := `
+UPDATE Review
+SET rating = ?, comment = ?, status = 'active'
+WHERE review_id = ?
+`
+	_, err = tx.Exec(upd, rating, comment, existingID)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return existingID, createdAt, nil
+}
+
+func postItemReviewHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, err := getUserIDFromAccessToken(c)
+		if err != nil {
+			logger.Warn("Unauthorized request", zap.Error(err))
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		var req CreateReviewRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+			return
+		}
+		req.ProductID = strings.TrimSpace(req.ProductID)
+		req.Comment = strings.TrimSpace(req.Comment)
+
+		if req.ProductID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing productId"})
+			return
+		}
+		if req.Rating < 1 || req.Rating > 5 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "rating must be between 1 and 5"})
+			return
+		}
+		if len(req.Comment) > 4000 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "comment too long"})
+			return
+		}
+
+		tx, err := db.Begin()
+		if err != nil {
+			logger.Error("DB begin failed", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+		defer func() { _ = tx.Rollback() }()
+
+		var exists int
+		if err := tx.QueryRow(`SELECT 1 FROM Product WHERE product_id = ? LIMIT 1`, req.ProductID).Scan(&exists); err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+				return
+			}
+			logger.Error("DB query failed (product exists)", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		newReviewID := uuid.NewString()
+		reviewID, createdAt, err := upsertReview(tx, newReviewID, req.ProductID, userID, req.Rating, req.Comment)
+		if err != nil {
+			logger.Error("DB upsert failed (review)", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		avg, cnt, err := recalcAndUpdateProductRating(tx, req.ProductID)
+		if err != nil {
+			logger.Error("DB update failed (product rating)", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		userName, err := fetchUserDisplayName(tx, userID)
+		if err != nil {
+			logger.Error("DB query failed (user display name)", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		if err := tx.Commit(); err != nil {
+			logger.Error("DB commit failed", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		c.JSON(http.StatusOK, CreateReviewResponse{
+			ProductID:   req.ProductID,
+			ReviewID:    reviewID,
+			UserID:      userID,
+			UserName:    userName,
+			Rating:      req.Rating,
+			Comment:     req.Comment,
+			CreatedAt:   createdAt,
+			AvgReview:   avg,
+			ReviewCount: cnt,
+		})
+	}
+}
+
 func main() {
 	var err error
 
@@ -372,7 +685,22 @@ func main() {
 		panic(err)
 	}
 
-	defer logger.Sync()
+	defer func() { _ = logger.Sync() }()
+
+	jwksURL, err := buildJWKSURL()
+	if err != nil {
+		logger.Fatal("failed to build jwks url", zap.Error(err))
+	}
+	logger.Info("JWKS URL", zap.String("jwks_url", jwksURL))
+
+	if err := initJWKS(jwksURL); err != nil {
+		logger.Fatal("failed to init jwks", zap.String("jwks_url", jwksURL), zap.Error(err))
+	}
+	defer func() {
+		if jwksCancel != nil {
+			jwksCancel()
+		}
+	}()
 
 	dsn := os.Getenv("MYSQL_DSN")
 	if dsn == "" {
@@ -391,6 +719,7 @@ func main() {
 
 	router.GET("/v1/item/detail/:productId", getItemDetailHandler(db))
 	router.GET("/v1/item/reviews/:productId", getItemReviewsHandler(db))
+	router.POST("/v1/item/review", postItemReviewHandler(db))
 
-	router.Run(port)
+	_ = router.Run(port)
 }
