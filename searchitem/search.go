@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -23,14 +24,18 @@ const (
 )
 
 type Item struct {
-	ProductId   string `json:"product_id"`
-	ProductName string `json:"product_name"`
-	SellerName  string `json:"seller_name"`
-	Category    int    `json:"category"`
-	Price       int    `json:"price"`
-	Rank        int    `json:"ranking"`
-	Stocks      int    `json:"stocks"`
-	MainURL     string `json:"main_url"`
+	ProductId    string  `json:"product_id"`
+	ProductName  string  `json:"product_name"`
+	SellerName   string  `json:"seller_name"`
+	Category     int     `json:"category"`
+	Price        int     `json:"price"`
+	Rank         int     `json:"ranking"`
+	Stocks       int     `json:"stocks"`
+	MainURL      string  `json:"main_url"`
+	AvgReview    float64 `json:"avg_review"`
+	ReviewCount  int     `json:"review_count"`
+	Condition    string  `json:"condition"`
+	CategoryName string  `json:"category_name"`
 }
 
 var (
@@ -58,6 +63,7 @@ func searchHandler(c *gin.Context) {
 
 	minPriceStr := c.Query("min_price")
 	maxPriceStr := c.Query("max_price")
+	minRatingStr := c.Query("min_rating")
 
 	if query == "" || pageStr == "" {
 		logger.Error("Search Query parameter is missing.")
@@ -74,6 +80,7 @@ func searchHandler(c *gin.Context) {
 		zap.String("stock", stockParam),
 		zap.String("min_price", minPriceStr),
 		zap.String("max_price", maxPriceStr),
+		zap.String("min_rating", minRatingStr),
 	)
 
 	searchReqCount.Inc()
@@ -88,20 +95,43 @@ func searchHandler(c *gin.Context) {
 
 	var filters []string
 
-	// Status filter (New / Used)
 	if len(statusParams) > 0 {
 		var expr string
 		for i, s := range statusParams {
-			if i == 0 {
-				expr = `condition = "` + s + `"`
+			sn := strings.ToLower(strings.TrimSpace(s))
+			if sn == "new" || sn == "used" {
+				if i == 0 {
+					expr = `condition = "` + sn + `"`
+				} else {
+					expr += ` OR condition = "` + sn + `"`
+				}
+				continue
+			}
+			if sn == "new" {
+				if i == 0 {
+					expr = `condition = "new"`
+				} else {
+					expr += ` OR condition = "new"`
+				}
+			} else if sn == "used" {
+				if i == 0 {
+					expr = `condition = "used"`
+				} else {
+					expr += ` OR condition = "used"`
+				}
 			} else {
-				expr += ` OR condition = "` + s + `"`
+				if i == 0 {
+					expr = `condition = "` + sn + `"`
+				} else {
+					expr += ` OR condition = "` + sn + `"`
+				}
 			}
 		}
-		filters = append(filters, expr)
+		if expr != "" {
+			filters = append(filters, expr)
+		}
 	}
 
-	// Category filter (multiple allowed)
 	if len(categoryParams) > 0 {
 		var expr string
 		for i, cID := range categoryParams {
@@ -114,22 +144,25 @@ func searchHandler(c *gin.Context) {
 		filters = append(filters, expr)
 	}
 
-	// Stock filter
 	if stockParam == "1" {
 		filters = append(filters, "stocks > 0")
 	}
 
-	// Min price filter
 	if minPriceStr != "" {
 		if v, err := strconv.Atoi(minPriceStr); err == nil {
 			filters = append(filters, "price >= "+strconv.Itoa(v))
 		}
 	}
 
-	// Max price filter
 	if maxPriceStr != "" {
 		if v, err := strconv.Atoi(maxPriceStr); err == nil {
 			filters = append(filters, "price <= "+strconv.Itoa(v))
+		}
+	}
+
+	if minRatingStr != "" {
+		if v, err := strconv.ParseFloat(minRatingStr, 64); err == nil {
+			filters = append(filters, "avg_review >= "+strconv.FormatFloat(v, 'f', -1, 64))
 		}
 	}
 
@@ -178,6 +211,8 @@ type ProductDetail struct {
 	LastUpdate   time.Time `json:"last_update"`
 	SellerName   string    `json:"seller_name"`
 	Stocks       int       `json:"stocks"`
+	AvgReview    float64   `json:"avg_review"`
+	ReviewCount  int       `json:"review_count"`
 }
 
 type ProductDetailResponse struct {
@@ -191,6 +226,8 @@ type ProductDetailResponse struct {
 	LastUpdate   time.Time `json:"last_update"`
 	SellerName   string    `json:"seller_name"`
 	Stocks       int       `json:"stocks"`
+	AvgReview    float64   `json:"avg_review"`
+	ReviewCount  int       `json:"review_count"`
 }
 
 func ConvertToResponse(detail *ProductDetail) ProductDetailResponse {
@@ -205,6 +242,8 @@ func ConvertToResponse(detail *ProductDetail) ProductDetailResponse {
 		LastUpdate:   detail.LastUpdate,
 		SellerName:   detail.SellerName,
 		Stocks:       detail.Stocks,
+		AvgReview:    detail.AvgReview,
+		ReviewCount:  detail.ReviewCount,
 	}
 }
 
@@ -254,63 +293,6 @@ func waitForMySQL(db *sql.DB, logger *zap.Logger) {
 	logger.Fatal("MySQL did not become ready in time.")
 }
 
-func getItemDetailHandler(db *sql.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		productID := c.Query("id")
-
-		if productID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing id parameter"})
-			return
-		}
-
-		query := `
-         SELECT 
-            p.product_id,
-            p.product_name,
-            p.price,
-            c.category_id,
-            c.category_name,
-            p.summary,
-            p.regist_day,
-            p.last_update,
-            t.stocks,
-            ue.USERNAME AS seller_name
-         FROM Product p
-         JOIN Category c ON p.category_id = c.category_id
-         JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
-         JOIN USER_GROUP_MEMBERSHIP ugm ON ue.ID = ugm.USER_ID
-         JOIN KEYCLOAK_GROUP kg ON ugm.GROUP_ID = kg.ID
-         JOIN Stock t ON p.product_id = t.product_id
-         WHERE p.product_id = ? AND kg.NAME = 'Seller'
-      `
-		var detail ProductDetail
-		err := db.QueryRow(query, productID).Scan(
-			&detail.ProductID,
-			&detail.ProductName,
-			&detail.Price,
-			&detail.CategoryID,
-			&detail.CategoryName,
-			&detail.Summary,
-			&detail.RegistDay,
-			&detail.LastUpdate,
-			&detail.Stocks,
-			&detail.SellerName,
-		)
-
-		if err != nil {
-			if err == sql.ErrNoRows {
-				c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
-			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-			}
-			return
-		}
-
-		responseJson := ConvertToResponse(&detail)
-		c.JSON(http.StatusOK, responseJson)
-	}
-}
-
 func main() {
 	var err error
 
@@ -356,7 +338,6 @@ func main() {
 	router := gin.Default()
 	router.GET("v1/search", searchHandler)
 	router.GET("v1/categories", getCategoryListHandler(db))
-	router.GET("v1/item/detail", getItemDetailHandler(db))
 
 	router.Run(port)
 }

@@ -35,6 +35,8 @@ interface Product {
   price: number;
   ranking: number;
   stocks: number;
+  avg_review?: number;
+  review_count?: number;
 }
 
 interface Category {
@@ -51,7 +53,14 @@ interface SearchFilters {
   freeShipping: boolean;
 }
 
-type SortOrder = 'default' | 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc';
+type SortOrder =
+  | 'default'
+  | 'name_asc'
+  | 'name_desc'
+  | 'price_asc'
+  | 'price_desc'
+  | 'review_desc'
+  | 'review_asc';
 
 const SearchResultNew: React.FC = () => {
   const location = useLocation();
@@ -106,7 +115,15 @@ const SearchResultNew: React.FC = () => {
   };
 
   const parseSortParam = (v: string | null): SortOrder => {
-    if (v === 'name_asc' || v === 'name_desc' || v === 'price_asc' || v === 'price_desc' || v === 'default') {
+    if (
+      v === 'name_asc' ||
+      v === 'name_desc' ||
+      v === 'price_asc' ||
+      v === 'price_desc' ||
+      v === 'review_desc' ||
+      v === 'review_asc' ||
+      v === 'default'
+    ) {
       return v;
     }
     return 'default';
@@ -126,6 +143,12 @@ const SearchResultNew: React.FC = () => {
       },
     };
     return JSON.stringify(keyObj);
+  };
+
+  const navigateWithPageReset = () => {
+    const params = new URLSearchParams(location.search);
+    params.set('p', '1');
+    navigate(`?${params.toString()}`);
   };
 
   const buildSearchUrl = (query: string, page: number, f: SearchFilters) => {
@@ -151,6 +174,10 @@ const SearchResultNew: React.FC = () => {
       url += `&max_price=${encodeURIComponent(String(maxPrice))}`;
     }
 
+    if (f.rating && f.rating > 0) {
+      url += `&min_rating=${encodeURIComponent(String(f.rating))}`;
+    }
+
     return url;
   };
 
@@ -160,6 +187,21 @@ const SearchResultNew: React.FC = () => {
     copied.sort((a, b) => {
       if (order === 'price_asc') return (a.price ?? 0) - (b.price ?? 0);
       if (order === 'price_desc') return (b.price ?? 0) - (a.price ?? 0);
+
+      if (order === 'review_desc' || order === 'review_asc') {
+        const ar = (a.avg_review ?? a.ranking ?? 0);
+        const br = (b.avg_review ?? b.ranking ?? 0);
+
+        if (ar !== br) {
+          return order === 'review_desc' ? (br - ar) : (ar - br);
+        }
+
+        const ac = (a.review_count ?? 0);
+        const bc = (b.review_count ?? 0);
+        if (ac !== bc) {
+          return order === 'review_desc' ? (bc - ac) : (ac - bc);
+        }
+      }
 
       const nameA = (a.product_name ?? '').toString();
       const nameB = (b.product_name ?? '').toString();
@@ -329,6 +371,7 @@ const SearchResultNew: React.FC = () => {
       ...prev,
       [filterType]: value,
     }));
+    navigateWithPageReset();
   };
 
   const handleCategoryToggle = (categoryId: string) => {
@@ -338,6 +381,7 @@ const SearchResultNew: React.FC = () => {
         ? prev.category.filter(c => c !== categoryId)
         : [...prev.category, categoryId],
     }));
+    navigateWithPageReset();
   };
 
   const handleStatusToggle = (status: string) => {
@@ -347,6 +391,15 @@ const SearchResultNew: React.FC = () => {
         ? prev.status.filter(s => s !== status)
         : [...prev.status, status],
     }));
+    navigateWithPageReset();
+  };
+
+  const handleRatingToggle = (rating: number) => {
+    setFilters(prev => ({
+      ...prev,
+      rating: prev.rating === rating ? 0 : rating,
+    }));
+    navigateWithPageReset();
   };
 
   const renderStars = (rating: number) => {
@@ -377,7 +430,9 @@ const SearchResultNew: React.FC = () => {
     if (sortOrder === 'name_asc') return 'Name (A→Z)';
     if (sortOrder === 'name_desc') return 'Name (Z→A)';
     if (sortOrder === 'price_asc') return 'Price (Low→High)';
-    return 'Price (High→Low)';
+    if (sortOrder === 'price_desc') return 'Price (High→Low)';
+    if (sortOrder === 'review_desc') return 'Review (High→Low)';
+    return 'Review (Low→High)';
   }, [sortOrder]);
 
   const applySortToUrl = (next: SortOrder) => {
@@ -429,6 +484,7 @@ const SearchResultNew: React.FC = () => {
                   const max = parseNumberOrEmptyToNull(priceMaxInput);
                   const next = normalizePriceRange(min, max);
                   setFilters(prev => ({ ...prev, priceRange: next }));
+                  navigateWithPageReset();
                 }}
               />
               <TextField
@@ -444,6 +500,7 @@ const SearchResultNew: React.FC = () => {
                   const max = parseNumberOrEmptyToNull(v);
                   const next = normalizePriceRange(min, max);
                   setFilters(prev => ({ ...prev, priceRange: next }));
+                  navigateWithPageReset();
                 }}
               />
             </Box>
@@ -489,26 +546,33 @@ const SearchResultNew: React.FC = () => {
               Review
             </Typography>
             <Box sx={{ paddingLeft: '20px' }}>
-              {[4.5, 4.0, 3.5].map((rating) => (
-                <Box
-                  key={rating}
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginBottom: '16px',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => handleFilterChange('rating', rating)}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Star sx={{ color: '#ffc107', fontSize: '16px' }} />
+              {[4.5, 4.0, 3.5].map((rating) => {
+                const selected = filters.rating === rating;
+                return (
+                  <Box
+                    key={rating}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '16px',
+                      cursor: 'pointer',
+                      borderRadius: '6px',
+                      padding: '6px 8px',
+                      border: selected ? '1px solid rgba(25, 118, 210, 0.65)' : '1px solid transparent',
+                      backgroundColor: selected ? 'rgba(25, 118, 210, 0.10)' : 'transparent',
+                    }}
+                    onClick={() => handleRatingToggle(rating)}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Star sx={{ color: '#ffc107', fontSize: '16px' }} />
+                    </Box>
+                    <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black' }}>
+                      {rating}〜
+                    </Typography>
                   </Box>
-                  <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black' }}>
-                    {rating}〜
-                  </Typography>
-                </Box>
-              ))}
+                );
+              })}
             </Box>
           </Box>
 
@@ -673,6 +737,24 @@ const SearchResultNew: React.FC = () => {
                   >
                     Price (High→Low)
                   </MenuItem>
+                  <MenuItem
+                    selected={sortOrder === 'review_desc'}
+                    onClick={() => {
+                      setSortAnchorEl(null);
+                      applySortToUrl('review_desc');
+                    }}
+                  >
+                    Review (High→Low)
+                  </MenuItem>
+                  <MenuItem
+                    selected={sortOrder === 'review_asc'}
+                    onClick={() => {
+                      setSortAnchorEl(null);
+                      applySortToUrl('review_asc');
+                    }}
+                  >
+                    Review (Low→High)
+                  </MenuItem>
                 </Menu>
               </Box>
             </Box>
@@ -725,7 +807,7 @@ const SearchResultNew: React.FC = () => {
                     </Typography>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '8px' }}>
-                      {renderStars(product.ranking || 4.0)}
+                      {renderStars(product.avg_review ?? product.ranking ?? 0)}
                     </Box>
 
                     <Typography
