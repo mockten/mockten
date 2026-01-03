@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/MicahParks/keyfunc"
+	"github.com/MicahParks/keyfunc/v3"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
@@ -18,7 +18,7 @@ import (
 type Authenticator struct {
 	logger *zap.Logger
 
-	jwks       *keyfunc.JWKS
+	jwks       keyfunc.Keyfunc
 	jwksCancel context.CancelFunc
 
 	// user-id extraction
@@ -27,7 +27,7 @@ type Authenticator struct {
 
 type Options struct {
 	Logger     *zap.Logger
-	ClaimOrder []string // 例: []string{"email","preferred_username","sub"}
+	ClaimOrder []string // Example: []string{"email","preferred_username","sub"}
 }
 
 func NewAuthenticatorFromEnv(opts Options) (*Authenticator, error) {
@@ -124,7 +124,7 @@ func jwtHeaderInfo(tokenStr string) (string, string) {
 	return strings.TrimSpace(kid), strings.TrimSpace(alg)
 }
 
-// これが「Authorization: Bearer」から user-id を取り出す本体
+// This is the main function to extract user-id from "Authorization: Bearer"
 func (a *Authenticator) UserIDFromGinContext(c *gin.Context) (string, error) {
 	tokenStr, ok := bearerTokenFromHeader(c.GetHeader("Authorization"))
 	if !ok {
@@ -159,7 +159,7 @@ func (a *Authenticator) UserIDFromGinContext(c *gin.Context) (string, error) {
 	return "", errors.New("no usable user identifier in token claims")
 }
 
-// ---- Gin middleware (共通で使える形) ----
+// ---- Gin middleware (usable for common) ----
 
 const CtxUserIDKey = "user_id"
 
