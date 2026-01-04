@@ -7,7 +7,6 @@ require (
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/redis/go-redis/v9 v9.17.2
-	github.com/mockten/mockten/common v0.0.0-00010101-00000000-000000000000
 )
 
 require (
@@ -46,3 +45,5 @@ require (
 	golang.org/x/tools v0.34.0 // indirect
 	google.golang.org/protobuf v1.36.9 // indirect
 )
+
+replace github.com/mockten/mockten/common => ../common

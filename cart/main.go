@@ -19,6 +19,9 @@ import (
 	ihttp "github.com/mockten/mockten/cart/internal/http"
 	"github.com/mockten/mockten/cart/internal/productrepo"
 	"github.com/mockten/mockten/cart/internal/service"
+
+	commonauth "github.com/mockten/mockten/common/auth"
+	"go.uber.org/zap"
 )
 
 func mustGetenv(key string) string {
@@ -47,6 +50,13 @@ func getenvDurationSeconds(key string, defSeconds int) time.Duration {
 }
 
 func main() {
+	logger, _ := zap.NewProduction()
+	authn, err := commonauth.NewAuthenticatorFromEnv(commonauth.Options{Logger: logger})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer authn.Close()
+
 	// ---- env ----
 	// Example: user:pass@tcp(localhost:3306)/dbname?parseTime=true&charset=utf8mb4&loc=UTC
 	mysqlDSN := mustGetenv("MYSQL_DSN")
@@ -98,7 +108,7 @@ func main() {
 	// ---- Router ----
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
-	ihttp.RegisterRoutes(r, h)
+	ihttp.RegisterRoutes(r, h, authn)
 
 	// ---- HTTP server + graceful shutdown ----
 	srv := &http.Server{
