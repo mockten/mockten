@@ -24,13 +24,17 @@ import (
 	"go.uber.org/zap"
 )
 
-func mustGetenv(key string) string {
-	v := os.Getenv(key)
-	if v == "" {
-		log.Fatalf("missing env: %s", key)
-	}
-	return v
-}
+const (
+	port = "50053"
+)
+
+// func mustGetenv(key string) string {
+// 	v := os.Getenv(key)
+// 	if v == "" {
+// 		log.Fatalf("missing env: %s", key)
+// 	}
+// 	return v
+// }
 
 func getenvInt(key string, def int) int {
 	v := os.Getenv(key)
@@ -59,19 +63,26 @@ func main() {
 
 	// ---- env ----
 	// Example: user:pass@tcp(localhost:3306)/dbname?parseTime=true&charset=utf8mb4&loc=UTC
-	mysqlDSN := mustGetenv("MYSQL_DSN")
-
-	redisAddr := mustGetenv("REDIS_ADDR")
+	// mysqlDSN := mustGetenv("MYSQL_DSN")
+	mysqlDSN := os.Getenv("MYSQL_DSN")
+	if mysqlDSN == "" {
+		mysqlDSN = "mocktenusr:mocktenpassword@tcp(mysql-service.default.svc.cluster.local:3306)/mocktendb?parseTime=true"
+	}
+	// redis-service.default.svc.cluster.local:6379
+	// redisAddr := mustGetenv("REDIS_ADDR")
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "redis-service.default.svc.cluster.local:6379"
+	}
+	// mocktenpass
 	redisPassword := os.Getenv("REDIS_PASSWORD")
+	if redisPassword == "" {
+		redisPassword = "mocktenpass"
+	}
 	redisDB := getenvInt("REDIS_DB", 0)
 
 	// 0 means no expiration
 	cartTTL := getenvDurationSeconds("CART_TTL_SECONDS", 0)
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
 
 	// ---- MySQL ----
 	db, err := sqlx.Open("mysql", mysqlDSN)

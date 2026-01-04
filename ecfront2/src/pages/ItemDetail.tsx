@@ -112,17 +112,6 @@ interface ApiItemReviewsResponse {
   reviews: ApiReview[];
 }
 
-const location = useLocation();
-const state = location.state as { successMessage?: string };
-
-const [open, setOpen] = useState(false);
-
-useEffect(() => {
-  if (state?.successMessage) {
-    setOpen(true);
-  }
-}, [state]);
-
 
 
 const parseS3ListXmlKeys = (xmlText: string): string[] => {
@@ -253,6 +242,16 @@ const ItemDetailNew: React.FC = () => {
     if (product?.product_id) return product.product_id;
     return id || '';
   }, [product?.product_id, id]);
+
+  const location = useLocation();
+  const state = (location.state ?? {}) as { successMessage?: string };
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (state?.successMessage) {
+      setOpen(true);
+    }
+  }, [state]);
 
   useEffect(() => {
     const run = async () => {
@@ -481,16 +480,17 @@ const ItemDetailNew: React.FC = () => {
   return (
     <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       <Appbar />
-      <Snackbar
-        open={open}
-        autoHideDuration={3000}
-        onClose={() => setOpen(false)}
-      >
-        <Alert severity="success" onClose={() => setOpen(false)}>
-          {state.successMessage}
-        </Alert>
-      </Snackbar>
-
+      {state.successMessage && (
+        <Snackbar
+          open={open}
+          autoHideDuration={3000}
+          onClose={() => setOpen(false)}
+        >
+          <Alert severity="success" onClose={() => setOpen(false)}>
+            {state.successMessage}
+          </Alert>
+        </Snackbar>
+      )}
       <Container maxWidth="lg" sx={{ padding: '24px 16px' }}>
         <Typography
         sx={{

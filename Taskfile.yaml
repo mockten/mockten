@@ -33,6 +33,6 @@ tasks:
       - (cd meilisearch && docker build -t meilisearch .)
       - (cd searchitem && docker build -t searchitem .)
       - (cd product && docker build -t product .)
-      - (cd cart && docker build -t cart .)
+      - (docker build -t cart -f cart/Dockerfile .)
       - (cd sync && docker build -t mockten-sync .)
       - (cd geocoding && docker build -t mockten-geocoding .)
