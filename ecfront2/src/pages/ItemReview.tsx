@@ -17,6 +17,8 @@ import {
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 import photoSvg from '../assets/photo.svg';
+// Import the apiClient we created in the module folder
+import apiClient from '../module/apiClient';
 
 interface ApiItemDetailResponse {
   productId: string;
@@ -61,26 +63,7 @@ type CreateReviewRequest = {
   comment: string;
 };
 
-const ACCESS_TOKEN_STORAGE_KEYS = [
-  'accessToken',
-  'access_token',
-  'kc_access_token',
-  'keycloak_access_token',
-  'mockten_access_token',
-];
-
-const getAccessTokenFromStorage = (): string => {
-  for (const k of ACCESS_TOKEN_STORAGE_KEYS) {
-    const v = localStorage.getItem(k);
-    if (v && v.trim().length > 0) return v.trim();
-  }
-  for (const k of ACCESS_TOKEN_STORAGE_KEYS) {
-    const v = sessionStorage.getItem(k);
-    if (v && v.trim().length > 0) return v.trim();
-  }
-  return '';
-};
-
+// S3 Helper Functions (No changes needed here)
 const parseS3ListXmlKeys = (xmlText: string): string[] => {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlText, 'application/xml');
@@ -143,6 +126,7 @@ const ItemReview: React.FC = () => {
   const productIdForFetch = useMemo(() => id || '', [id]);
   const productIdForImages = useMemo(() => productData?.id || id || '', [productData?.id, id]);
 
+  // Fetch Product Detail
   useEffect(() => {
     const run = async () => {
       setLoadError('');
@@ -154,13 +138,11 @@ const ItemReview: React.FC = () => {
       }
 
       try {
-        const res = await fetch(`/api/item/detail/${encodeURIComponent(productIdForFetch)}`, { method: 'GET' });
-        if (!res.ok) {
-          setLoadError(`Failed to load product detail. status=${res.status}`);
-          return;
-        }
-
-        const api = (await res.json()) as ApiItemDetailResponse;
+        // Use apiClient.get instead of fetch
+        // This handles token attachment and auto-refresh logic automatically
+        const res = await apiClient.get<ApiItemDetailResponse>(`/api/item/detail/${encodeURIComponent(productIdForFetch)}`);
+        
+        const api = res.data;
 
         const mapped: ProductData = {
           id: api.productId || productIdForFetch,
@@ -170,7 +152,7 @@ const ItemReview: React.FC = () => {
         };
 
         setProductData(mapped);
-      } catch {
+      } catch (error) {
         setLoadError('Failed to load product detail.');
       }
     };
@@ -178,6 +160,7 @@ const ItemReview: React.FC = () => {
     run();
   }, [productIdForFetch]);
 
+  // Fetch Images (Assuming public access, keeping fetch is fine, or switch to apiClient if needed)
   useEffect(() => {
     const run = async () => {
       if (!productIdForImages) {
@@ -219,6 +202,7 @@ const ItemReview: React.FC = () => {
     setRating(value);
   };
 
+  // Submit Review
   const handleSubmitReview = async () => {
     setSubmitError('');
     setSubmitOk('');
@@ -229,11 +213,7 @@ const ItemReview: React.FC = () => {
       return;
     }
 
-    const token = getAccessTokenFromStorage();
-    if (!token) {
-      setSubmitError('Missing access token. Please login again.');
-      return;
-    }
+    // No need to manually get token here, apiClient handles it.
 
     const payload: CreateReviewRequest = {
       productId,
@@ -243,26 +223,16 @@ const ItemReview: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/item/review', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const t = await res.text().catch(() => '');
-        setSubmitError(`Failed to submit review. status=${res.status}${t ? ` body=${t}` : ''}`);
-        return;
-      }
+      // Use apiClient.post
+      // If access token is expired (401), it will auto-refresh and retry seamlessly.
+      await apiClient.post('/api/item/review', payload);
 
       setSubmitOk('Review submitted.');
       setRating(0);
       setReviewComment('');
-    } catch {
-      setSubmitError('Failed to submit review.');
+    } catch (error: any) {
+      const msg = error.response?.data?.error || 'Failed to submit review.';
+      setSubmitError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -357,6 +327,7 @@ const ItemReview: React.FC = () => {
             <Box sx={{ flexGrow: 1 }} />
 
             <Box sx={{ width: '944px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Breadcrumbs */}
               <Typography
                 sx={{
                   fontFamily: 'Noto Sans',
@@ -408,6 +379,8 @@ const ItemReview: React.FC = () => {
 
                 <Box component="span">Review</Box>
               </Typography>
+
+              {/* Product Info Section */}
               <Box sx={{ display: 'flex', gap: '10px', height: '233px' }}>
                 <Box sx={{ width: '645px', display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px' }}>
                   <Typography
@@ -485,6 +458,7 @@ const ItemReview: React.FC = () => {
                 </Box>
               </Box>
 
+              {/* Rating Section */}
               <Box
                 sx={{
                   backgroundColor: 'white',
@@ -510,6 +484,7 @@ const ItemReview: React.FC = () => {
                 {renderStars(rating)}
               </Box>
 
+              {/* Comment Section */}
               <Box
                 sx={{
                   backgroundColor: 'white',

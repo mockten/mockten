@@ -1,4 +1,5 @@
 import React, { useState, useEffect, FormEvent } from 'react';
+// Login API (returns both tokens)
 import { login } from '../module/login';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../Auth';
@@ -35,13 +36,18 @@ const UserLoginNew: React.FC = () => {
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      const { token } = await login(userID, password);
+      // 1. Get both tokens from the API
+      const { token, refreshToken } = await login(userID, password);
+      
       const decodedToken = JSON.parse(atob(token.split('.')[1]));
       const roles = decodedToken.roles || [];
       if (!roles.includes('customer')) {
         throw new Error('You are not authorized as a customer');
       }
-      auth.login(token);
+
+      // 2. Pass BOTH tokens to Auth Context to save them
+      auth.login(token, refreshToken);
+      
       navigate('/');
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Login failed');
@@ -74,6 +80,7 @@ const UserLoginNew: React.FC = () => {
     window.location.href = `/api/uam/auth?${qs.toString()}`;
   };
 
+  // Handle Google/Facebook Redirect
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
@@ -97,7 +104,14 @@ const UserLoginNew: React.FC = () => {
         );
         const data = await res.json();
         if (!res.ok) throw new Error(data.error_description || 'Token exchange failed');
-        auth.login(data.access_token);
+        
+        // Extract both tokens from social login response
+        const accessToken = data.access_token;
+        const refreshToken = data.refresh_token;
+
+        // Pass BOTH to Auth Context
+        auth.login(accessToken, refreshToken);
+        
         navigate('/');
       } catch (err: any) {
         alert(err?.message || 'Google login failed');
