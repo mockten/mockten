@@ -113,7 +113,6 @@ interface ApiItemReviewsResponse {
 }
 
 
-
 const parseS3ListXmlKeys = (xmlText: string): string[] => {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlText, 'application/xml');
@@ -235,6 +234,10 @@ const ItemDetailNew: React.FC = () => {
   const [allReviews, setAllReviews] = useState<Review[]>([]);
   const [reviewsTotal, setReviewsTotal] = useState(0);
   const [reviewsPage, setReviewsPage] = useState(1);
+
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity,] = useState<'success' | 'error'>('success');
 
   const reviewsPageSize = 20;
 
@@ -362,8 +365,41 @@ const ItemDetailNew: React.FC = () => {
     console.log('Purchase clicked', { productId: product?.product_id, quantity });
   };
 
-  const handleAddtocart = () => {
+  const handleAddtocart = async () => {
     console.log('Add to cart clicked', { productId: product?.product_id, quantity });
+    if (!product?.product_id) {
+      console.error('Product ID is missing');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('access_token');
+
+      const response = await fetch('/api/cart/items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify({
+          productId: product.product_id,
+          quantity: quantity,
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        throw new Error(`Add to cart failed: ${response.status} ${errText}`);
+      }
+
+      console.log('Product added to cart');
+      setSnackbarMessage('Added to cart');
+      setSnackbarOpen(true);
+    } catch (err: any) {
+      console.error(err.message || 'Add to cart failed');
+      setSnackbarMessage('Add to cart failed');
+      setSnackbarOpen(true);
+    }
   };
 
   const relatedProducts = [
@@ -493,37 +529,37 @@ const ItemDetailNew: React.FC = () => {
       )}
       <Container maxWidth="lg" sx={{ padding: '24px 16px' }}>
         <Typography
-        sx={{
-          fontFamily: 'Noto Sans',
-          fontSize: '14px',
-          color: '#8c8c8c',
-          marginBottom: '16px',
-        }}
-        >
-        <Box
-          component="span"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            navigate('/');
-          }}
           sx={{
-            cursor: 'pointer',
-            '&:hover': { textDecoration: 'underline' },
-          }}
-          role="link"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              navigate('/');
-            }
+            fontFamily: 'Noto Sans',
+            fontSize: '14px',
+            color: '#8c8c8c',
+            marginBottom: '16px',
           }}
         >
-          Home
-        </Box>
-        {' > '}
-        {product.name}
+          <Box
+            component="span"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              navigate('/');
+            }}
+            sx={{
+              cursor: 'pointer',
+              '&:hover': { textDecoration: 'underline' },
+            }}
+            role="link"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                navigate('/');
+              }
+            }}
+          >
+            Home
+          </Box>
+          {' > '}
+          {product.name}
         </Typography>
 
 
@@ -678,6 +714,20 @@ const ItemDetailNew: React.FC = () => {
               >
                 Add to Cart
               </Button>
+              <Snackbar
+                open={snackbarOpen}
+                autoHideDuration={3000}
+                onClose={() => setSnackbarOpen(false)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+              >
+                <Alert
+                  onClose={() => setSnackbarOpen(false)}
+                  severity={snackbarSeverity}
+                  sx={{ width: '100%' }}
+                >
+                  {snackbarMessage}
+                </Alert>
+              </Snackbar>
 
               <Button
                 fullWidth

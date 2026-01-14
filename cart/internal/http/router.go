@@ -6,7 +6,7 @@ import (
 )
 
 func RegisterRoutes(r *gin.Engine, h *Handler, authn *commonauth.Authenticator) {
-	me := r.Group("/cart")
+	me := r.Group("/v1//cart")
 	me.Use(authn.RequireUserID())
 	{
 		me.GET("/", h.GetMeCart)
