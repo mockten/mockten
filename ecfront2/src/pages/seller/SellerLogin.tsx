@@ -2,6 +2,8 @@ import React, { useState, FormEvent } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../Auth';
+// Import setTokens helper from apiClient to ensure consistency
+import { setTokens } from '../../module/apiClient'; 
 import { Container, TextField, Button, Grid, Typography } from '@mui/material';
 
 const SellerLogin: React.FC = () => {
@@ -21,7 +23,10 @@ const SellerLogin: React.FC = () => {
                 password: sellerpassword,
             }));
 
+            // Extract both tokens
             const token = response.data.access_token;
+            const refreshToken = response.data.refresh_token; // Added
+            
             console.log('Token:', token);
 
             const decodedToken = JSON.parse(atob(token.split('.')[1]));
@@ -32,6 +37,7 @@ const SellerLogin: React.FC = () => {
             }
 
             try {
+                // Ideally, use apiClient.get here too, but axios is fine for login flow
                 const userInfoResponse = await axios.get(
                     `/api/uam/userinfo`,
                     {
@@ -44,7 +50,11 @@ const SellerLogin: React.FC = () => {
                 const userInfo = userInfoResponse.data;
                 console.log('User Info:', userInfo);
 
-                auth.login(token);
+                // Save tokens to localStorage manually to be safe
+                setTokens(token, refreshToken);
+
+                // Pass BOTH tokens to Auth Context (Fixes CI Error)
+                auth.login(token, refreshToken);
 
                 navigate(`/seller?name=${encodeURIComponent(sellerID)}`, { state: { token } });
 

@@ -1,9 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+// Import helpers from apiClient
+import { setTokens, clearTokens, getAccessToken } from './module/apiClient';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (token: string) => void;
+  // Updated signature to accept both tokens
+  login: (token: string, refreshToken: string) => void;
   logout: () => void;
 }
 
@@ -19,22 +22,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    console.log("Auth called");
+    // Check if access token exists on mount
+    const token = getAccessToken();
+    console.log("Auth check triggered, token exists:", !!token);
     if (token) {
       setIsAuthenticated(true);
     }
     setIsLoading(false);
   }, []);
 
-  const login = (token: string) => {
-    console.log(token);
-    localStorage.setItem('accessToken', token);
+  // Explicitly save tokens here to ensure consistency
+  const login = (token: string, refreshToken: string) => {
+    console.log("Auth.login called");
+    setTokens(token, refreshToken); // Save to localStorage
     setIsAuthenticated(true);
   };
 
   const logout = () => {
-    localStorage.removeItem('accessToken');
+    clearTokens();
     setIsAuthenticated(false);
   };
 
