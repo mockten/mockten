@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Snackbar, Alert } from '@mui/material';
 import {
   Box,
   Container,
@@ -110,6 +111,19 @@ interface ApiItemReviewsResponse {
   offset: number;
   reviews: ApiReview[];
 }
+
+const location = useLocation();
+const state = location.state as { successMessage?: string };
+
+const [open, setOpen] = useState(false);
+
+useEffect(() => {
+  if (state?.successMessage) {
+    setOpen(true);
+  }
+}, [state]);
+
+
 
 const parseS3ListXmlKeys = (xmlText: string): string[] => {
   const parser = new DOMParser();
@@ -467,6 +481,15 @@ const ItemDetailNew: React.FC = () => {
   return (
     <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       <Appbar />
+      <Snackbar
+        open={open}
+        autoHideDuration={3000}
+        onClose={() => setOpen(false)}
+      >
+        <Alert severity="success" onClose={() => setOpen(false)}>
+          {state.successMessage}
+        </Alert>
+      </Snackbar>
 
       <Container maxWidth="lg" sx={{ padding: '24px 16px' }}>
         <Typography
