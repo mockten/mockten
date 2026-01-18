@@ -37,6 +37,7 @@ import {
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 import photoSvg from '../assets/photo.svg';
+import { api } from '../module/api';
 
 interface Review {
   id: string;
@@ -373,24 +374,10 @@ const ItemDetailNew: React.FC = () => {
     }
 
     try {
-      const token = localStorage.getItem('access_token');
-
-      const response = await fetch('/api/cart/items', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        body: JSON.stringify({
-          productId: product.product_id,
-          quantity: quantity,
-        }),
+      await api.post("/cart/items", {
+        productId: product.product_id,
+        quantity,
       });
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => '');
-        throw new Error(`Add to cart failed: ${response.status} ${errText}`);
-      }
 
       console.log('Product added to cart');
       setSnackbarMessage('Added to cart');

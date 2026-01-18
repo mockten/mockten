@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { api } from '../module/api';
 import {
   AppBar as MuiAppBar,
   Toolbar,
@@ -45,12 +45,11 @@ const Appbar: React.FC<AppbarProps> = ({
 
   const handleCartClick = async () => {
     try {
-      const response = await axios.get('/api/cart/list');
+      const response = await api.get("/cart/list");
       const cartData = response.data.cart;
-  
-      // TODO: 消す
-      console.log('🛒 Cart contents:', cartData); 
-  
+
+      console.log('🛒 Cart contents:', cartData);
+
       if (onCartClick) {
         onCartClick();
       } else {
