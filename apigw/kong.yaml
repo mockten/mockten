@@ -180,6 +180,58 @@ services:
         strip_path: true
         methods:
           - POST
+  - name: cart-service
+    url: http://cart-service.default.svc.cluster.local:50053
+    routes:
+      - name: get-cart
+        paths: [ /api/cart ]
+        methods: [ GET ]
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1/cart/
+      - name: add-to-cart
+        paths: [ /api/cart/items ]
+        methods: [ POST ]
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1/cart/items
+      - name: change-cart-item-quantity
+        paths:
+          - ~/api/cart/items/([^/]+)$
+        methods:
+          - PUT
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: "/v1/cart/items/$(uri_captures[1])"
+      - name: remove-cart-item
+        paths:
+          - ~/api/cart/items/([^/]+)$
+        methods:
+          - DELETE
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: "/v1/cart/items/$(uri_captures[1])"
+      - name: clear-cart
+        paths: [ /api/cart ]
+        methods: [ DELETE ]
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1/cart/
   - name: profile-geocode
     url: http://geocoding-service.default.svc.cluster.local:8080/profile
     routes:

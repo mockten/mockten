@@ -141,7 +141,7 @@ const ItemReview: React.FC = () => {
         // Use apiClient.get instead of fetch
         // This handles token attachment and auto-refresh logic automatically
         const res = await apiClient.get<ApiItemDetailResponse>(`/api/item/detail/${encodeURIComponent(productIdForFetch)}`);
-        
+
         const api = res.data;
 
         const mapped: ProductData = {
@@ -230,6 +230,9 @@ const ItemReview: React.FC = () => {
       setSubmitOk('Review submitted.');
       setRating(0);
       setReviewComment('');
+      navigate(`/item/${productId}`, {
+        state: { successMessage: 'Review submitted.' },
+      });
     } catch (error: any) {
       const msg = error.response?.data?.error || 'Failed to submit review.';
       setSubmitError(msg);
