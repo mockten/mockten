@@ -54,10 +54,22 @@ func getenvDurationSeconds(key string, defSeconds int) time.Duration {
 }
 
 func main() {
-	logger, _ := zap.NewProduction()
-	authn, err := commonauth.NewAuthenticatorFromEnv(commonauth.Options{Logger: logger})
+	var logger *zap.Logger
+	var err error
+	if os.Getenv("mockten_environment") == "production" {
+		logger, err = zap.NewProduction()
+	} else {
+		logger, err = zap.NewDevelopment()
+	}
 	if err != nil {
 		log.Fatal(err)
+	}
+	defer logger.Sync()
+	zap.ReplaceGlobals(logger)
+
+	authn, err := commonauth.NewAuthenticatorFromEnv(commonauth.Options{Logger: logger})
+	if err != nil {
+		logger.Fatal("failed to init authenticator", zap.Error(err))
 	}
 	defer authn.Close()
 
@@ -87,16 +99,16 @@ func main() {
 	// ---- MySQL ----
 	db, err := sqlx.Open("mysql", mysqlDSN)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("failed to open mysql", zap.Error(err))
 	}
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(25)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	if err := db.Ping(); err != nil {
-		log.Fatal(err)
+		logger.Fatal("failed to ping mysql", zap.Error(err))
 	}
-	log.Println("MySQL connected")
+	logger.Info("MySQL connected")
 
 	// ---- Redis ----
 	rdb := redis.NewClient(&redis.Options{
@@ -105,9 +117,9 @@ func main() {
 		DB:       redisDB,
 	})
 	if err := rdb.Ping(context.Background()).Err(); err != nil {
-		log.Fatal(err)
+		logger.Fatal("failed to ping redis", zap.Error(err))
 	}
-	log.Println("Redis connected")
+	logger.Info("Redis connected")
 
 	// ---- DI ----
 	cStore := cartstore.NewRedisCartStore(rdb, cartTTL)
@@ -129,9 +141,9 @@ func main() {
 	}
 
 	go func() {
-		log.Println("cart-service listening on :" + port)
+		logger.Info("cart-service listening", zap.String("addr", port))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
+			logger.Fatal("listen and serve failed", zap.Error(err))
 		}
 	}()
 
@@ -145,5 +157,5 @@ func main() {
 	_ = srv.Shutdown(ctx)
 	_ = rdb.Close()
 	_ = db.Close()
-	log.Println("cart-service shutdown complete")
+	logger.Info("cart-service shutdown complete")
 }

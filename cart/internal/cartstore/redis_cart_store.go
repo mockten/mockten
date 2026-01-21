@@ -10,6 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/mockten/mockten/cart/internal/model"
+	"go.uber.org/zap"
 )
 
 var ErrCartNotFound = errors.New("cart not found")
@@ -34,6 +35,11 @@ func (s *RedisCartStore) key(userID string) string {
 
 func (s *RedisCartStore) Get(ctx context.Context, userID string) (*model.RedisCart, error) {
 	val, err := s.rdb.Get(ctx, s.key(userID)).Result()
+	zap.L().Debug("RedisCartStore.Get",
+		zap.String("userID", userID),
+		zap.String("val", val),
+		zap.Error(err),
+	)
 	if err == redis.Nil {
 		return nil, ErrCartNotFound
 	}
@@ -58,7 +64,11 @@ func (s *RedisCartStore) updateCart(ctx context.Context, userID string, mutate f
 
 		err := s.rdb.Watch(ctx, func(tx *redis.Tx) error {
 			val, err := tx.Get(ctx, key).Result()
-
+			zap.L().Debug("RedisCartStore.updateCart",
+				zap.String("userID", userID),
+				zap.String("val", val),
+				zap.Error(err),
+			)
 			var cart model.RedisCart
 			switch {
 			case err == redis.Nil:

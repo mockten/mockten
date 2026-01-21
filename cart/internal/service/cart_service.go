@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/mockten/mockten/cart/internal/model"
+	"go.uber.org/zap"
 )
 
 type CartGetter interface {
@@ -45,6 +46,10 @@ func (s *CartService) GetCartView(ctx context.Context, userID string) (*model.Ca
 	}
 
 	products, err := s.productRepo.GetByIDs(ctx, ids)
+	zap.L().Debug("CartService.GetCartView.products",
+		zap.Any("products", products),
+		zap.Error(err),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -53,6 +58,9 @@ func (s *CartService) GetCartView(ctx context.Context, userID string) (*model.Ca
 	for _, p := range products {
 		pm[p.ProductID] = p
 	}
+	zap.L().Debug("CartService.GetCartView.pm",
+		zap.Any("pm", pm),
+	)
 
 	// keep cart order and combine (image_url is not returned)
 	items := make([]model.CartViewItem, 0, len(c.Cart))

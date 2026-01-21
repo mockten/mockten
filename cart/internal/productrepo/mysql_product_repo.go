@@ -6,6 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/mockten/mockten/cart/internal/model"
+	"go.uber.org/zap"
 )
 
 type MySQLProductRepo struct {
@@ -29,6 +30,9 @@ func (r *MySQLProductRepo) GetByIDs(ctx context.Context, productIDs []string) ([
 		WHERE product_id IN (?)
 	`, productIDs)
 	if err != nil {
+		zap.L().Debug("sqlx.In",
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
@@ -36,7 +40,13 @@ func (r *MySQLProductRepo) GetByIDs(ctx context.Context, productIDs []string) ([
 
 	var ps []model.Product
 	if err := r.db.SelectContext(ctx, &ps, query, args...); err != nil {
+		zap.L().Debug("r.db.SelectContext",
+			zap.Error(err),
+		)
 		return nil, err
 	}
+	zap.L().Debug("ProductRepo.GetByIDs",
+		zap.Any("products", ps),
+	)
 	return ps, nil
 }
