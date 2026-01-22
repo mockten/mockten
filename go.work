@@ -4,4 +4,10 @@ use (
 	./cart
 	./common
 	./product
+	./adder
+	./ecpay
+	./notification
+	./searchitem
+	./payexecution
+	./ranking
 )
