@@ -1,0 +1,13 @@
+go 1.23.2
+
+use (
+	./cart
+	./common
+	./product
+	./adder
+	./ecpay
+	./notification
+	./searchitem
+	./payexecution
+	./ranking
+)

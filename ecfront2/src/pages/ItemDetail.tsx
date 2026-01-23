@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Snackbar, Alert } from '@mui/material';
 import {
   Box,
   Container,
@@ -36,6 +37,7 @@ import {
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 import photoSvg from '../assets/photo.svg';
+import { api } from '../module/api';
 
 interface Review {
   id: string;
@@ -110,6 +112,7 @@ interface ApiItemReviewsResponse {
   offset: number;
   reviews: ApiReview[];
 }
+
 
 const parseS3ListXmlKeys = (xmlText: string): string[] => {
   const parser = new DOMParser();
@@ -233,12 +236,26 @@ const ItemDetailNew: React.FC = () => {
   const [reviewsTotal, setReviewsTotal] = useState(0);
   const [reviewsPage, setReviewsPage] = useState(1);
 
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity,] = useState<'success' | 'error'>('success');
+
   const reviewsPageSize = 20;
 
   const productIdForImages = useMemo(() => {
     if (product?.product_id) return product.product_id;
     return id || '';
   }, [product?.product_id, id]);
+
+  const location = useLocation();
+  const state = (location.state ?? {}) as { successMessage?: string };
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (state?.successMessage) {
+      setOpen(true);
+    }
+  }, [state]);
 
   useEffect(() => {
     const run = async () => {
@@ -349,8 +366,27 @@ const ItemDetailNew: React.FC = () => {
     console.log('Purchase clicked', { productId: product?.product_id, quantity });
   };
 
-  const handleAddtocart = () => {
+  const handleAddtocart = async () => {
     console.log('Add to cart clicked', { productId: product?.product_id, quantity });
+    if (!product?.product_id) {
+      console.error('Product ID is missing');
+      return;
+    }
+
+    try {
+      await api.post("/cart/items", {
+        productId: product.product_id,
+        quantity,
+      });
+
+      console.log('Product added to cart');
+      setSnackbarMessage('Added to cart');
+      setSnackbarOpen(true);
+    } catch (err: any) {
+      console.error(err.message || 'Add to cart failed');
+      setSnackbarMessage('Add to cart failed');
+      setSnackbarOpen(true);
+    }
   };
 
   const relatedProducts = [
@@ -467,40 +503,50 @@ const ItemDetailNew: React.FC = () => {
   return (
     <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       <Appbar />
-
+      {state.successMessage && (
+        <Snackbar
+          open={open}
+          autoHideDuration={3000}
+          onClose={() => setOpen(false)}
+        >
+          <Alert severity="success" onClose={() => setOpen(false)}>
+            {state.successMessage}
+          </Alert>
+        </Snackbar>
+      )}
       <Container maxWidth="lg" sx={{ padding: '24px 16px' }}>
         <Typography
-        sx={{
-          fontFamily: 'Noto Sans',
-          fontSize: '14px',
-          color: '#8c8c8c',
-          marginBottom: '16px',
-        }}
-        >
-        <Box
-          component="span"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            navigate('/');
-          }}
           sx={{
-            cursor: 'pointer',
-            '&:hover': { textDecoration: 'underline' },
-          }}
-          role="link"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              navigate('/');
-            }
+            fontFamily: 'Noto Sans',
+            fontSize: '14px',
+            color: '#8c8c8c',
+            marginBottom: '16px',
           }}
         >
-          Home
-        </Box>
-        {' > '}
-        {product.name}
+          <Box
+            component="span"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              navigate('/');
+            }}
+            sx={{
+              cursor: 'pointer',
+              '&:hover': { textDecoration: 'underline' },
+            }}
+            role="link"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                navigate('/');
+              }
+            }}
+          >
+            Home
+          </Box>
+          {' > '}
+          {product.name}
         </Typography>
 
 
@@ -655,6 +701,20 @@ const ItemDetailNew: React.FC = () => {
               >
                 Add to Cart
               </Button>
+              <Snackbar
+                open={snackbarOpen}
+                autoHideDuration={3000}
+                onClose={() => setSnackbarOpen(false)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+              >
+                <Alert
+                  onClose={() => setSnackbarOpen(false)}
+                  severity={snackbarSeverity}
+                  sx={{ width: '100%' }}
+                >
+                  {snackbarMessage}
+                </Alert>
+              </Snackbar>
 
               <Button
                 fullWidth
