@@ -26,7 +26,7 @@ func (r *MySQLProductRepo) GetByIDs(ctx context.Context, productIDs []string) ([
 		SELECT
 		  product_id, product_name, seller_id, price, category_id, summary,
 		  product_condition, geo_id, regist_day, last_update
-		FROM product
+		FROM Product
 		WHERE product_id IN (?)
 	`, productIDs)
 	if err != nil {

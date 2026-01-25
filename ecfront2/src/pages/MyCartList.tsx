@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { api } from '../module/api';
 import {
   Box,
   Typography,
@@ -24,8 +25,27 @@ import Footer from '../components/Footer';
 import photoSvg from "../assets/photo.svg";
 import closeIcon from "../assets/close.png";
 
+interface ProductBackend {
+  product_id: string;
+  product_name: string;
+  seller_id: string;
+  price: number;
+  category_id: string;
+  summary: string;
+  product_condition: string;
+  geo_id: string;
+  regist_day: string;
+  last_update: string;
+}
+
+interface CartItemBackend {
+  product: ProductBackend;
+  quantity: number;
+  added_at: string;
+}
+
 interface CartItem {
-  id: number;
+  id: string;
   name: string;
   description: string;
   price: number;
@@ -45,47 +65,43 @@ interface RecommendedProduct {
 
 const CartListNew: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
-  // Mock data - replace with actual API calls
-  const mockCartItems: CartItem[] = [
-    {
-      id: 1,
-      name: 'Sample',
-      description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
-      price: 4550,
-      quantity: 1,
-      image: photoSvg,
-      rating: 4.5,
-    },
-    {
-      id: 2,
-      name: 'Sample',
-      description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
-      price: 4550,
-      quantity: 1,
-      image: photoSvg,
-      rating: 4.5,
-    },
-    {
-      id: 3,
-      name: 'Sample',
-      description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
-      price: 4550,
-      quantity: 1,
-      image: photoSvg,
-      rating: 4.5,
-    },
-    {
-      id: 4,
-      name: 'Sample',
-      description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
-      price: 4550,
-      quantity: 1,
-      image: photoSvg,
-      rating: 4.5,
-    },
-  ];
+  useEffect(() => {
+    const initCart = async () => {
+      let items: CartItemBackend[] = [];
+      if (location.state && location.state.cartData) {
+        items = location.state.cartData;
+      } else {
+        try {
+          const res = await api.get('/cart/list');
+          items = res.data.items;
+        } catch (e) {
+          console.error('Failed to fetch cart items', e);
+        }
+      }
+
+      if (items && Array.isArray(items)) {
+        const mappedItems: CartItem[] = items.map((item) => ({
+          id: item.product.product_id,
+          name: item.product.product_name,
+          description: item.product.summary,
+          price: item.product.price,
+          quantity: item.quantity,
+          image: photoSvg, // Default image as API response doesn't have one yet
+          rating: 0, // Default rating
+        }));
+        setCartItems(mappedItems);
+      }
+    };
+    initCart();
+  }, [location.state]);
+
+
+  const handleRemoveItem = (itemId: string) => {
+    setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
+  };
 
   const mockRecommendedProducts: RecommendedProduct[] = [
     {
@@ -121,16 +137,6 @@ const CartListNew: React.FC = () => {
       image: photoSvg,
     },
   ];
-
-  useEffect(() => {
-    // Mock API call for cart items
-    setCartItems(mockCartItems);
-  }, []);
-
-
-  const handleRemoveItem = (itemId: number) => {
-    setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
-  };
 
   const handleCheckout = () => {
     // TODO: Implement checkout functionality
@@ -174,7 +180,7 @@ const CartListNew: React.FC = () => {
 
 
   return (
-    <Box sx={{  width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
+    <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       {/* App Bar */}
       <Appbar />
 
@@ -217,7 +223,7 @@ const CartListNew: React.FC = () => {
           {/* Cart Items */}
           <Grid item xs={12} md={8}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-              {cartItems.map((item, ) => (
+              {cartItems.map((item,) => (
                 <Box
                   key={item.id}
                   sx={{

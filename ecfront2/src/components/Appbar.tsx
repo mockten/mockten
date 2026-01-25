@@ -46,7 +46,7 @@ const Appbar: React.FC<AppbarProps> = ({
   const handleCartClick = async () => {
     try {
       const response = await api.get("/cart/list");
-      const cartData = response.data.cart;
+      const cartData = response.data.items;
 
       console.log('🛒 Cart contents:', cartData);
 
