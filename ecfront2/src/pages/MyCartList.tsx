@@ -89,7 +89,7 @@ const CartListNew: React.FC = () => {
           description: item.product.summary,
           price: item.product.price,
           quantity: item.quantity,
-          image: photoSvg, // Default image as API response doesn't have one yet
+          image: `/api/storage/${item.product.product_id}.png`,
           rating: 0, // Default rating
         }));
         setCartItems(mappedItems);
@@ -99,8 +99,13 @@ const CartListNew: React.FC = () => {
   }, [location.state]);
 
 
-  const handleRemoveItem = (itemId: string) => {
-    setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
+  const handleRemoveItem = async (itemId: string) => {
+    try {
+      await api.delete(`/cart/items/${itemId}`);
+      setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
+    } catch (error) {
+      console.error('Failed to remove item', error);
+    }
   };
 
   const mockRecommendedProducts: RecommendedProduct[] = [
@@ -268,7 +273,14 @@ const CartListNew: React.FC = () => {
                       marginTop: '12px',
                     }}
                   >
-                    <img src={item.image} alt={item.name} style={{ width: '64px', height: '64px' }} />
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      style={{ width: '64px', height: '64px', objectFit: 'contain' }}
+                      onError={(e) => {
+                        e.currentTarget.src = photoSvg;
+                      }}
+                    />
                   </Box>
 
                   {/* Product Details */}

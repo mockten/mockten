@@ -504,15 +504,42 @@ const ItemDetailNew: React.FC = () => {
     <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       <Appbar />
       {state.successMessage && (
-        <Snackbar
+        <Dialog
           open={open}
-          autoHideDuration={3000}
           onClose={() => setOpen(false)}
+          PaperProps={{
+            sx: {
+              padding: '16px',
+              minWidth: '300px',
+            }
+          }}
         >
-          <Alert severity="success" onClose={() => setOpen(false)}>
-            {state.successMessage}
-          </Alert>
-        </Snackbar>
+          <DialogTitle sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '20px', textAlign: 'center' }}>
+            Success
+          </DialogTitle>
+          <DialogContent>
+            <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', textAlign: 'center', color: 'black' }}>
+              {state.successMessage}
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: 'center' }}>
+            <Button
+              onClick={() => setOpen(false)}
+              variant="contained"
+              sx={{
+                fontFamily: 'Noto Sans',
+                fontWeight: 'bold',
+                backgroundColor: '#5856D6',
+                color: 'white',
+                '&:hover': {
+                  backgroundColor: '#4846C6',
+                }
+              }}
+            >
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
       <Container maxWidth="lg" sx={{ padding: '24px 16px' }}>
         <Typography
