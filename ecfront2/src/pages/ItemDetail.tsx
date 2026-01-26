@@ -367,15 +367,16 @@ const ItemDetailNew: React.FC = () => {
   };
 
   const handleAddtocart = async () => {
-    console.log('Add to cart clicked', { productId: product?.product_id, quantity });
+    console.log('Add to cart clicked', { product_id: product?.product_id, quantity });
     if (!product?.product_id) {
       console.error('Product ID is missing');
       return;
     }
 
     try {
+      // Use api.post which includes baseURL "/api"
       await api.post("/cart/items", {
-        productId: product.product_id,
+        product_id: product.product_id,
         quantity,
       });
 
