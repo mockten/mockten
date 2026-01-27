@@ -53,6 +53,21 @@ func getenvDurationSeconds(key string, defSeconds int) time.Duration {
 	return time.Duration(sec) * time.Second
 }
 
+func retry(logger *zap.Logger, name string, timeout time.Duration, sleep time.Duration, fn func() error) error {
+	start := time.Now()
+	for {
+		err := fn()
+		if err == nil {
+			return nil
+		}
+		if time.Since(start) > timeout {
+			return err
+		}
+		logger.Warn("failed to connect, retrying", zap.String("target", name), zap.Error(err))
+		time.Sleep(sleep)
+	}
+}
+
 func main() {
 	var logger *zap.Logger
 	var err error
@@ -67,8 +82,15 @@ func main() {
 	defer logger.Sync()
 	zap.ReplaceGlobals(logger)
 
-	authn, err := commonauth.NewAuthenticatorFromEnv(commonauth.Options{Logger: logger})
-	if err != nil {
+	retryTimeout := 10 * time.Minute
+	retrySleep := 30 * time.Second
+
+	var authn *commonauth.Authenticator
+	if err := retry(logger, "authenticator", retryTimeout, retrySleep, func() error {
+		var e error
+		authn, e = commonauth.NewAuthenticatorFromEnv(commonauth.Options{Logger: logger})
+		return e
+	}); err != nil {
 		logger.Fatal("failed to init authenticator", zap.Error(err))
 	}
 	defer authn.Close()
@@ -97,26 +119,32 @@ func main() {
 	cartTTL := getenvDurationSeconds("CART_TTL_SECONDS", 0)
 
 	// ---- MySQL ----
-	db, err := sqlx.Open("mysql", mysqlDSN)
-	if err != nil {
-		logger.Fatal("failed to open mysql", zap.Error(err))
-	}
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(25)
-	db.SetConnMaxLifetime(5 * time.Minute)
-
-	if err := db.Ping(); err != nil {
-		logger.Fatal("failed to ping mysql", zap.Error(err))
+	var db *sqlx.DB
+	if err := retry(logger, "mysql", retryTimeout, retrySleep, func() error {
+		var e error
+		db, e = sqlx.Open("mysql", mysqlDSN)
+		if e != nil {
+			return e
+		}
+		db.SetMaxOpenConns(25)
+		db.SetMaxIdleConns(25)
+		db.SetConnMaxLifetime(5 * time.Minute)
+		return db.Ping()
+	}); err != nil {
+		logger.Fatal("failed to open/ping mysql", zap.Error(err))
 	}
 	logger.Info("MySQL connected")
 
 	// ---- Redis ----
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     redisAddr,
-		Password: redisPassword,
-		DB:       redisDB,
-	})
-	if err := rdb.Ping(context.Background()).Err(); err != nil {
+	var rdb *redis.Client
+	if err := retry(logger, "redis", retryTimeout, retrySleep, func() error {
+		rdb = redis.NewClient(&redis.Options{
+			Addr:     redisAddr,
+			Password: redisPassword,
+			DB:       redisDB,
+		})
+		return rdb.Ping(context.Background()).Err()
+	}); err != nil {
 		logger.Fatal("failed to ping redis", zap.Error(err))
 	}
 	logger.Info("Redis connected")

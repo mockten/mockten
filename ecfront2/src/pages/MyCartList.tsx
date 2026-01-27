@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { api } from '../module/api';
+import apiClient from '../module/apiClient';
 import {
   Box,
   Typography,
@@ -75,7 +75,8 @@ const CartListNew: React.FC = () => {
         items = location.state.cartData;
       } else {
         try {
-          const res = await api.get('/cart/list');
+          const res = await apiClient.get('/api/cart/list');
+
           items = res.data.items;
         } catch (e) {
           console.error('Failed to fetch cart items', e);
@@ -101,7 +102,7 @@ const CartListNew: React.FC = () => {
 
   const handleRemoveItem = async (itemId: string) => {
     try {
-      await api.delete(`/cart/items/${itemId}`);
+      await apiClient.delete(`/api/cart/items/${itemId}`);
       setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
     } catch (error) {
       console.error('Failed to remove item', error);
