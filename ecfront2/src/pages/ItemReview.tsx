@@ -213,7 +213,6 @@ const ItemReview: React.FC = () => {
       return;
     }
 
-    // No need to manually get token here, apiClient handles it.
 
     const payload: CreateReviewRequest = {
       productId,
@@ -223,8 +222,7 @@ const ItemReview: React.FC = () => {
 
     setSubmitting(true);
     try {
-      // Use apiClient.post
-      // If access token is expired (401), it will auto-refresh and retry seamlessly.
+
       await apiClient.post('/api/item/review', payload);
 
       setSubmitOk('Review submitted.');

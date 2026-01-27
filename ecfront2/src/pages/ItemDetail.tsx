@@ -37,7 +37,7 @@ import {
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 import photoSvg from '../assets/photo.svg';
-import { api } from '../module/api';
+import apiClient from '../module/apiClient';
 
 interface Review {
   id: string;
@@ -238,7 +238,7 @@ const ItemDetailNew: React.FC = () => {
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity,] = useState<'success' | 'error'>('success');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
 
   const reviewsPageSize = 20;
 
@@ -268,13 +268,9 @@ const ItemDetailNew: React.FC = () => {
       }
 
       try {
-        const res = await fetch(`/api/item/detail/${encodeURIComponent(id)}`, { method: 'GET' });
-        if (!res.ok) {
-          setLoadError(`Failed to load product detail. status=${res.status}`);
-          return;
-        }
-        const api = (await res.json()) as ApiItemDetailResponse;
-        setProduct(mapApiToProduct(api, id));
+        const res = await apiClient.get<ApiItemDetailResponse>(`/api/item/detail/${encodeURIComponent(id)}`);
+        const apiData = res.data;
+        setProduct(mapApiToProduct(apiData, id));
       } catch {
         setLoadError('Failed to load product detail.');
       }
@@ -364,27 +360,31 @@ const ItemDetailNew: React.FC = () => {
 
   const handlePurchase = () => {
     console.log('Purchase clicked', { productId: product?.product_id, quantity });
+    navigate('/cart/shipto');
   };
 
   const handleAddtocart = async () => {
-    console.log('Add to cart clicked', { productId: product?.product_id, quantity });
+    console.log('Add to cart clicked', { product_id: product?.product_id, quantity });
     if (!product?.product_id) {
       console.error('Product ID is missing');
       return;
     }
 
     try {
-      await api.post("/cart/items", {
-        productId: product.product_id,
+      // Use apiClient.post which requires full path starts with /api
+      await apiClient.post("/api/cart/items", {
+        product_id: product.product_id,
         quantity,
       });
 
       console.log('Product added to cart');
       setSnackbarMessage('Added to cart');
+      setSnackbarSeverity('success');
       setSnackbarOpen(true);
     } catch (err: any) {
       console.error(err.message || 'Add to cart failed');
       setSnackbarMessage('Add to cart failed');
+      setSnackbarSeverity('error');
       setSnackbarOpen(true);
     }
   };
@@ -504,15 +504,42 @@ const ItemDetailNew: React.FC = () => {
     <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       <Appbar />
       {state.successMessage && (
-        <Snackbar
+        <Dialog
           open={open}
-          autoHideDuration={3000}
           onClose={() => setOpen(false)}
+          PaperProps={{
+            sx: {
+              padding: '16px',
+              minWidth: '300px',
+            }
+          }}
         >
-          <Alert severity="success" onClose={() => setOpen(false)}>
-            {state.successMessage}
-          </Alert>
-        </Snackbar>
+          <DialogTitle sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '20px', textAlign: 'center' }}>
+            Success
+          </DialogTitle>
+          <DialogContent>
+            <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', textAlign: 'center', color: 'black' }}>
+              {state.successMessage}
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: 'center' }}>
+            <Button
+              onClick={() => setOpen(false)}
+              variant="contained"
+              sx={{
+                fontFamily: 'Noto Sans',
+                fontWeight: 'bold',
+                backgroundColor: '#5856D6',
+                color: 'white',
+                '&:hover': {
+                  backgroundColor: '#4846C6',
+                }
+              }}
+            >
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
       <Container maxWidth="lg" sx={{ padding: '24px 16px' }}>
         <Typography

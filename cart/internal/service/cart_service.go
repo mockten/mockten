@@ -88,7 +88,9 @@ func (s *CartService) GetCartView(ctx context.Context, userID string) (*model.Ca
 			AddedAt:  it.AddedAt,
 		})
 	}
-
+	zap.L().Debug("CartService.GetCartView.items",
+		zap.Any("items", items),
+	)
 	return &model.CartView{
 		UpdatedAt: c.UpdatedAt,
 		Items:     items,
