@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
+import apiClient, { getAccessToken } from '../module/apiClient';
 import {
   Box,
   Container,
@@ -66,12 +67,62 @@ const MyCartCheckout: React.FC = () => {
   const [selectedCard, setSelectedCard] = useState('************1234');
   const [securityCode, setSecurityCode] = useState('');
 
-  // Mock data - replace with actual API calls
-  const shippingAddress = {
-    name: 'Taro Yamada',
-    postalCode: '1530064',
-    address: '103, Hikari Building, 5-3-11 Nakamachi, Shibuya-ku, Tokyo',
-  };
+  const [shippingAddress, setShippingAddress] = useState({
+    name: 'Loading...',
+    postalCode: '',
+    address: '',
+  });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // 1. Get user name from token
+        const token = getAccessToken();
+        let name = 'User';
+        if (token) {
+          try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            const decoded = JSON.parse(jsonPayload);
+            name = decoded.name || decoded.preferred_username || decoded.email || 'User';
+          } catch (e) {
+            console.error('Failed to decode token for name', e);
+          }
+        }
+
+        // 2. Fetch geo data
+        const response = await apiClient.get('/api/geo');
+        const geo = response.data;
+
+        // Format address
+        const fullAddress = [
+          geo.prefecture,
+          geo.city,
+          geo.town,
+          geo.building_name,
+          geo.room_number
+        ].filter(Boolean).join(' ');
+
+        setShippingAddress({
+          name: name,
+          postalCode: geo.postal_code,
+          address: fullAddress || 'Address not registered',
+        });
+      } catch (error) {
+        console.error('Failed to fetch shipping address', error);
+        setShippingAddress({
+          name: 'Error',
+          postalCode: '-',
+          address: 'Failed to load address. Please check your settings.',
+        });
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const orderSummary = {
     subtotal: subtotal,
