@@ -11,19 +11,22 @@ import {
   CardContent,
   Grid,
   Divider,
+  Select,
+  MenuItem,
+  FormControl,
 } from '@mui/material';
 import {
   Star,
   StarHalf,
   StarBorder,
   KeyboardArrowRight,
+  Delete,
 } from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 
 // Sample photo icon when a customer does not set prodct image.
 import photoSvg from "../assets/photo.svg";
-import closeIcon from "../assets/close.png";
 
 interface ProductBackend {
   product_id: string;
@@ -112,6 +115,23 @@ const CartListNew: React.FC = () => {
       setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
     } catch (error) {
       console.error('Failed to remove item', error);
+    }
+  };
+
+  const handleUpdateQuantity = async (itemId: string, newQuantity: number) => {
+    if (newQuantity === 0) {
+      await handleRemoveItem(itemId);
+      return;
+    }
+    try {
+      await apiClient.put(`/api/cart/items/${itemId}`, { quantity: newQuantity });
+      setCartItems(prevItems =>
+        prevItems.map(item =>
+          item.id === itemId ? { ...item, quantity: newQuantity } : item
+        )
+      );
+    } catch (error) {
+      console.error('Failed to update quantity', error);
     }
   };
 
@@ -262,16 +282,14 @@ const CartListNew: React.FC = () => {
                       position: 'absolute',
                       top: '8px',
                       left: '8px',
-                      backgroundColor: 'black',
-                      color: 'white',
-                      width: '24px',
-                      height: '24px',
+                      color: '#9e9e9e',
                       '&:hover': {
-                        backgroundColor: '#333',
+                        color: '#d32f2f',
+                        backgroundColor: 'rgba(211, 47, 47, 0.04)',
                       },
                     }}
                   >
-                    <img src={closeIcon} alt="Remove" style={{ width: '16px', height: '16px' }} />
+                    <Delete />
                   </IconButton>
 
                   {/* Product Image */}
@@ -322,15 +340,40 @@ const CartListNew: React.FC = () => {
                     >
                       {item.description}
                     </Typography>
-                    <Typography
-                      sx={{
-                        fontFamily: 'Noto Sans',
-                        fontSize: '16px',
-                        color: '#666666',
-                      }}
-                    >
-                      Quantity: {item.quantity}
-                    </Typography>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                      <Typography
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontSize: '16px',
+                          color: '#666666',
+                        }}
+                      >
+                        Quantity:
+                      </Typography>
+                      <FormControl variant="standard" sx={{ minWidth: 60 }}>
+                        <Select
+                          value={item.quantity}
+                          onChange={(e) => handleUpdateQuantity(item.id, Number(e.target.value))}
+                          disableUnderline
+                          sx={{
+                            fontFamily: 'Noto Sans',
+                            fontSize: '16px',
+                            color: '#666666',
+                            fontWeight: 'bold',
+                            '& .MuiSelect-select': {
+                              paddingY: '0px',
+                            }
+                          }}
+                        >
+                          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                            <MenuItem key={num} value={num}>
+                              {num === 0 ? '0 (Remove)' : num}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Box>
                     <Typography
                       sx={{
                         fontFamily: 'Noto Sans',
@@ -569,7 +612,7 @@ const CartListNew: React.FC = () => {
 
       {/* Footer */}
       <Footer />
-    </Box>
+    </Box >
   );
 };
 
