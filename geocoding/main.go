@@ -581,6 +581,13 @@ func shippingHandler(w http.ResponseWriter, r *http.Request) {
 	productID := r.URL.Query().Get("product_id")
 	token := r.URL.Query().Get("token")
 
+	if token == "" {
+		authHeader := r.Header.Get("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			token = strings.TrimPrefix(authHeader, "Bearer ")
+		}
+	}
+
 	// Fallback to token if userID is missing
 	if userID == "" && token != "" {
 		if uid, err := getUserIDFromTokenString(token); err == nil && uid != "" {
