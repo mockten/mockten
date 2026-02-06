@@ -63,16 +63,22 @@ type Node struct {
 }
 
 type ShippingDomesticResponse struct {
-	StandardFee float64 `json:"standard_fee"`
-	ExpressFee  float64 `json:"express_fee"`
+	StandardFee  float64 `json:"standard_fee"`
+	ExpressFee   float64 `json:"express_fee"`
+	StandardDays int     `json:"standard_days"`
+	ExpressDays  int     `json:"express_days"`
 }
 
 type ShippingInternationalResponse struct {
-	AirStandardFee float64 `json:"air_standard_fee,omitempty"`
-	AirExpressFee  float64 `json:"air_express_fee,omitempty"`
-	SeaStandardFee float64 `json:"sea_standard_fee,omitempty"`
-	SeaExpressFee  float64 `json:"sea_express_fee,omitempty"`
-	Message        string  `json:"message,omitempty"`
+	AirStandardFee  float64 `json:"air_standard_fee,omitempty"`
+	AirExpressFee   float64 `json:"air_express_fee,omitempty"`
+	SeaStandardFee  float64 `json:"sea_standard_fee,omitempty"`
+	SeaExpressFee   float64 `json:"sea_express_fee,omitempty"`
+	AirStandardDays int     `json:"air_standard_days,omitempty"`
+	AirExpressDays  int     `json:"air_express_days,omitempty"`
+	SeaStandardDays int     `json:"sea_standard_days,omitempty"`
+	SeaExpressDays  int     `json:"sea_express_days,omitempty"`
+	Message         string  `json:"message,omitempty"`
 }
 
 var cfg Config
@@ -550,6 +556,21 @@ func handleDomestic(w http.ResponseWriter, product *Product, user *UserGeo) {
 		StandardFee: round2(finalStd),
 		ExpressFee:  round2(finalExp),
 	}
+
+	// Calculate days
+	// If Road is selected (cheaper or equal), Road Standard=2, Road Express=1
+	// If Air is selected (cheaper), Air Standard=4, Air Express=2
+	if finalStd <= roadStd && !math.IsInf(airStd, 1) && airStd < roadStd {
+		resp.StandardDays = 4
+	} else {
+		resp.StandardDays = 2
+	}
+
+	if finalExp <= roadExp && !math.IsInf(airExp, 1) && airExp < roadExp {
+		resp.ExpressDays = 2
+	} else {
+		resp.ExpressDays = 1
+	}
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -619,15 +640,19 @@ func handleInternational(w http.ResponseWriter, product *Product, user *UserGeo)
 	resp := ShippingInternationalResponse{}
 	if !math.IsInf(airStd, 1) {
 		resp.AirStandardFee = airStd
+		resp.AirStandardDays = 4
 	}
 	if !math.IsInf(airExp, 1) {
 		resp.AirExpressFee = airExp
+		resp.AirExpressDays = 2
 	}
 	if !math.IsInf(seaStd, 1) {
 		resp.SeaStandardFee = seaStd
+		resp.SeaStandardDays = 14
 	}
 	if !math.IsInf(seaExp, 1) {
 		resp.SeaExpressFee = seaExp
+		resp.SeaExpressDays = 7
 	}
 	if resp.AirStandardFee == 0 && resp.AirExpressFee == 0 && resp.SeaStandardFee == 0 && resp.SeaExpressFee == 0 {
 		resp.Message = "No international route available (sea/air cost missing)"
