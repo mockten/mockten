@@ -76,26 +76,39 @@ const MyCartCheckout: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. Get user name from token
-        const token = getAccessToken();
+        // 1. Get user name from userinfo API or token fallback
         let name = 'User';
-        if (token) {
-          try {
-            const base64Url = token.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
-              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-            }).join(''));
-            const decoded = JSON.parse(jsonPayload);
-            name = decoded.name || decoded.preferred_username || decoded.email || 'User';
-          } catch (e) {
-            console.error('Failed to decode token for name', e);
+        try {
+          const userinfoRes = await apiClient.get('/api/uam/userinfo');
+          const userData = userinfoRes.data;
+          name = userData.name || userData.given_name || userData.preferred_username || userData.email || 'User';
+        } catch (uiError) {
+          console.error('Failed to fetch userinfo', uiError);
+          // Fallback to token decoding
+          const token = getAccessToken();
+          if (token) {
+            try {
+              const base64Url = token.split('.')[1];
+              const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+              const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+              }).join(''));
+              const decoded = JSON.parse(jsonPayload);
+              name = decoded.name || decoded.preferred_username || decoded.email || 'User';
+            } catch (e) {
+              console.error('Failed to decode token for name', e);
+            }
           }
         }
 
         // 2. Fetch geo data
         const response = await apiClient.get('/api/geo');
         const geo = response.data;
+
+        // Prioritize name from geo API if available
+        if (geo.user_name && geo.user_name !== 'User') {
+          name = geo.user_name;
+        }
 
         // Format address
         const fullAddress = [

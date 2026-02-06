@@ -86,6 +86,7 @@ type ShippingInternationalResponse struct {
 }
 
 type GeoResponse struct {
+	UserName     string `json:"user_name"`
 	CountryCode  string `json:"country_code"`
 	PostalCode   string `json:"postal_code"`
 	Prefecture   string `json:"prefecture"`
@@ -817,13 +818,14 @@ func getGeoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := `
-SELECT country_code, postal_code, prefecture, city, town, building_name, room_number
-FROM Geo
-WHERE user_id = ?
+SELECT TRIM(CONCAT(COALESCE(ue.FIRST_NAME, ''), ' ', COALESCE(ue.LAST_NAME, ''))) as user_name, g.country_code, g.postal_code, g.prefecture, g.city, g.town, g.building_name, g.room_number
+FROM Geo g
+LEFT JOIN USER_ENTITY ue ON g.user_id = ue.EMAIL
+WHERE g.user_id = ?
 `
 	var g GeoResponse
 	err := db.QueryRow(q, userID).Scan(
-		&g.CountryCode, &g.PostalCode, &g.Prefecture,
+		&g.UserName, &g.CountryCode, &g.PostalCode, &g.Prefecture,
 		&g.City, &g.Town, &g.BuildingName, &g.RoomNumber,
 	)
 	if err != nil {
