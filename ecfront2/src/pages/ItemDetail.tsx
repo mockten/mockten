@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Snackbar, Alert } from '@mui/material';
+import axios from 'axios';
 import {
   Box,
   Container,
@@ -37,7 +38,7 @@ import {
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 import photoSvg from '../assets/photo.svg';
-import apiClient from '../module/apiClient';
+import apiClient, { getAccessToken } from '../module/apiClient';
 
 interface Review {
   id: string;
@@ -111,6 +112,13 @@ interface ApiItemReviewsResponse {
   limit: number;
   offset: number;
   reviews: ApiReview[];
+}
+
+interface ShippingInfo {
+  sea_standard_fee: number;
+  sea_express_fee: number;
+  sea_standard_days: number;
+  sea_express_days: number;
 }
 
 
@@ -236,6 +244,10 @@ const ItemDetailNew: React.FC = () => {
   const [reviewsTotal, setReviewsTotal] = useState(0);
   const [reviewsPage, setReviewsPage] = useState(1);
 
+  const [shippingInfo, setShippingInfo] = useState<ShippingInfo | null>(null);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState('');
+
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
@@ -277,6 +289,35 @@ const ItemDetailNew: React.FC = () => {
     };
 
     run();
+  }, [id]);
+
+  useEffect(() => {
+    const fetchShipping = async () => {
+      setShippingInfo(null);
+      setShippingLoading(false);
+      setShippingError('');
+
+      if (!id) return;
+
+      const token = getAccessToken();
+      if (!token) {
+        // Just fail silently or show message if strictly required
+        return;
+      }
+
+      setShippingLoading(true);
+      try {
+        const url = `/api/shipping?token=${encodeURIComponent(token)}&product_id=${encodeURIComponent(id)}`;
+        const res = await axios.get<ShippingInfo>(url);
+        setShippingInfo(res.data);
+      } catch (err) {
+        setShippingError('Failed to load shipping info');
+      } finally {
+        setShippingLoading(false);
+      }
+    };
+
+    fetchShipping();
   }, [id]);
 
   useEffect(() => {
@@ -873,6 +914,7 @@ const ItemDetailNew: React.FC = () => {
             </Typography>
           </Box>
           <Typography
+            component="div"
             sx={{
               fontFamily: 'Noto Sans',
               fontSize: '16px',
@@ -882,7 +924,18 @@ const ItemDetailNew: React.FC = () => {
               textAlign: 'left',
             }}
           >
-            Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text.
+            {shippingLoading ? (
+              <Box>Loading shipping info...</Box>
+            ) : shippingError ? (
+              <Box sx={{ color: 'red' }}>{shippingError}</Box>
+            ) : shippingInfo ? (
+              <ul>
+                <li>Sea Standard: ${shippingInfo.sea_standard_fee} ({shippingInfo.sea_standard_days} days)</li>
+                <li>Sea Express: ${shippingInfo.sea_express_fee} ({shippingInfo.sea_express_days} days)</li>
+              </ul>
+            ) : (
+              'No shipping information available.'
+            )}
           </Typography>
         </Box>
 
