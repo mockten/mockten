@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -16,7 +18,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MicahParks/keyfunc/v3"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type Config struct {
@@ -81,8 +85,12 @@ type ShippingInternationalResponse struct {
 	Message         string  `json:"message,omitempty"`
 }
 
-var cfg Config
-var db *sql.DB
+var (
+	cfg        Config
+	db         *sql.DB
+	jwks       keyfunc.Keyfunc
+	jwksCancel context.CancelFunc
+)
 
 func loadConfig(path string) {
 	f, err := os.Open(path)
@@ -296,6 +304,101 @@ func geocodeHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// ===== Auth helpers =====
+
+func buildJWKSURL() (string, error) {
+	if v := strings.TrimSpace(os.Getenv("KEYCLOAK_JWKS_URL")); v != "" {
+		return v, nil
+	}
+
+	base := strings.TrimSpace(os.Getenv("KEYCLOAK_BASE_URL"))
+	if base == "" {
+		base = "http://uam-service.default.svc.cluster.local"
+	}
+	realm := strings.TrimSpace(os.Getenv("KEYCLOAK_REALM"))
+	if realm == "" {
+		realm = "mockten-realm-dev"
+	}
+
+	base = strings.TrimRight(base, "/")
+	if realm == "" {
+		return "", errors.New("KEYCLOAK_REALM is empty")
+	}
+
+	return base + "/realms/" + realm + "/protocol/openid-connect/certs", nil
+}
+
+func initJWKS(jwksURL string) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	jwksCancel = cancel
+
+	k, err := keyfunc.NewDefaultCtx(ctx, []string{jwksURL})
+	if err != nil {
+		return err
+	}
+	jwks = k
+	return nil
+}
+
+func jwtHeaderInfo(tokenStr string) (string, string) {
+	p := strings.Split(tokenStr, ".")
+	if len(p) < 2 {
+		return "", ""
+	}
+
+	b, err := base64.RawURLEncoding.DecodeString(p[0])
+	if err != nil {
+		return "", ""
+	}
+
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		return "", ""
+	}
+
+	kid, _ := m["kid"].(string)
+	alg, _ := m["alg"].(string)
+	return strings.TrimSpace(kid), strings.TrimSpace(alg)
+}
+
+func getUserIDFromTokenString(tokenStr string) (string, error) {
+	kid, alg := jwtHeaderInfo(tokenStr)
+
+	parser := jwt.NewParser(
+		jwt.WithValidMethods([]string{"RS256", "RS384", "RS512"}),
+		jwt.WithLeeway(30*time.Second),
+	)
+
+	var claims jwt.MapClaims
+	tok, err := parser.ParseWithClaims(tokenStr, &claims, jwks.Keyfunc)
+	if err != nil {
+		log.Printf("JWT parse failed kid=%s alg=%s err=%v", kid, alg, err)
+		return "", err
+	}
+	if !tok.Valid {
+		log.Printf("JWT invalid kid=%s alg=%s", kid, alg)
+		return "", errors.New("invalid token")
+	}
+
+	if v, ok := claims["email"]; ok {
+		if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+			return strings.TrimSpace(s), nil
+		}
+	}
+	if v, ok := claims["preferred_username"]; ok {
+		if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+			return strings.TrimSpace(s), nil
+		}
+	}
+	if v, ok := claims["sub"]; ok {
+		if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+			return strings.TrimSpace(s), nil
+		}
+	}
+
+	return "", errors.New("no usable user identifier in token claims")
+}
+
 // ===== Shipping helpers (DB) =====
 
 func getProductLocation(productID string) (*Product, error) {
@@ -476,6 +579,17 @@ func round2(v float64) float64 {
 func shippingHandler(w http.ResponseWriter, r *http.Request) {
 	userID := r.URL.Query().Get("user_id")
 	productID := r.URL.Query().Get("product_id")
+	token := r.URL.Query().Get("token")
+
+	// Fallback to token if userID is missing
+	if userID == "" && token != "" {
+		if uid, err := getUserIDFromTokenString(token); err == nil && uid != "" {
+			userID = uid
+		} else {
+			log.Printf("Failed to derive user_id from token: %v", err)
+		}
+	}
+
 	if userID == "" || productID == "" {
 		http.Error(w, "Missing user_id or product_id", http.StatusBadRequest)
 		return
@@ -670,6 +784,22 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 
 func main() {
 	loadConfig("config.json")
+
+	jwksURL, err := buildJWKSURL()
+	if err != nil {
+		log.Fatalf("failed to build jwks url: %v", err)
+	}
+	log.Printf("JWKS URL: %s", jwksURL)
+
+	if err := initJWKS(jwksURL); err != nil {
+		log.Fatalf("failed to init jwks: %v", err)
+	}
+	defer func() {
+		if jwksCancel != nil {
+			jwksCancel()
+		}
+	}()
+
 	initDBWait()
 
 	http.HandleFunc("/profile", geocodeHandler)
