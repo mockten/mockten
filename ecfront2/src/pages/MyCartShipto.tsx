@@ -28,8 +28,39 @@ const arrowRightIcon = "http://localhost:3845/assets/ce1540ba1f8cb0bde2e26ff8f9f
 
 const MyCartShipto: React.FC = () => {
   const navigate = useNavigate();
-  const [selectedDate, setSelectedDate] = useState('April 1, 2023');
-  const [selectedTime, setSelectedTime] = useState('19:00〜21:00');
+  const location = useLocation();
+  // Get state
+  const { shippingFee = 1820, subtotal = 18200, maxDays = 3 } = location.state || {};
+
+  // Generate available dates based on maxDays
+  const getAvailableDates = (startOffset: number) => {
+    const dates = [];
+    const today = new Date();
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + startOffset + i);
+      const dateStr = `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+      dates.push(dateStr);
+    }
+    return dates;
+  };
+
+  const availableDates = getAvailableDates(maxDays);
+
+  const [selectedDate, setSelectedDate] = useState(availableDates[0]);
+  /* New time slots as requested: 10:00-20:00, 2-hour intervals */
+  const availableTimeSlots = [
+    '10:00〜12:00',
+    '12:00〜14:00',
+    '14:00〜16:00',
+    '16:00〜18:00',
+    '18:00〜20:00',
+  ];
+
+  /* Update default state to first available slot */
+  const [selectedTime, setSelectedTime] = useState('10:00〜12:00');
   const [paymentMethod, setPaymentMethod] = useState('credit-card');
   const [selectedCard, setSelectedCard] = useState('************1234');
   const [securityCode, setSecurityCode] = useState('');
@@ -41,26 +72,11 @@ const MyCartShipto: React.FC = () => {
     address: '103, Hikari Building, 5-3-11 Nakamachi, Shibuya-ku, Tokyo',
   };
 
-  const location = useLocation();
-  // Get shipping fee from state or default to 1820
-  const { shippingFee } = location.state || { shippingFee: 1820 };
-
   const orderSummary = {
-    subtotal: 18200,
+    subtotal: subtotal,
     shipping: shippingFee,
-    total: 18200 + shippingFee,
+    total: subtotal + shippingFee,
   };
-
-  const availableDates = [
-    'April 1, 2023',
-    'April 2, 2023',
-    'April 3, 2023',
-  ];
-
-  const availableTimeSlots = [
-    '19:00〜21:00',
-    '21:00〜23:00',
-  ];
 
   const savedCards = [
     '************1234',

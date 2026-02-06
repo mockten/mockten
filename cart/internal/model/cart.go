@@ -15,6 +15,7 @@ type RedisCartItem struct {
 	ID           string    `json:"id"`
 	ShippingFee  float64   `json:"shipping_fee"`
 	ShippingType string    `json:"shipping_type"`
+	ShippingDays int       `json:"shipping_days"`
 }
 
 // For DB (product table)
@@ -52,6 +53,7 @@ type CartViewItem struct {
 	AddedAt      time.Time  `json:"added_at"`
 	ShippingFee  float64    `json:"shipping_fee"`
 	ShippingType string     `json:"shipping_type"`
+	ShippingDays int        `json:"shipping_days"`
 }
 
 type CartView struct {

@@ -89,6 +89,7 @@ func (s *CartService) GetCartView(ctx context.Context, userID string) (*model.Ca
 			AddedAt:      it.AddedAt,
 			ShippingFee:  it.ShippingFee,
 			ShippingType: it.ShippingType,
+			ShippingDays: it.ShippingDays,
 		})
 	}
 	zap.L().Debug("CartService.GetCartView.items",

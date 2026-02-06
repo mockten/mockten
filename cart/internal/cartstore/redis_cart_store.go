@@ -132,7 +132,7 @@ func findItemIndex(items []model.RedisCartItem, id string) int {
 	return -1
 }
 
-func (s *RedisCartStore) AddItem(ctx context.Context, userID, productID string, quantity int, shippingFee float64, shippingType string) (*model.RedisCart, error) {
+func (s *RedisCartStore) AddItem(ctx context.Context, userID, productID string, quantity int, shippingFee float64, shippingType string, shippingDays int) (*model.RedisCart, error) {
 	now := time.Now().UTC()
 	// Generate unique ID for cart item
 	id := fmt.Sprintf("%s:%s", productID, shippingType)
@@ -153,6 +153,7 @@ func (s *RedisCartStore) AddItem(ctx context.Context, userID, productID string, 
 			AddedAt:      now,
 			ShippingFee:  shippingFee,
 			ShippingType: shippingType,
+			ShippingDays: shippingDays,
 		})
 		return nil
 	})

@@ -257,7 +257,7 @@ const ItemDetailNew: React.FC = () => {
   const [shippingInfo, setShippingInfo] = useState<ShippingInfo | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
   const [shippingError, setShippingError] = useState('');
-  const [selectedShipping, setSelectedShipping] = useState<{ fee: number, label: string } | null>(null);
+  const [selectedShipping, setSelectedShipping] = useState<{ fee: number, label: string; days: number } | null>(null);
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -436,6 +436,7 @@ const ItemDetailNew: React.FC = () => {
         quantity,
         shipping_fee: selectedShipping.fee,
         shipping_type: selectedShipping.label,
+        shipping_days: selectedShipping.days,
       });
 
       console.log('Product added to cart');
@@ -957,7 +958,7 @@ const ItemDetailNew: React.FC = () => {
                       if (selectedShipping?.label === 'Air Standard') {
                         setSelectedShipping(null);
                       } else {
-                        setSelectedShipping({ fee: shippingInfo.air_standard_fee!, label: 'Air Standard' });
+                        setSelectedShipping({ fee: shippingInfo.air_standard_fee!, label: 'Air Standard', days: shippingInfo.air_standard_days! });
                       }
                     }}
                     sx={{
@@ -994,7 +995,7 @@ const ItemDetailNew: React.FC = () => {
                       if (selectedShipping?.label === 'Air Express') {
                         setSelectedShipping(null);
                       } else {
-                        setSelectedShipping({ fee: shippingInfo.air_express_fee!, label: 'Air Express' });
+                        setSelectedShipping({ fee: shippingInfo.air_express_fee!, label: 'Air Express', days: shippingInfo.air_express_days! });
                       }
                     }}
                     sx={{
@@ -1031,7 +1032,7 @@ const ItemDetailNew: React.FC = () => {
                       if (selectedShipping?.label === 'Sea Standard') {
                         setSelectedShipping(null);
                       } else {
-                        setSelectedShipping({ fee: shippingInfo.sea_standard_fee!, label: 'Sea Standard' });
+                        setSelectedShipping({ fee: shippingInfo.sea_standard_fee!, label: 'Sea Standard', days: shippingInfo.sea_standard_days! });
                       }
                     }}
                     sx={{
@@ -1068,7 +1069,7 @@ const ItemDetailNew: React.FC = () => {
                       if (selectedShipping?.label === 'Sea Express') {
                         setSelectedShipping(null);
                       } else {
-                        setSelectedShipping({ fee: shippingInfo.sea_express_fee!, label: 'Sea Express' });
+                        setSelectedShipping({ fee: shippingInfo.sea_express_fee!, label: 'Sea Express', days: shippingInfo.sea_express_days! });
                       }
                     }}
                     sx={{
@@ -1105,7 +1106,7 @@ const ItemDetailNew: React.FC = () => {
                       if (selectedShipping?.label === 'Standard Delivery') {
                         setSelectedShipping(null);
                       } else {
-                        setSelectedShipping({ fee: shippingInfo.standard_fee!, label: 'Standard Delivery' });
+                        setSelectedShipping({ fee: shippingInfo.standard_fee!, label: 'Standard Delivery', days: shippingInfo.standard_days! });
                       }
                     }}
                     sx={{
@@ -1142,7 +1143,7 @@ const ItemDetailNew: React.FC = () => {
                       if (selectedShipping?.label === 'Express Delivery') {
                         setSelectedShipping(null);
                       } else {
-                        setSelectedShipping({ fee: shippingInfo.express_fee!, label: 'Express Delivery' });
+                        setSelectedShipping({ fee: shippingInfo.express_fee!, label: 'Express Delivery', days: shippingInfo.express_days! });
                       }
                     }}
                     sx={{

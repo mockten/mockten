@@ -58,6 +58,7 @@ interface CartItem {
   rating: number;
   shipping_fee: number;
   shipping_type: string;
+  shipping_days: number;
 }
 
 interface RecommendedProduct {
@@ -101,6 +102,7 @@ const CartListNew: React.FC = () => {
           rating: 0, // Default rating
           shipping_fee: item.shipping_fee || 0,
           shipping_type: item.shipping_type || 'Standard',
+          shipping_days: item.shipping_days || 3,
         }));
         setCartItems(mappedItems);
       }
@@ -171,10 +173,14 @@ const CartListNew: React.FC = () => {
   ];
 
   const handleCheckout = () => {
-    // TODO: Implement checkout functionality
     const fee = calculateShipping();
-    navigate('/cart/shipto', { state: { shippingFee: fee } });
-    console.log('Proceeding to checkout');
+    const subtotal = calculateSubtotal();
+    const maxDays = cartItems.reduce((max, item) => Math.max(max, item.shipping_days || 3), 0);
+    // If no items or all 0, default to 3
+    const finalDays = maxDays > 0 ? maxDays : 3;
+
+    navigate('/cart/shipto', { state: { shippingFee: fee, subtotal: subtotal, maxDays: finalDays } });
+    console.log('Proceeding to checkout with fee:', fee, 'subtotal:', subtotal, 'days:', finalDays);
   };
 
   const renderStars = (rating: number) => {
