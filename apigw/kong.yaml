@@ -250,3 +250,12 @@ services:
         strip_path: true
         methods:
           - GET
+  - name: geocoding-retriever
+    url: http://geocoding-service.default.svc.cluster.local:8080/geo
+    routes:
+      - name: geocoding-retriever-route
+        paths:
+          - /api/geo
+        strip_path: true
+        methods:
+          - GET

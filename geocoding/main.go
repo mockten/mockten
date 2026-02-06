@@ -85,6 +85,16 @@ type ShippingInternationalResponse struct {
 	Message         string  `json:"message,omitempty"`
 }
 
+type GeoResponse struct {
+	CountryCode  string `json:"country_code"`
+	PostalCode   string `json:"postal_code"`
+	Prefecture   string `json:"prefecture"`
+	City         string `json:"city"`
+	Town         string `json:"town"`
+	BuildingName string `json:"building_name"`
+	RoomNumber   string `json:"room_number"`
+}
+
 var (
 	cfg        Config
 	db         *sql.DB
@@ -781,6 +791,54 @@ func handleInternational(w http.ResponseWriter, product *Product, user *UserGeo)
 	writeJSON(w, http.StatusOK, resp)
 }
 
+func getGeoHandler(w http.ResponseWriter, r *http.Request) {
+	userID := r.URL.Query().Get("user_id")
+	token := r.URL.Query().Get("token")
+
+	if token == "" {
+		authHeader := r.Header.Get("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			token = strings.TrimPrefix(authHeader, "Bearer ")
+		}
+	}
+
+	// Fallback to token if userID is missing
+	if userID == "" && token != "" {
+		if uid, err := getUserIDFromTokenString(token); err == nil && uid != "" {
+			userID = uid
+		} else {
+			log.Printf("Failed to derive user_id from token: %v", err)
+		}
+	}
+
+	if userID == "" {
+		http.Error(w, "Missing user_id", http.StatusBadRequest)
+		return
+	}
+
+	q := `
+SELECT country_code, postal_code, prefecture, city, town, building_name, room_number
+FROM Geo
+WHERE user_id = ?
+`
+	var g GeoResponse
+	err := db.QueryRow(q, userID).Scan(
+		&g.CountryCode, &g.PostalCode, &g.Prefecture,
+		&g.City, &g.Town, &g.BuildingName, &g.RoomNumber,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "User geo data not found", http.StatusNotFound)
+		} else {
+			log.Printf("DB query error: %v", err)
+			http.Error(w, "Database error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, g)
+}
+
 func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
@@ -811,6 +869,7 @@ func main() {
 
 	http.HandleFunc("/profile", geocodeHandler)
 	http.HandleFunc("/shipping", shippingHandler)
+	http.HandleFunc("/geo", getGeoHandler)
 
 	fmt.Println("Server started at :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
