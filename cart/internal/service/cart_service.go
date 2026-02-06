@@ -83,9 +83,12 @@ func (s *CartService) GetCartView(ctx context.Context, userID string) (*model.Ca
 			LastUpdate:       p.LastUpdate,
 		}
 		items = append(items, model.CartViewItem{
-			Product:  dto,
-			Quantity: it.Quantity,
-			AddedAt:  it.AddedAt,
+			ID:           it.ID,
+			Product:      dto,
+			Quantity:     it.Quantity,
+			AddedAt:      it.AddedAt,
+			ShippingFee:  it.ShippingFee,
+			ShippingType: it.ShippingType,
 		})
 	}
 	zap.L().Debug("CartService.GetCartView.items",

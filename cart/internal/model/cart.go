@@ -9,9 +9,12 @@ type RedisCart struct {
 }
 
 type RedisCartItem struct {
-	ProductID string    `json:"product_id"`
-	Quantity  int       `json:"quantity"`
-	AddedAt   time.Time `json:"added_at"`
+	ProductID    string    `json:"product_id"`
+	Quantity     int       `json:"quantity"`
+	AddedAt      time.Time `json:"added_at"`
+	ID           string    `json:"id"`
+	ShippingFee  float64   `json:"shipping_fee"`
+	ShippingType string    `json:"shipping_type"`
 }
 
 // For DB (product table)
@@ -43,9 +46,12 @@ type ProductDTO struct {
 }
 
 type CartViewItem struct {
-	Product  ProductDTO `json:"product"`
-	Quantity int        `json:"quantity"`
-	AddedAt  time.Time  `json:"added_at"`
+	ID           string     `json:"id"`
+	Product      ProductDTO `json:"product"`
+	Quantity     int        `json:"quantity"`
+	AddedAt      time.Time  `json:"added_at"`
+	ShippingFee  float64    `json:"shipping_fee"`
+	ShippingType string     `json:"shipping_type"`
 }
 
 type CartView struct {

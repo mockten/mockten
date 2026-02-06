@@ -47,8 +47,10 @@ func (h *Handler) GetMeCart(c *gin.Context) {
 }
 
 type AddItemReq struct {
-	ProductID string `json:"product_id" binding:"required"`
-	Quantity  int    `json:"quantity" binding:"required,min=1,max=99"`
+	ProductID    string  `json:"product_id" binding:"required"`
+	Quantity     int     `json:"quantity" binding:"required,min=1,max=99"`
+	ShippingFee  float64 `json:"shipping_fee" binding:"min=0"`
+	ShippingType string  `json:"shipping_type" binding:"required"`
 }
 
 func (h *Handler) AddItem(c *gin.Context) {
@@ -64,7 +66,7 @@ func (h *Handler) AddItem(c *gin.Context) {
 		return
 	}
 
-	if _, err := h.cartStore.AddItem(c.Request.Context(), uid, req.ProductID, req.Quantity); err != nil {
+	if _, err := h.cartStore.AddItem(c.Request.Context(), uid, req.ProductID, req.Quantity, req.ShippingFee, req.ShippingType); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

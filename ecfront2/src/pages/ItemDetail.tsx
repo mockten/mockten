@@ -257,6 +257,7 @@ const ItemDetailNew: React.FC = () => {
   const [shippingInfo, setShippingInfo] = useState<ShippingInfo | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
   const [shippingError, setShippingError] = useState('');
+  const [selectedShipping, setSelectedShipping] = useState<{ fee: number, label: string } | null>(null);
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -406,7 +407,13 @@ const ItemDetailNew: React.FC = () => {
 
   const handlePurchase = () => {
     console.log('Purchase clicked', { productId: product?.product_id, quantity });
-    navigate('/cart/shipto');
+    if (!selectedShipping) {
+      setSnackbarMessage('Please select a delivery method');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      return;
+    }
+    navigate('/cart/shipto', { state: { shippingFee: selectedShipping.fee } });
   };
 
   const handleAddtocart = async () => {
@@ -415,12 +422,20 @@ const ItemDetailNew: React.FC = () => {
       console.error('Product ID is missing');
       return;
     }
+    if (!selectedShipping) {
+      setSnackbarMessage('Please select a delivery method');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      return;
+    }
 
     try {
       // Use apiClient.post which requires full path starts with /api
       await apiClient.post("/api/cart/items", {
         product_id: product.product_id,
         quantity,
+        shipping_fee: selectedShipping.fee,
+        shipping_type: selectedShipping.label,
       });
 
       console.log('Product added to cart');
@@ -938,13 +953,21 @@ const ItemDetailNew: React.FC = () => {
                 {/* Air Standard Shipping */}
                 {shippingInfo.air_standard_fee !== undefined && (
                   <Box
+                    onClick={() => {
+                      if (selectedShipping?.label === 'Air Standard') {
+                        setSelectedShipping(null);
+                      } else {
+                        setSelectedShipping({ fee: shippingInfo.air_standard_fee!, label: 'Air Standard' });
+                      }
+                    }}
                     sx={{
-                      border: '1px solid #ddd',
+                      border: selectedShipping?.label === 'Air Standard' ? '2px solid #5856D6' : '1px solid #ddd',
                       borderRadius: '8px',
                       padding: '16px',
                       display: 'flex',
                       alignItems: 'center',
-                      backgroundColor: '#fafafa',
+                      backgroundColor: selectedShipping?.label === 'Air Standard' ? '#f0effc' : '#fafafa',
+                      cursor: 'pointer',
                     }}
                   >
                     <Box sx={{ marginRight: '16px', display: 'flex', alignItems: 'center' }}>
@@ -967,13 +990,21 @@ const ItemDetailNew: React.FC = () => {
                 {/* Air Express Shipping */}
                 {shippingInfo.air_express_fee !== undefined && (
                   <Box
+                    onClick={() => {
+                      if (selectedShipping?.label === 'Air Express') {
+                        setSelectedShipping(null);
+                      } else {
+                        setSelectedShipping({ fee: shippingInfo.air_express_fee!, label: 'Air Express' });
+                      }
+                    }}
                     sx={{
-                      border: '1px solid #ddd',
+                      border: selectedShipping?.label === 'Air Express' ? '2px solid #5856D6' : '1px solid #ddd',
                       borderRadius: '8px',
                       padding: '16px',
                       display: 'flex',
                       alignItems: 'center',
-                      backgroundColor: '#fafafa',
+                      backgroundColor: selectedShipping?.label === 'Air Express' ? '#f0effc' : '#fafafa',
+                      cursor: 'pointer',
                     }}
                   >
                     <Box sx={{ marginRight: '16px', display: 'flex', alignItems: 'center' }}>
@@ -996,13 +1027,21 @@ const ItemDetailNew: React.FC = () => {
                 {/* Sea Standard Shipping */}
                 {shippingInfo.sea_standard_fee !== undefined && (
                   <Box
+                    onClick={() => {
+                      if (selectedShipping?.label === 'Sea Standard') {
+                        setSelectedShipping(null);
+                      } else {
+                        setSelectedShipping({ fee: shippingInfo.sea_standard_fee!, label: 'Sea Standard' });
+                      }
+                    }}
                     sx={{
-                      border: '1px solid #ddd',
+                      border: selectedShipping?.label === 'Sea Standard' ? '2px solid #5856D6' : '1px solid #ddd',
                       borderRadius: '8px',
                       padding: '16px',
                       display: 'flex',
                       alignItems: 'center',
-                      backgroundColor: '#fafafa',
+                      backgroundColor: selectedShipping?.label === 'Sea Standard' ? '#f0effc' : '#fafafa',
+                      cursor: 'pointer',
                     }}
                   >
                     <Box sx={{ marginRight: '16px', display: 'flex', alignItems: 'center' }}>
@@ -1025,13 +1064,21 @@ const ItemDetailNew: React.FC = () => {
                 {/* Sea Express Shipping */}
                 {shippingInfo.sea_express_fee !== undefined && (
                   <Box
+                    onClick={() => {
+                      if (selectedShipping?.label === 'Sea Express') {
+                        setSelectedShipping(null);
+                      } else {
+                        setSelectedShipping({ fee: shippingInfo.sea_express_fee!, label: 'Sea Express' });
+                      }
+                    }}
                     sx={{
-                      border: '1px solid #ddd',
+                      border: selectedShipping?.label === 'Sea Express' ? '2px solid #5856D6' : '1px solid #ddd',
                       borderRadius: '8px',
                       padding: '16px',
                       display: 'flex',
                       alignItems: 'center',
-                      backgroundColor: '#fafafa',
+                      backgroundColor: selectedShipping?.label === 'Sea Express' ? '#f0effc' : '#fafafa',
+                      cursor: 'pointer',
                     }}
                   >
                     <Box sx={{ marginRight: '16px', display: 'flex', alignItems: 'center' }}>
@@ -1054,13 +1101,21 @@ const ItemDetailNew: React.FC = () => {
                 {/* Domestic Standard Shipping */}
                 {shippingInfo.standard_fee !== undefined && (
                   <Box
+                    onClick={() => {
+                      if (selectedShipping?.label === 'Standard Delivery') {
+                        setSelectedShipping(null);
+                      } else {
+                        setSelectedShipping({ fee: shippingInfo.standard_fee!, label: 'Standard Delivery' });
+                      }
+                    }}
                     sx={{
-                      border: '1px solid #ddd',
+                      border: selectedShipping?.label === 'Standard Delivery' ? '2px solid #5856D6' : '1px solid #ddd',
                       borderRadius: '8px',
                       padding: '16px',
                       display: 'flex',
                       alignItems: 'center',
-                      backgroundColor: '#fafafa',
+                      backgroundColor: selectedShipping?.label === 'Standard Delivery' ? '#f0effc' : '#fafafa',
+                      cursor: 'pointer',
                     }}
                   >
                     <Box sx={{ marginRight: '16px', display: 'flex', alignItems: 'center' }}>
@@ -1083,13 +1138,21 @@ const ItemDetailNew: React.FC = () => {
                 {/* Domestic Express Shipping */}
                 {shippingInfo.express_fee !== undefined && (
                   <Box
+                    onClick={() => {
+                      if (selectedShipping?.label === 'Express Delivery') {
+                        setSelectedShipping(null);
+                      } else {
+                        setSelectedShipping({ fee: shippingInfo.express_fee!, label: 'Express Delivery' });
+                      }
+                    }}
                     sx={{
-                      border: '1px solid #ddd',
+                      border: selectedShipping?.label === 'Express Delivery' ? '2px solid #5856D6' : '1px solid #ddd',
                       borderRadius: '8px',
                       padding: '16px',
                       display: 'flex',
                       alignItems: 'center',
-                      backgroundColor: '#fafafa',
+                      backgroundColor: selectedShipping?.label === 'Express Delivery' ? '#f0effc' : '#fafafa',
+                      cursor: 'pointer',
                     }}
                   >
                     <Box sx={{ marginRight: '16px', display: 'flex', alignItems: 'center' }}>

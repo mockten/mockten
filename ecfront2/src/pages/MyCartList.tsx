@@ -45,13 +45,16 @@ interface CartItemBackend {
 }
 
 interface CartItem {
-  id: string;
+  id: string; // This is now the line item ID (e.g. "prodID:shipping")
+  productId: string; // Original product ID for images/links
   name: string;
   description: string;
   price: number;
   quantity: number;
   image: string;
   rating: number;
+  shipping_fee: number;
+  shipping_type: string;
 }
 
 interface RecommendedProduct {
@@ -84,14 +87,17 @@ const CartListNew: React.FC = () => {
       }
 
       if (items && Array.isArray(items)) {
-        const mappedItems: CartItem[] = items.map((item) => ({
-          id: item.product.product_id,
+        const mappedItems: CartItem[] = items.map((item: any) => ({
+          id: item.id || item.product.product_id, // Use new ID if available, fallback for old items
+          productId: item.product.product_id,
           name: item.product.product_name,
           description: item.product.summary,
           price: item.product.price,
           quantity: item.quantity,
           image: `/api/storage/${item.product.product_id}.png`,
           rating: 0, // Default rating
+          shipping_fee: item.shipping_fee || 0,
+          shipping_type: item.shipping_type || 'Standard',
         }));
         setCartItems(mappedItems);
       }
@@ -146,7 +152,8 @@ const CartListNew: React.FC = () => {
 
   const handleCheckout = () => {
     // TODO: Implement checkout functionality
-    navigate('/cart/shipto');
+    const fee = calculateShipping();
+    navigate('/cart/shipto', { state: { shippingFee: fee } });
     console.log('Proceeding to checkout');
   };
 
@@ -175,9 +182,15 @@ const CartListNew: React.FC = () => {
     return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
+  // Removed getShippingFee (localStorage based)
+
   const calculateShipping = () => {
-    const subtotal = calculateSubtotal();
-    return Math.round(subtotal * 0.1); // 10% shipping
+    // Sum up shipping fee of all items
+    // Assuming backend fee is PER ITEM UNIT. If it is total for that line, then just add it.
+    // Based on backend change: `c.Cart[idx].Quantity += quantity` and `ShippingFee` stored in struct.
+    // If we add 2 items, `ShippingFee` in struct stays same (unit fee).
+    // So Total = sum(item.quantity * item.shipping_fee)
+    return cartItems.reduce((total, item) => total + (item.shipping_fee * item.quantity), 0);
   };
 
   const calculateTotal = () => {
@@ -317,6 +330,16 @@ const CartListNew: React.FC = () => {
                       }}
                     >
                       Quantity: {item.quantity}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontFamily: 'Noto Sans',
+                        fontSize: '14px',
+                        color: '#666666',
+                        marginTop: '4px',
+                      }}
+                    >
+                      Shipping: {item.shipping_type} (${item.shipping_fee.toFixed(2)})
                     </Typography>
                   </Box>
                 </Box>

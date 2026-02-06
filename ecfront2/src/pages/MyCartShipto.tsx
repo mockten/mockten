@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -41,10 +41,14 @@ const MyCartShipto: React.FC = () => {
     address: '103, Hikari Building, 5-3-11 Nakamachi, Shibuya-ku, Tokyo',
   };
 
+  const location = useLocation();
+  // Get shipping fee from state or default to 1820
+  const { shippingFee } = location.state || { shippingFee: 1820 };
+
   const orderSummary = {
     subtotal: 18200,
-    shipping: 1820,
-    total: 20020,
+    shipping: shippingFee,
+    total: 18200 + shippingFee,
   };
 
   const availableDates = [
@@ -123,7 +127,7 @@ const MyCartShipto: React.FC = () => {
   );
 
   return (
-    <Box sx={{  width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
+    <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       {/* App Bar */}
       <Appbar />
 
