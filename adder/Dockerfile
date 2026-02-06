@@ -15,7 +15,7 @@ COPY . .
 RUN go build .
 
 # As runner
-FROM alpine:3.23.2
+FROM alpine:3.23.3
 RUN apk --no-cache add ca-certificates &&\
     apk add gcompat
 COPY --from=builder  /go/setenv/adder .
