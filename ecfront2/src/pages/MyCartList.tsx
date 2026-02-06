@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import apiClient from '../module/apiClient';
 import {
   Box,
@@ -240,7 +240,10 @@ const CartListNew: React.FC = () => {
             marginBottom: '16px',
           }}
         >
-          Home &gt; My Cart List
+          <Link to="/" style={{ color: '#8c8c8c', textDecoration: 'none' }}>
+            Home
+          </Link>{' '}
+          &gt; My Cart
         </Typography>
 
         {/* Cart Title */}
@@ -451,7 +454,7 @@ const CartListNew: React.FC = () => {
                       color: 'black',
                     }}
                   >
-                    Shipping and service charges:
+                    Shipping fee:
                   </Typography>
                   <Typography
                     sx={{
@@ -475,7 +478,7 @@ const CartListNew: React.FC = () => {
                       color: 'black',
                     }}
                   >
-                    Amount billed:
+                    Total Amount:
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Typography

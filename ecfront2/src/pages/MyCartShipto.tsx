@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -162,13 +162,20 @@ const MyCartShipto: React.FC = () => {
                 marginBottom: '16px',
               }}
             >
-              Home &gt; My Cart List &gt; Ship to
+              <Link to="/" style={{ color: '#8c8c8c', textDecoration: 'none' }}>
+                Home
+              </Link>{' '}
+              &gt;{' '}
+              <Link to="/cart/list" style={{ color: '#8c8c8c', textDecoration: 'none' }}>
+                My Cart
+              </Link>{' '}
+              &gt; Checkout
             </Typography>
 
             <Divider sx={{ marginBottom: '16px', backgroundColor: '#dddddd' }} />
 
-            {/* Date and Time of Dubbing */}
-            <SectionTitle title="Date and Time of Dubbing" />
+            {/* Delivery Date and Time */}
+            <SectionTitle title="Delivery Date and Time" />
             <FormControl
               fullWidth
               sx={{
@@ -274,7 +281,7 @@ const MyCartShipto: React.FC = () => {
                 marginBottom: '16px',
               }}
             >
-              Same delivery address as member information
+              Same as member address
             </Typography>
             <Button
               variant="outlined"
@@ -535,7 +542,7 @@ const MyCartShipto: React.FC = () => {
                       color: 'black',
                     }}
                   >
-                    Shipping and service charges:
+                    Shipping Fee:
                   </Typography>
                   <Typography
                     sx={{
@@ -557,7 +564,7 @@ const MyCartShipto: React.FC = () => {
                       color: 'black',
                     }}
                   >
-                    Amount billed :
+                    Total Amount :
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
                     <Typography
