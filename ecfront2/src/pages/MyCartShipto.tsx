@@ -30,7 +30,8 @@ const MyCartShipto: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   // Get state
-  const { shippingFee = 1820, subtotal = 18200, maxDays = 3 } = location.state || {};
+  // Get state
+  const { shippingFee = 1820, subtotal = 18200, maxDays = 3, items = [] } = location.state || {};
 
   // Generate available dates based on maxDays
   const getAvailableDates = (startOffset: number) => {
@@ -472,7 +473,37 @@ const MyCartShipto: React.FC = () => {
 
           {/* Right Column - Order Summary */}
           <Grid item xs={12} md={5}>
-            <Box sx={{ paddingTop: '128px' }}>
+            <Box sx={{ paddingTop: '50px' }}>
+              {/* Item List Summary */}
+              <Box sx={{ marginBottom: '32px' }}>
+                <Typography
+                  sx={{
+                    fontFamily: 'Noto Sans',
+                    fontWeight: 'bold',
+                    fontSize: '18px',
+                    color: 'black',
+                    marginBottom: '16px',
+                  }}
+                >
+                  Items in Cart ({items.length})
+                </Typography>
+                {items.map((item: any) => (
+                  <Box key={item.id} sx={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      style={{ width: '64px', height: '64px', objectFit: 'contain', backgroundColor: '#f5f5f5', borderRadius: '4px' }}
+                      onError={(e) => { e.currentTarget.src = "http://localhost:3845/assets/ce1540ba1f8cb0bde2e26ff8f9fc566f7be994a6.svg"; }} /* Fallback to existing icon if fail? Or just the photo placeholder */
+                    />
+                    <Box>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', fontWeight: 'bold' }}>{item.name}</Typography>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '12px', color: '#666' }}>Quantity: {item.quantity}</Typography>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '12px', color: '#666' }}>Shipping: {item.shipping_type}</Typography>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+
               {/* Order Summary */}
               <Box sx={{ marginBottom: '16px' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>

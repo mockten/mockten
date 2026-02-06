@@ -179,8 +179,8 @@ const CartListNew: React.FC = () => {
     // If no items or all 0, default to 3
     const finalDays = maxDays > 0 ? maxDays : 3;
 
-    navigate('/cart/shipto', { state: { shippingFee: fee, subtotal: subtotal, maxDays: finalDays } });
-    console.log('Proceeding to checkout with fee:', fee, 'subtotal:', subtotal, 'days:', finalDays);
+    navigate('/cart/shipto', { state: { shippingFee: fee, subtotal: subtotal, maxDays: finalDays, items: [...cartItems] } });
+    console.log('Proceeding to checkout with fee:', fee, 'subtotal:', subtotal, 'days:', finalDays, 'items:', cartItems.length);
   };
 
   const renderStars = (rating: number) => {
