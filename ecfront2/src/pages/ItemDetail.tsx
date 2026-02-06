@@ -413,7 +413,7 @@ const ItemDetailNew: React.FC = () => {
       setSnackbarOpen(true);
       return;
     }
-    navigate('/cart/shipto', { state: { shippingFee: selectedShipping.fee } });
+    navigate('/cart/checkout', { state: { shippingFee: selectedShipping.fee } });
   };
 
   const handleAddtocart = async () => {

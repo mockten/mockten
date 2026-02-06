@@ -10,9 +10,9 @@ import ItemReview from './pages/ItemReview';
 import SellerDashboard from './pages/seller/SellerDashboard';
 import SellerLoginPage from './pages/seller/SellerLogin';
 import MyCartList from './pages/MyCartList';
-import MyCartShipto from './pages/MyCartShipto';
-import MyCartConfirm from './pages/MyCartConfirm';
 import MyCartCheckout from './pages/MyCartCheckout';
+import MyCartConfirm from './pages/MyCartConfirm';
+import MyCartOrderComplete from './pages/MyCartOrderComplete';
 import MyFavoriteList from './pages/MyFavoriteList';
 import OrderHistory from './pages/OrderHistory';
 import AdminLogin from './pages/admin/AdminLogin';
@@ -32,7 +32,7 @@ const App: React.FC = () => {
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>}/>
+          <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/search" element={<PrivateRoute><SearchResultDashboard /></PrivateRoute>} />
           <Route path="/user/login" element={<UserLogin />} />
           <Route path="/user/signup" element={<UserSignUp />} />
@@ -40,9 +40,9 @@ const App: React.FC = () => {
           <Route path="/item/:id" element={<PrivateRoute><ItemDetail /></PrivateRoute>} />
           <Route path="/item/:id/review" element={<PrivateRoute><ItemReview /></PrivateRoute>} />
           <Route path="/cart/list" element={<PrivateRoute><MyCartList /></PrivateRoute>} />
-          <Route path="/cart/shipto" element={<PrivateRoute><MyCartShipto /></PrivateRoute>} />
-          <Route path="/cart/confirm" element={<PrivateRoute><MyCartConfirm /></PrivateRoute>} />
           <Route path="/cart/checkout" element={<PrivateRoute><MyCartCheckout /></PrivateRoute>} />
+          <Route path="/cart/confirm" element={<PrivateRoute><MyCartConfirm /></PrivateRoute>} />
+          <Route path="/cart/complete" element={<PrivateRoute><MyCartOrderComplete /></PrivateRoute>} />
           <Route path="/fav/list" element={<PrivateRoute><MyFavoriteList /></PrivateRoute>} />
           <Route path="/order-history" element={<PrivateRoute><OrderHistory /></PrivateRoute>} />
           <Route path="/seller/login" element={<PrivateRoute><SellerLoginPage /></PrivateRoute>} />
