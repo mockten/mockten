@@ -19,8 +19,6 @@ import Footer from '../components/Footer';
 
 interface AccountFormData {
   email: string;
-  password: string;
-  confirmPassword: string;
   name: string;
   phoneNumber: string;
   postCode: string;
@@ -33,8 +31,6 @@ interface AccountFormData {
 const AccountSettingsNew: React.FC = () => {
   const [formData, setFormData] = useState<AccountFormData>({
     email: 'sample@sample.com',
-    password: '****',
-    confirmPassword: '****',
     name: 'Taro Yamada',
     phoneNumber: '07012345678',
     postCode: '1234567',
@@ -108,90 +104,6 @@ const AccountSettingsNew: React.FC = () => {
               variant="outlined"
               value={formData.email}
               onChange={handleInputChange('email')}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
-                },
-                '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
-                },
-              }}
-            />
-          </Box>
-
-          {/* Password */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Password
-            </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              type="password"
-              value={formData.password}
-              onChange={handleInputChange('password')}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
-                },
-                '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
-                },
-              }}
-            />
-          </Box>
-
-          {/* Confirm Password */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Confirm Password
-            </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              type="password"
-              value={formData.confirmPassword}
-              onChange={handleInputChange('confirmPassword')}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '4px',

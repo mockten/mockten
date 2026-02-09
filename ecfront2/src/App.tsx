@@ -5,6 +5,7 @@ import SearchResultDashboard from './pages/SearchResultDashboard';
 import UserLogin from './pages/UserLogin';
 import UserSignUp from './pages/UserSignUp';
 import AccountSettings from './pages/AccountSettings';
+import PasswordSettings from './pages/PasswordSettings';
 import ItemDetail from './pages/ItemDetail';
 import ItemReview from './pages/ItemReview';
 import SellerDashboard from './pages/seller/SellerDashboard';
@@ -37,6 +38,7 @@ const App: React.FC = () => {
           <Route path="/user/login" element={<UserLogin />} />
           <Route path="/user/signup" element={<UserSignUp />} />
           <Route path="/user/account-settings" element={<PrivateRoute><AccountSettings /></PrivateRoute>} />
+          <Route path="/user/password-settings" element={<PrivateRoute><PasswordSettings /></PrivateRoute>} />
           <Route path="/item/:id" element={<PrivateRoute><ItemDetail /></PrivateRoute>} />
           <Route path="/item/:id/review" element={<PrivateRoute><ItemReview /></PrivateRoute>} />
           <Route path="/cart/list" element={<PrivateRoute><MyCartList /></PrivateRoute>} />
