@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../module/apiClient';
 import {
@@ -9,6 +9,8 @@ import {
   Typography,
   IconButton,
   Box,
+  Menu,
+  MenuItem,
 } from '@mui/material';
 import {
   Search,
@@ -35,6 +37,9 @@ const Appbar: React.FC<AppbarProps> = ({
 }) => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [accountMenuAnchorEl, setAccountMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const accountMenuCloseTimerRef = useRef<number | null>(null);
+  const isAccountMenuOpen = Boolean(accountMenuAnchorEl);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,6 +87,31 @@ const Appbar: React.FC<AppbarProps> = ({
     } else {
       navigate('/user/account-settings');
     }
+  };
+
+  const clearAccountMenuCloseTimer = () => {
+    if (accountMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(accountMenuCloseTimerRef.current);
+      accountMenuCloseTimerRef.current = null;
+    }
+  };
+
+  const handleAccountMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    clearAccountMenuCloseTimer();
+    setAccountMenuAnchorEl(event.currentTarget);
+  };
+
+  const handleAccountMenuClose = () => {
+    clearAccountMenuCloseTimer();
+    setAccountMenuAnchorEl(null);
+  };
+
+  const scheduleAccountMenuClose = () => {
+    clearAccountMenuCloseTimer();
+    accountMenuCloseTimerRef.current = window.setTimeout(() => {
+      setAccountMenuAnchorEl(null);
+      accountMenuCloseTimerRef.current = null;
+    }, 150);
   };
 
   const handleLogoClick = () => {
@@ -178,9 +208,48 @@ const Appbar: React.FC<AppbarProps> = ({
           <IconButton sx={{ color: 'black' }} onClick={handleFavoriteClick}>
             <FavoriteBorder />
           </IconButton>
-          <IconButton sx={{ color: 'black' }} onClick={handleProfileClick}>
+          <IconButton
+            id="account-menu-button"
+            aria-controls={isAccountMenuOpen ? 'account-menu' : undefined}
+            aria-haspopup="true"
+            aria-expanded={isAccountMenuOpen ? 'true' : undefined}
+            sx={{ color: 'black' }}
+            onMouseEnter={handleAccountMenuOpen}
+            onMouseLeave={scheduleAccountMenuClose}
+            onClick={handleAccountMenuOpen}
+          >
             <Person />
           </IconButton>
+          <Menu
+            id="account-menu"
+            anchorEl={accountMenuAnchorEl}
+            open={isAccountMenuOpen}
+            onClose={handleAccountMenuClose}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            MenuListProps={{
+              'aria-labelledby': 'account-menu-button',
+              onMouseEnter: clearAccountMenuCloseTimer,
+              onMouseLeave: scheduleAccountMenuClose,
+            }}
+          >
+            <MenuItem
+              onClick={() => {
+                handleAccountMenuClose();
+                handleProfileClick();
+              }}
+            >
+              My Account
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                handleAccountMenuClose();
+                navigate('/user/password-settings');
+              }}
+            >
+              Change Password
+            </MenuItem>
+          </Menu>
         </Box>
       </Toolbar>
     </MuiAppBar>
