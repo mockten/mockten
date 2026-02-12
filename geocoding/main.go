@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -16,7 +18,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MicahParks/keyfunc/v3"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type Config struct {
@@ -63,20 +67,41 @@ type Node struct {
 }
 
 type ShippingDomesticResponse struct {
-	StandardFee float64 `json:"standard_fee"`
-	ExpressFee  float64 `json:"express_fee"`
+	StandardFee  float64 `json:"standard_fee"`
+	ExpressFee   float64 `json:"express_fee"`
+	StandardDays int     `json:"standard_days"`
+	ExpressDays  int     `json:"express_days"`
 }
 
 type ShippingInternationalResponse struct {
-	AirStandardFee float64 `json:"air_standard_fee,omitempty"`
-	AirExpressFee  float64 `json:"air_express_fee,omitempty"`
-	SeaStandardFee float64 `json:"sea_standard_fee,omitempty"`
-	SeaExpressFee  float64 `json:"sea_express_fee,omitempty"`
-	Message        string  `json:"message,omitempty"`
+	AirStandardFee  float64 `json:"air_standard_fee,omitempty"`
+	AirExpressFee   float64 `json:"air_express_fee,omitempty"`
+	SeaStandardFee  float64 `json:"sea_standard_fee,omitempty"`
+	SeaExpressFee   float64 `json:"sea_express_fee,omitempty"`
+	AirStandardDays int     `json:"air_standard_days,omitempty"`
+	AirExpressDays  int     `json:"air_express_days,omitempty"`
+	SeaStandardDays int     `json:"sea_standard_days,omitempty"`
+	SeaExpressDays  int     `json:"sea_express_days,omitempty"`
+	Message         string  `json:"message,omitempty"`
 }
 
-var cfg Config
-var db *sql.DB
+type GeoResponse struct {
+	UserName     string `json:"user_name"`
+	CountryCode  string `json:"country_code"`
+	PostalCode   string `json:"postal_code"`
+	Prefecture   string `json:"prefecture"`
+	City         string `json:"city"`
+	Town         string `json:"town"`
+	BuildingName string `json:"building_name"`
+	RoomNumber   string `json:"room_number"`
+}
+
+var (
+	cfg        Config
+	db         *sql.DB
+	jwks       keyfunc.Keyfunc
+	jwksCancel context.CancelFunc
+)
 
 func loadConfig(path string) {
 	f, err := os.Open(path)
@@ -290,6 +315,101 @@ func geocodeHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// ===== Auth helpers =====
+
+func buildJWKSURL() (string, error) {
+	if v := strings.TrimSpace(os.Getenv("KEYCLOAK_JWKS_URL")); v != "" {
+		return v, nil
+	}
+
+	base := strings.TrimSpace(os.Getenv("KEYCLOAK_BASE_URL"))
+	if base == "" {
+		base = "http://uam-service.default.svc.cluster.local"
+	}
+	realm := strings.TrimSpace(os.Getenv("KEYCLOAK_REALM"))
+	if realm == "" {
+		realm = "mockten-realm-dev"
+	}
+
+	base = strings.TrimRight(base, "/")
+	if realm == "" {
+		return "", errors.New("KEYCLOAK_REALM is empty")
+	}
+
+	return base + "/realms/" + realm + "/protocol/openid-connect/certs", nil
+}
+
+func initJWKS(jwksURL string) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	jwksCancel = cancel
+
+	k, err := keyfunc.NewDefaultCtx(ctx, []string{jwksURL})
+	if err != nil {
+		return err
+	}
+	jwks = k
+	return nil
+}
+
+func jwtHeaderInfo(tokenStr string) (string, string) {
+	p := strings.Split(tokenStr, ".")
+	if len(p) < 2 {
+		return "", ""
+	}
+
+	b, err := base64.RawURLEncoding.DecodeString(p[0])
+	if err != nil {
+		return "", ""
+	}
+
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		return "", ""
+	}
+
+	kid, _ := m["kid"].(string)
+	alg, _ := m["alg"].(string)
+	return strings.TrimSpace(kid), strings.TrimSpace(alg)
+}
+
+func getUserIDFromTokenString(tokenStr string) (string, error) {
+	kid, alg := jwtHeaderInfo(tokenStr)
+
+	parser := jwt.NewParser(
+		jwt.WithValidMethods([]string{"RS256", "RS384", "RS512"}),
+		jwt.WithLeeway(30*time.Second),
+	)
+
+	var claims jwt.MapClaims
+	tok, err := parser.ParseWithClaims(tokenStr, &claims, jwks.Keyfunc)
+	if err != nil {
+		log.Printf("JWT parse failed kid=%s alg=%s err=%v", kid, alg, err)
+		return "", err
+	}
+	if !tok.Valid {
+		log.Printf("JWT invalid kid=%s alg=%s", kid, alg)
+		return "", errors.New("invalid token")
+	}
+
+	if v, ok := claims["email"]; ok {
+		if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+			return strings.TrimSpace(s), nil
+		}
+	}
+	if v, ok := claims["preferred_username"]; ok {
+		if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+			return strings.TrimSpace(s), nil
+		}
+	}
+	if v, ok := claims["sub"]; ok {
+		if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+			return strings.TrimSpace(s), nil
+		}
+	}
+
+	return "", errors.New("no usable user identifier in token claims")
+}
+
 // ===== Shipping helpers (DB) =====
 
 func getProductLocation(productID string) (*Product, error) {
@@ -470,6 +590,24 @@ func round2(v float64) float64 {
 func shippingHandler(w http.ResponseWriter, r *http.Request) {
 	userID := r.URL.Query().Get("user_id")
 	productID := r.URL.Query().Get("product_id")
+	token := r.URL.Query().Get("token")
+
+	if token == "" {
+		authHeader := r.Header.Get("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			token = strings.TrimPrefix(authHeader, "Bearer ")
+		}
+	}
+
+	// Fallback to token if userID is missing
+	if userID == "" && token != "" {
+		if uid, err := getUserIDFromTokenString(token); err == nil && uid != "" {
+			userID = uid
+		} else {
+			log.Printf("Failed to derive user_id from token: %v", err)
+		}
+	}
+
 	if userID == "" || productID == "" {
 		http.Error(w, "Missing user_id or product_id", http.StatusBadRequest)
 		return
@@ -550,6 +688,21 @@ func handleDomestic(w http.ResponseWriter, product *Product, user *UserGeo) {
 		StandardFee: round2(finalStd),
 		ExpressFee:  round2(finalExp),
 	}
+
+	// Calculate days
+	// If Road is selected (cheaper or equal), Road Standard=2, Road Express=1
+	// If Air is selected (cheaper), Air Standard=4, Air Express=2
+	if finalStd <= roadStd && !math.IsInf(airStd, 1) && airStd < roadStd {
+		resp.StandardDays = 4
+	} else {
+		resp.StandardDays = 2
+	}
+
+	if finalExp <= roadExp && !math.IsInf(airExp, 1) && airExp < roadExp {
+		resp.ExpressDays = 2
+	} else {
+		resp.ExpressDays = 1
+	}
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -619,20 +772,73 @@ func handleInternational(w http.ResponseWriter, product *Product, user *UserGeo)
 	resp := ShippingInternationalResponse{}
 	if !math.IsInf(airStd, 1) {
 		resp.AirStandardFee = airStd
+		resp.AirStandardDays = 4
 	}
 	if !math.IsInf(airExp, 1) {
 		resp.AirExpressFee = airExp
+		resp.AirExpressDays = 2
 	}
 	if !math.IsInf(seaStd, 1) {
 		resp.SeaStandardFee = seaStd
+		resp.SeaStandardDays = 14
 	}
 	if !math.IsInf(seaExp, 1) {
 		resp.SeaExpressFee = seaExp
+		resp.SeaExpressDays = 7
 	}
 	if resp.AirStandardFee == 0 && resp.AirExpressFee == 0 && resp.SeaStandardFee == 0 && resp.SeaExpressFee == 0 {
 		resp.Message = "No international route available (sea/air cost missing)"
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+func getGeoHandler(w http.ResponseWriter, r *http.Request) {
+	userID := r.URL.Query().Get("user_id")
+	token := r.URL.Query().Get("token")
+
+	if token == "" {
+		authHeader := r.Header.Get("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			token = strings.TrimPrefix(authHeader, "Bearer ")
+		}
+	}
+
+	// Fallback to token if userID is missing
+	if userID == "" && token != "" {
+		if uid, err := getUserIDFromTokenString(token); err == nil && uid != "" {
+			userID = uid
+		} else {
+			log.Printf("Failed to derive user_id from token: %v", err)
+		}
+	}
+
+	if userID == "" {
+		http.Error(w, "Missing user_id", http.StatusBadRequest)
+		return
+	}
+
+	q := `
+SELECT TRIM(CONCAT(COALESCE(ue.FIRST_NAME, ''), ' ', COALESCE(ue.LAST_NAME, ''))) as user_name, g.country_code, g.postal_code, g.prefecture, g.city, g.town, g.building_name, g.room_number
+FROM Geo g
+LEFT JOIN USER_ENTITY ue ON g.user_id = ue.EMAIL
+WHERE g.user_id = ?
+`
+	var g GeoResponse
+	err := db.QueryRow(q, userID).Scan(
+		&g.UserName, &g.CountryCode, &g.PostalCode, &g.Prefecture,
+		&g.City, &g.Town, &g.BuildingName, &g.RoomNumber,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "User geo data not found", http.StatusNotFound)
+		} else {
+			log.Printf("DB query error: %v", err)
+			http.Error(w, "Database error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, g)
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -645,10 +851,27 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 
 func main() {
 	loadConfig("config.json")
+
+	jwksURL, err := buildJWKSURL()
+	if err != nil {
+		log.Fatalf("failed to build jwks url: %v", err)
+	}
+	log.Printf("JWKS URL: %s", jwksURL)
+
+	if err := initJWKS(jwksURL); err != nil {
+		log.Fatalf("failed to init jwks: %v", err)
+	}
+	defer func() {
+		if jwksCancel != nil {
+			jwksCancel()
+		}
+	}()
+
 	initDBWait()
 
 	http.HandleFunc("/profile", geocodeHandler)
 	http.HandleFunc("/shipping", shippingHandler)
+	http.HandleFunc("/geo", getGeoHandler)
 
 	fmt.Println("Server started at :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

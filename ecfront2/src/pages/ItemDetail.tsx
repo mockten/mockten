@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Snackbar, Alert } from '@mui/material';
+
 import {
   Box,
   Container,
@@ -33,6 +34,8 @@ import {
   CardGiftcard,
   LocalShipping,
   Apartment,
+  DirectionsBoat,
+  Flight,
 } from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
@@ -111,6 +114,21 @@ interface ApiItemReviewsResponse {
   limit: number;
   offset: number;
   reviews: ApiReview[];
+}
+
+interface ShippingInfo {
+  sea_standard_fee?: number;
+  sea_express_fee?: number;
+  sea_standard_days?: number;
+  sea_express_days?: number;
+  air_standard_fee?: number;
+  air_express_fee?: number;
+  air_standard_days?: number;
+  air_express_days?: number;
+  standard_fee?: number;
+  express_fee?: number;
+  standard_days?: number;
+  express_days?: number;
 }
 
 
@@ -236,6 +254,11 @@ const ItemDetailNew: React.FC = () => {
   const [reviewsTotal, setReviewsTotal] = useState(0);
   const [reviewsPage, setReviewsPage] = useState(1);
 
+  const [shippingInfo, setShippingInfo] = useState<ShippingInfo | null>(null);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState('');
+  const [selectedShipping, setSelectedShipping] = useState<{ fee: number, label: string; days: number } | null>(null);
+
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
@@ -277,6 +300,30 @@ const ItemDetailNew: React.FC = () => {
     };
 
     run();
+  }, [id]);
+
+  useEffect(() => {
+    const fetchShipping = async () => {
+      setShippingInfo(null);
+      setShippingLoading(false);
+      setShippingError('');
+
+      if (!id) return;
+
+      setShippingLoading(true);
+      try {
+        const res = await apiClient.get<ShippingInfo>('/api/shipping', {
+          params: { product_id: id }
+        });
+        setShippingInfo(res.data);
+      } catch (err) {
+        setShippingError('Failed to load shipping info');
+      } finally {
+        setShippingLoading(false);
+      }
+    };
+
+    fetchShipping();
   }, [id]);
 
   useEffect(() => {
@@ -360,7 +407,13 @@ const ItemDetailNew: React.FC = () => {
 
   const handlePurchase = () => {
     console.log('Purchase clicked', { productId: product?.product_id, quantity });
-    navigate('/cart/shipto');
+    if (!selectedShipping) {
+      setSnackbarMessage('Please select a delivery method');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      return;
+    }
+    navigate('/cart/checkout', { state: { shippingFee: selectedShipping.fee } });
   };
 
   const handleAddtocart = async () => {
@@ -369,12 +422,21 @@ const ItemDetailNew: React.FC = () => {
       console.error('Product ID is missing');
       return;
     }
+    if (!selectedShipping) {
+      setSnackbarMessage('Please select a delivery method');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      return;
+    }
 
     try {
       // Use apiClient.post which requires full path starts with /api
       await apiClient.post("/api/cart/items", {
         product_id: product.product_id,
         quantity,
+        shipping_fee: selectedShipping.fee,
+        shipping_type: selectedShipping.label,
+        shipping_days: selectedShipping.days,
       });
 
       console.log('Product added to cart');
@@ -873,6 +935,7 @@ const ItemDetailNew: React.FC = () => {
             </Typography>
           </Box>
           <Typography
+            component="div"
             sx={{
               fontFamily: 'Noto Sans',
               fontSize: '16px',
@@ -882,7 +945,237 @@ const ItemDetailNew: React.FC = () => {
               textAlign: 'left',
             }}
           >
-            Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text.
+            {shippingLoading ? (
+              <Box>Loading shipping info...</Box>
+            ) : shippingError ? (
+              <Box sx={{ color: 'red' }}>{shippingError}</Box>
+            ) : shippingInfo ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Air Standard Shipping */}
+                {shippingInfo.air_standard_fee !== undefined && (
+                  <Box
+                    onClick={() => {
+                      if (selectedShipping?.label === 'Air Standard') {
+                        setSelectedShipping(null);
+                      } else {
+                        setSelectedShipping({ fee: shippingInfo.air_standard_fee!, label: 'Air Standard', days: shippingInfo.air_standard_days! });
+                      }
+                    }}
+                    sx={{
+                      border: selectedShipping?.label === 'Air Standard' ? '2px solid #5856D6' : '1px solid #ddd',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      backgroundColor: selectedShipping?.label === 'Air Standard' ? '#f0effc' : '#fafafa',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Box sx={{ marginRight: '16px', display: 'flex', alignItems: 'center' }}>
+                      <Flight sx={{ color: '#5856D6', fontSize: '28px' }} />
+                    </Box>
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
+                        Air Standard
+                      </Typography>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: '#666' }}>
+                        Estimated delivery within {shippingInfo.air_standard_days} days
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '18px', color: 'black' }}>
+                      ${shippingInfo.air_standard_fee.toFixed(2)}
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Air Express Shipping */}
+                {shippingInfo.air_express_fee !== undefined && (
+                  <Box
+                    onClick={() => {
+                      if (selectedShipping?.label === 'Air Express') {
+                        setSelectedShipping(null);
+                      } else {
+                        setSelectedShipping({ fee: shippingInfo.air_express_fee!, label: 'Air Express', days: shippingInfo.air_express_days! });
+                      }
+                    }}
+                    sx={{
+                      border: selectedShipping?.label === 'Air Express' ? '2px solid #5856D6' : '1px solid #ddd',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      backgroundColor: selectedShipping?.label === 'Air Express' ? '#f0effc' : '#fafafa',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Box sx={{ marginRight: '16px', display: 'flex', alignItems: 'center' }}>
+                      <Flight sx={{ color: '#5856D6', fontSize: '28px' }} />
+                    </Box>
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
+                        Air Express
+                      </Typography>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: '#666' }}>
+                        Estimated delivery within {shippingInfo.air_express_days} days
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '18px', color: 'black' }}>
+                      ${shippingInfo.air_express_fee.toFixed(2)}
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Sea Standard Shipping */}
+                {shippingInfo.sea_standard_fee !== undefined && (
+                  <Box
+                    onClick={() => {
+                      if (selectedShipping?.label === 'Sea Standard') {
+                        setSelectedShipping(null);
+                      } else {
+                        setSelectedShipping({ fee: shippingInfo.sea_standard_fee!, label: 'Sea Standard', days: shippingInfo.sea_standard_days! });
+                      }
+                    }}
+                    sx={{
+                      border: selectedShipping?.label === 'Sea Standard' ? '2px solid #5856D6' : '1px solid #ddd',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      backgroundColor: selectedShipping?.label === 'Sea Standard' ? '#f0effc' : '#fafafa',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Box sx={{ marginRight: '16px', display: 'flex', alignItems: 'center' }}>
+                      <DirectionsBoat sx={{ color: '#5856D6', fontSize: '28px' }} />
+                    </Box>
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
+                        Sea Standard
+                      </Typography>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: '#666' }}>
+                        Estimated delivery within {shippingInfo.sea_standard_days} days
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '18px', color: 'black' }}>
+                      ${shippingInfo.sea_standard_fee.toFixed(2)}
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Sea Express Shipping */}
+                {shippingInfo.sea_express_fee !== undefined && (
+                  <Box
+                    onClick={() => {
+                      if (selectedShipping?.label === 'Sea Express') {
+                        setSelectedShipping(null);
+                      } else {
+                        setSelectedShipping({ fee: shippingInfo.sea_express_fee!, label: 'Sea Express', days: shippingInfo.sea_express_days! });
+                      }
+                    }}
+                    sx={{
+                      border: selectedShipping?.label === 'Sea Express' ? '2px solid #5856D6' : '1px solid #ddd',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      backgroundColor: selectedShipping?.label === 'Sea Express' ? '#f0effc' : '#fafafa',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Box sx={{ marginRight: '16px', display: 'flex', alignItems: 'center' }}>
+                      <DirectionsBoat sx={{ color: '#5856D6', fontSize: '28px' }} />
+                    </Box>
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
+                        Sea Express
+                      </Typography>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: '#666' }}>
+                        Estimated delivery within {shippingInfo.sea_express_days} days
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '18px', color: 'black' }}>
+                      ${shippingInfo.sea_express_fee.toFixed(2)}
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Domestic Standard Shipping */}
+                {shippingInfo.standard_fee !== undefined && (
+                  <Box
+                    onClick={() => {
+                      if (selectedShipping?.label === 'Standard Delivery') {
+                        setSelectedShipping(null);
+                      } else {
+                        setSelectedShipping({ fee: shippingInfo.standard_fee!, label: 'Standard Delivery', days: shippingInfo.standard_days! });
+                      }
+                    }}
+                    sx={{
+                      border: selectedShipping?.label === 'Standard Delivery' ? '2px solid #5856D6' : '1px solid #ddd',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      backgroundColor: selectedShipping?.label === 'Standard Delivery' ? '#f0effc' : '#fafafa',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Box sx={{ marginRight: '16px', display: 'flex', alignItems: 'center' }}>
+                      <LocalShipping sx={{ color: '#5856D6', fontSize: '28px' }} />
+                    </Box>
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
+                        Standard Delivery
+                      </Typography>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: '#666' }}>
+                        Estimated delivery within {shippingInfo.standard_days} days
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '18px', color: 'black' }}>
+                      ${shippingInfo.standard_fee.toFixed(2)}
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Domestic Express Shipping */}
+                {shippingInfo.express_fee !== undefined && (
+                  <Box
+                    onClick={() => {
+                      if (selectedShipping?.label === 'Express Delivery') {
+                        setSelectedShipping(null);
+                      } else {
+                        setSelectedShipping({ fee: shippingInfo.express_fee!, label: 'Express Delivery', days: shippingInfo.express_days! });
+                      }
+                    }}
+                    sx={{
+                      border: selectedShipping?.label === 'Express Delivery' ? '2px solid #5856D6' : '1px solid #ddd',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      backgroundColor: selectedShipping?.label === 'Express Delivery' ? '#f0effc' : '#fafafa',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Box sx={{ marginRight: '16px', display: 'flex', alignItems: 'center' }}>
+                      <LocalShipping sx={{ color: '#5856D6', fontSize: '28px' }} />
+                    </Box>
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
+                        Express Delivery
+                      </Typography>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: '#666' }}>
+                        Estimated delivery within {shippingInfo.express_days} days
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '18px', color: 'black' }}>
+                      ${shippingInfo.express_fee.toFixed(2)}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            ) : (
+              'No shipping information available.'
+            )}
           </Typography>
         </Box>
 

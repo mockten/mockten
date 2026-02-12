@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -88,7 +88,7 @@ const MyCartConfirm: React.FC = () => {
   const handlePlaceOrder = () => {
     // TODO: Implement order placement logic
     console.log('Place order clicked');
-    navigate('/cart/checkout');
+    navigate('/cart/complete');
   };
 
   const SectionTitle: React.FC<{ title: string }> = ({ title }) => (
@@ -115,7 +115,7 @@ const MyCartConfirm: React.FC = () => {
   );
 
   return (
-    <Box sx={{  width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
+    <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       {/* App Bar */}
       <Appbar />
 
@@ -130,7 +130,18 @@ const MyCartConfirm: React.FC = () => {
             marginBottom: '24px',
           }}
         >
-          Home &gt; My Cart List &gt; Ship to &gt; Confirmation
+          <Link to="/" style={{ color: '#8c8c8c', textDecoration: 'none' }}>
+            Home
+          </Link>{' '}
+          &gt;{' '}
+          <Link to="/cart/list" style={{ color: '#8c8c8c', textDecoration: 'none' }}>
+            My Cart
+          </Link>{' '}
+          &gt;{' '}
+          <Link to="/cart/checkout" style={{ color: '#8c8c8c', textDecoration: 'none' }}>
+            Checkout
+          </Link>{' '}
+          &gt; Confirmation
         </Typography>
 
         <Grid container spacing={4}>

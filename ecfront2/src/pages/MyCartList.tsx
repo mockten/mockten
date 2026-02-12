@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import apiClient from '../module/apiClient';
 import {
   Box,
@@ -11,19 +11,22 @@ import {
   CardContent,
   Grid,
   Divider,
+  Select,
+  MenuItem,
+  FormControl,
 } from '@mui/material';
 import {
   Star,
   StarHalf,
   StarBorder,
   KeyboardArrowRight,
+  Delete,
 } from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 
 // Sample photo icon when a customer does not set prodct image.
 import photoSvg from "../assets/photo.svg";
-import closeIcon from "../assets/close.png";
 
 interface ProductBackend {
   product_id: string;
@@ -45,13 +48,17 @@ interface CartItemBackend {
 }
 
 interface CartItem {
-  id: string;
+  id: string; // This is now the line item ID (e.g. "prodID:shipping")
+  productId: string; // Original product ID for images/links
   name: string;
   description: string;
   price: number;
   quantity: number;
   image: string;
   rating: number;
+  shipping_fee: number;
+  shipping_type: string;
+  shipping_days: number;
 }
 
 interface RecommendedProduct {
@@ -84,14 +91,18 @@ const CartListNew: React.FC = () => {
       }
 
       if (items && Array.isArray(items)) {
-        const mappedItems: CartItem[] = items.map((item) => ({
-          id: item.product.product_id,
+        const mappedItems: CartItem[] = items.map((item: any) => ({
+          id: item.id || item.product.product_id, // Use new ID if available, fallback for old items
+          productId: item.product.product_id,
           name: item.product.product_name,
           description: item.product.summary,
           price: item.product.price,
           quantity: item.quantity,
           image: `/api/storage/${item.product.product_id}.png`,
           rating: 0, // Default rating
+          shipping_fee: item.shipping_fee || 0,
+          shipping_type: item.shipping_type || 'Standard',
+          shipping_days: item.shipping_days || 3,
         }));
         setCartItems(mappedItems);
       }
@@ -106,6 +117,23 @@ const CartListNew: React.FC = () => {
       setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
     } catch (error) {
       console.error('Failed to remove item', error);
+    }
+  };
+
+  const handleUpdateQuantity = async (itemId: string, newQuantity: number) => {
+    if (newQuantity === 0) {
+      await handleRemoveItem(itemId);
+      return;
+    }
+    try {
+      await apiClient.put(`/api/cart/items/${itemId}`, { quantity: newQuantity });
+      setCartItems(prevItems =>
+        prevItems.map(item =>
+          item.id === itemId ? { ...item, quantity: newQuantity } : item
+        )
+      );
+    } catch (error) {
+      console.error('Failed to update quantity', error);
     }
   };
 
@@ -145,9 +173,14 @@ const CartListNew: React.FC = () => {
   ];
 
   const handleCheckout = () => {
-    // TODO: Implement checkout functionality
-    navigate('/cart/shipto');
-    console.log('Proceeding to checkout');
+    const fee = calculateShipping();
+    const subtotal = calculateSubtotal();
+    const maxDays = cartItems.reduce((max, item) => Math.max(max, item.shipping_days || 3), 0);
+    // If no items or all 0, default to 3
+    const finalDays = maxDays > 0 ? maxDays : 3;
+
+    navigate('/cart/checkout', { state: { shippingFee: fee, subtotal: subtotal, maxDays: finalDays, items: [...cartItems] } });
+    console.log('Proceeding to checkout with fee:', fee, 'subtotal:', subtotal, 'days:', finalDays, 'items:', cartItems.length);
   };
 
   const renderStars = (rating: number) => {
@@ -175,9 +208,15 @@ const CartListNew: React.FC = () => {
     return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
+  // Removed getShippingFee (localStorage based)
+
   const calculateShipping = () => {
-    const subtotal = calculateSubtotal();
-    return Math.round(subtotal * 0.1); // 10% shipping
+    // Sum up shipping fee of all items
+    // Assuming backend fee is PER ITEM UNIT. If it is total for that line, then just add it.
+    // Based on backend change: `c.Cart[idx].Quantity += quantity` and `ShippingFee` stored in struct.
+    // If we add 2 items, `ShippingFee` in struct stays same (unit fee).
+    // So Total = sum(item.quantity * item.shipping_fee)
+    return cartItems.reduce((total, item) => total + (item.shipping_fee * item.quantity), 0);
   };
 
   const calculateTotal = () => {
@@ -201,7 +240,10 @@ const CartListNew: React.FC = () => {
             marginBottom: '16px',
           }}
         >
-          Home &gt; My Cart List
+          <Link to="/" style={{ color: '#8c8c8c', textDecoration: 'none' }}>
+            Home
+          </Link>{' '}
+          &gt; My Cart
         </Typography>
 
         {/* Cart Title */}
@@ -249,16 +291,14 @@ const CartListNew: React.FC = () => {
                       position: 'absolute',
                       top: '8px',
                       left: '8px',
-                      backgroundColor: 'black',
-                      color: 'white',
-                      width: '24px',
-                      height: '24px',
+                      color: '#9e9e9e',
                       '&:hover': {
-                        backgroundColor: '#333',
+                        color: '#d32f2f',
+                        backgroundColor: 'rgba(211, 47, 47, 0.04)',
                       },
                     }}
                   >
-                    <img src={closeIcon} alt="Remove" style={{ width: '16px', height: '16px' }} />
+                    <Delete />
                   </IconButton>
 
                   {/* Product Image */}
@@ -309,14 +349,49 @@ const CartListNew: React.FC = () => {
                     >
                       {item.description}
                     </Typography>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                      <Typography
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontSize: '16px',
+                          color: '#666666',
+                        }}
+                      >
+                        Quantity:
+                      </Typography>
+                      <FormControl variant="standard" sx={{ minWidth: 60 }}>
+                        <Select
+                          value={item.quantity}
+                          onChange={(e) => handleUpdateQuantity(item.id, Number(e.target.value))}
+                          disableUnderline
+                          sx={{
+                            fontFamily: 'Noto Sans',
+                            fontSize: '16px',
+                            color: '#666666',
+                            fontWeight: 'bold',
+                            '& .MuiSelect-select': {
+                              paddingY: '0px',
+                            }
+                          }}
+                        >
+                          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                            <MenuItem key={num} value={num}>
+                              {num === 0 ? '0 (Remove)' : num}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Box>
                     <Typography
                       sx={{
                         fontFamily: 'Noto Sans',
-                        fontSize: '16px',
+                        fontSize: '14px',
                         color: '#666666',
+                        marginTop: '4px',
                       }}
                     >
-                      Quantity: {item.quantity}
+                      Shipping: {item.shipping_type} (${item.shipping_fee.toFixed(2)})
                     </Typography>
                   </Box>
                 </Box>
@@ -379,7 +454,7 @@ const CartListNew: React.FC = () => {
                       color: 'black',
                     }}
                   >
-                    Shipping and service charges:
+                    Shipping fee:
                   </Typography>
                   <Typography
                     sx={{
@@ -403,7 +478,7 @@ const CartListNew: React.FC = () => {
                       color: 'black',
                     }}
                   >
-                    Amount billed:
+                    Total Amount:
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Typography
@@ -546,7 +621,7 @@ const CartListNew: React.FC = () => {
 
       {/* Footer */}
       <Footer />
-    </Box>
+    </Box >
   );
 };
 

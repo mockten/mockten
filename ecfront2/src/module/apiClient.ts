@@ -3,7 +3,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'ax
 // =================================================================
 // Constants
 // =================================================================
-const TOKEN_URL = `/api/uam/token`; 
+const TOKEN_URL = `/api/uam/token`;
 // Look for these keys in localStorage to prevent 401 errors
 const ACCESS_TOKEN_KEYS = ['access_token', 'accessToken', 'mockten_access_token'];
 const REFRESH_TOKEN_KEYS = ['refresh_token', 'refreshToken', 'mockten_refresh_token'];
@@ -88,7 +88,7 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if ((error.response?.status === 401 || error.response?.status === 400) && !originalRequest._retry) {
       const refreshToken = getRefreshToken();
 
       if (!refreshToken) {
@@ -120,7 +120,7 @@ apiClient.interceptors.response.use(
         params.append('refresh_token', refreshToken);
 
         const response = await axios.post(TOKEN_URL, params);
-        
+
         // We trust the structure is the same as login
         const access_token = response.data.access_token;
         const refresh_token = response.data.refresh_token;
