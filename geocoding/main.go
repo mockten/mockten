@@ -251,22 +251,24 @@ func insertGeo(in GeocodeRequest, latStr, lonStr string) error {
 		lon = sql.NullFloat64{Float64: v, Valid: true}
 	}
 
+	// Check if a primary address already exists for this user
+	var existingGeoID string
+	err := db.QueryRowContext(ctx, "SELECT geo_id FROM Geo WHERE user_id = ? AND is_primary = 1", in.UserID).Scan(&existingGeoID)
+
+	isPrimary := 0
+	if err == sql.ErrNoRows {
+		isPrimary = 1
+	} else if err != nil {
+		return err
+	}
+
+	// Always insert a new record
 	q := `
 INSERT INTO Geo (
-  geo_id, user_id, country_code, postal_code, prefecture, city, town, building_name, room_number, latitude, longitude
-) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON DUPLICATE KEY UPDATE
-  country_code = VALUES(country_code),
-  postal_code  = VALUES(postal_code),
-  prefecture   = VALUES(prefecture),
-  city         = VALUES(city),
-  town         = VALUES(town),
-  building_name= VALUES(building_name),
-  room_number  = VALUES(room_number),
-  latitude     = VALUES(latitude),
-  longitude    = VALUES(longitude);
+  geo_id, user_id, country_code, postal_code, prefecture, city, town, building_name, room_number, latitude, longitude, is_primary
+) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
-	_, err := db.ExecContext(ctx, q,
+	_, err = db.ExecContext(ctx, q,
 		in.UserID,
 		strings.ToUpper(strings.TrimSpace(in.CountryCode)),
 		in.PostalCode,
@@ -276,6 +278,7 @@ ON DUPLICATE KEY UPDATE
 		in.BuildingName,
 		in.RoomNumber,
 		lat, lon,
+		isPrimary,
 	)
 	return err
 }
@@ -431,7 +434,7 @@ func getUserLocation(userID string) (*UserGeo, error) {
 	q := `
 SELECT country_code, latitude, longitude
 FROM Geo
-WHERE user_id = ?
+WHERE user_id = ? AND is_primary = 1
 `
 	var g UserGeo
 	err := db.QueryRow(q, userID).Scan(&g.Country, &g.Latitude, &g.Longitude)

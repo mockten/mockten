@@ -81,7 +81,8 @@ CREATE TABLE IF NOT EXISTS Geo (
   room_number VARCHAR(20),
   latitude DECIMAL(10,7),
   longitude DECIMAL(10,7),
-  UNIQUE KEY uq_geo_user_id (user_id)
+  is_primary TINYINT(1) NOT NULL DEFAULT 0,
+  KEY idx_geo_user_primary (user_id, is_primary)
 );
 
 CREATE TABLE IF NOT EXISTS `Order` (
@@ -344,31 +345,21 @@ VALUES
 ON DUPLICATE KEY UPDATE
   cost_usd = VALUES(cost_usd);
 
-INSERT INTO Geo (geo_id, user_id, country_code, postal_code, prefecture, city, town, building_name, latitude, longitude)
+INSERT INTO Geo (geo_id, user_id, country_code, postal_code, prefecture, city, town, building_name, latitude, longitude, is_primary)
 VALUES
-('40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 'mocktenHubJP','JP','143-0006', 'Tokyo', 'Ota-ku', 'Heiwajima', 'Mockten Hub Japan', 35.5774, 139.7516),
-('e99da54a-71ea-420a-85d1-9dc55146c2fb', 'mocktenHubSG','SG','118423','Singapore','Singapore','2 Pasir Panjang Rd','Mockten Hub Singapore', 1.2754, 103.7957),
-('2dceee6c-67c4-406c-941c-3407ab6037a1', 'customer1@gmail.com','JP','810-8660', 'Fukuoka', 'Chuo Ward', 'Jigyohama', 'Paypay Dome', 33.5954, 130.3621),
-('f324ad72-68b2-4d56-8e1c-ee0f4c6e9112', 'customer2@gmail.com','JP','279-0031', 'Chiba', 'Urayasu', 'Maihama 1-1', 'Tokyo Disney Resort', 35.6329, 139.8804),
-('c32289c6-fa70-496a-a2b8-f1c5cce481da', 'SIN','SG','819643','Singapore','Singapore','Changi','Singapore Changi Airport', 1.3575574, 103.9884812),
-('db347209-4171-422f-aec8-caac0a030f2c', 'SGP','SG','118424','Singapore','Singapore','1 Pasir Panjang Rd','Pasir Panjang Terminal', 1.2702, 103.7669),
-('25e83344-7f15-46aa-bd46-b6d85915dcc3', 'NRT','JP','286-0104','Chiba','Narita','Narita','Narita International Airport', 35.7758714, 140.3933101),
-('33621aba-5ac3-4fc9-b636-6ac8c6bb0960', 'HND','JP','144-0041','Tokyo','Ota-ku','Haneda','Tokyo Haneda Airport', 35.5456924, 139.7760994),
-('6d925d2b-65c3-4ecc-8bb8-1acfcba9045b', 'KIX','JP','549-0001','Osaka','Izumisano','Senshu','Kansai International Airport', 34.4342, 135.2328),
-('6944c68e-e760-46eb-a9ba-3afcfc2860a7', 'CTS','JP','066-0012','Hokkaido','Chitose','','New Chitose Airport', 42.7752, 141.6923),
-('2bdc5586-beaa-43d7-84fe-b295d886888c', 'FUK','JP','812-0003','Fukuoka','Fukuoka','Hakata','Fukuoka Airport', 33.5859, 130.4500),
-('0fb8de28-a3f2-4df7-ba13-68d1cdceae25', 'NGO','JP','479-0881','Aichi','Tokoname','Centrair','Chubu Centrair Airport', 34.8584, 136.8054),
-('e1d6d45b-7b00-410a-bcc6-de1ec27660dc', 'TYOP','JP','135-0063','Tokyo','Koto-ku','4-chōme-8 Ariake','Tokyo Port', 35.6329, 139.7966)
-ON DUPLICATE KEY UPDATE
-  geo_id       = VALUES(geo_id),
-  country_code = VALUES(country_code),
-  postal_code  = VALUES(postal_code),
-  prefecture   = VALUES(prefecture),
-  city         = VALUES(city),
-  town         = VALUES(town),
-  building_name = VALUES(building_name),
-  latitude     = VALUES(latitude),
-  longitude    = VALUES(longitude);
+('40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 'mocktenHubJP','JP','143-0006', 'Tokyo', 'Ota-ku', 'Heiwajima', 'Mockten Hub Japan', 35.5774, 139.7516, 1),
+('e99da54a-71ea-420a-85d1-9dc55146c2fb', 'mocktenHubSG','SG','118423','Singapore','Singapore','2 Pasir Panjang Rd','Mockten Hub Singapore', 1.2754, 103.7957, 1),
+('2dceee6c-67c4-406c-941c-3407ab6037a1', 'customer1@gmail.com','JP','810-8660', 'Fukuoka', 'Chuo Ward', 'Jigyohama', 'Paypay Dome', 33.5954, 130.3621, 1),
+('f324ad72-68b2-4d56-8e1c-ee0f4c6e9112', 'customer2@gmail.com','JP','279-0031', 'Chiba', 'Urayasu', 'Maihama 1-1', 'Tokyo Disney Resort', 35.6329, 139.8804, 1),
+('c32289c6-fa70-496a-a2b8-f1c5cce481da', 'SIN','SG','819643','Singapore','Singapore','Changi','Singapore Changi Airport', 1.3575574, 103.9884812, 1),
+('db347209-4171-422f-aec8-caac0a030f2c', 'SGP','SG','118424','Singapore','Singapore','1 Pasir Panjang Rd','Pasir Panjang Terminal', 1.2702, 103.7669, 1),
+('25e83344-7f15-46aa-bd46-b6d85915dcc3', 'NRT','JP','286-0104','Chiba','Narita','Narita','Narita International Airport', 35.7758714, 140.3933101, 1),
+('33621aba-5ac3-4fc9-b636-6ac8c6bb0960', 'HND','JP','144-0041','Tokyo','Ota-ku','Haneda','Tokyo Haneda Airport', 35.5456924, 139.7760994, 1),
+('6d925d2b-65c3-4ecc-8bb8-1acfcba9045b', 'KIX','JP','549-0001','Osaka','Izumisano','Senshu','Kansai International Airport', 34.4342, 135.2328, 1),
+('6944c68e-e760-46eb-a9ba-3afcfc2860a7', 'CTS','JP','066-0012','Hokkaido','Chitose','','New Chitose Airport', 42.7752, 141.6923, 1),
+('2bdc5586-beaa-43d7-84fe-b295d886888c', 'FUK','JP','812-0003','Fukuoka','Fukuoka','Hakata','Fukuoka Airport', 33.5859, 130.4500, 1),
+('0fb8de28-a3f2-4df7-ba13-68d1cdceae25', 'NGO','JP','479-0881','Aichi','Tokoname','Centrair','Chubu Centrair Airport', 34.8584, 136.8054, 1),
+('e1d6d45b-7b00-410a-bcc6-de1ec27660dc', 'TYOP','JP','135-0063','Tokyo','Koto-ku','4-chōme-8 Ariake','Tokyo Port', 35.6329, 139.7966, 1);
 
 INSERT INTO PaymentProfile (user_id, stripe_customer_id)
 VALUES ('customer1@gmail.com', 'cus_123456789'),
