@@ -86,8 +86,6 @@ type ShippingInternationalResponse struct {
 }
 
 type GeoResponse struct {
-	GeoID        string `json:"geo_id"`
-	IsPrimary    bool   `json:"is_primary"`
 	UserName     string `json:"user_name"`
 	CountryCode  string `json:"country_code"`
 	PostalCode   string `json:"postal_code"`
@@ -253,24 +251,22 @@ func insertGeo(in GeocodeRequest, latStr, lonStr string) error {
 		lon = sql.NullFloat64{Float64: v, Valid: true}
 	}
 
-	// Check if a primary address already exists for this user
-	var existingGeoID string
-	err := db.QueryRowContext(ctx, "SELECT geo_id FROM Geo WHERE user_id = ? AND is_primary = 1", in.UserID).Scan(&existingGeoID)
-
-	isPrimary := 0
-	if err == sql.ErrNoRows {
-		isPrimary = 1
-	} else if err != nil {
-		return err
-	}
-
-	// Always insert a new record
 	q := `
 INSERT INTO Geo (
-  geo_id, user_id, country_code, postal_code, prefecture, city, town, building_name, room_number, latitude, longitude, is_primary
-) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  geo_id, user_id, country_code, postal_code, prefecture, city, town, building_name, room_number, latitude, longitude
+) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE
+  country_code = VALUES(country_code),
+  postal_code  = VALUES(postal_code),
+  prefecture   = VALUES(prefecture),
+  city         = VALUES(city),
+  town         = VALUES(town),
+  building_name= VALUES(building_name),
+  room_number  = VALUES(room_number),
+  latitude     = VALUES(latitude),
+  longitude    = VALUES(longitude);
 `
-	_, err = db.ExecContext(ctx, q,
+	_, err := db.ExecContext(ctx, q,
 		in.UserID,
 		strings.ToUpper(strings.TrimSpace(in.CountryCode)),
 		in.PostalCode,
@@ -280,7 +276,6 @@ INSERT INTO Geo (
 		in.BuildingName,
 		in.RoomNumber,
 		lat, lon,
-		isPrimary,
 	)
 	return err
 }
@@ -291,22 +286,6 @@ func geocodeHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
-
-	if reqBody.UserID == "" {
-		token := r.URL.Query().Get("token")
-		if token == "" {
-			authHeader := r.Header.Get("Authorization")
-			if strings.HasPrefix(authHeader, "Bearer ") {
-				token = strings.TrimPrefix(authHeader, "Bearer ")
-			}
-		}
-		if token != "" {
-			if uid, err := getUserIDFromTokenString(token); err == nil && uid != "" {
-				reqBody.UserID = uid
-			}
-		}
-	}
-
 	params := buildParams(reqBody)
 	lat, lon, found, err := geocodeOnce(params)
 	if err != nil {
@@ -327,14 +306,12 @@ func geocodeHandler(w http.ResponseWriter, r *http.Request) {
 	if found {
 		url := fmt.Sprintf("https://www.google.com/maps?q=%s,%s", lat, lon)
 		fmt.Println("Geocode Result:", url)
+		if err := insertGeo(reqBody, lat, lon); err != nil {
+			log.Printf("DB insert error: %v", err)
+		}
 	} else {
 		fmt.Println("Geocode Result: NOT_FOUND")
 	}
-
-	if err := insertGeo(reqBody, lat, lon); err != nil {
-		log.Printf("DB insert error: %v", err)
-	}
-
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -454,50 +431,13 @@ func getUserLocation(userID string) (*UserGeo, error) {
 	q := `
 SELECT country_code, latitude, longitude
 FROM Geo
-WHERE user_id = ? AND is_primary = 1
+WHERE user_id = ?
 `
 	var g UserGeo
-	var lat, lon sql.NullFloat64
-	err := db.QueryRow(q, userID).Scan(&g.Country, &lat, &lon)
+	err := db.QueryRow(q, userID).Scan(&g.Country, &g.Latitude, &g.Longitude)
 	if err != nil {
 		return nil, err
 	}
-	if lat.Valid {
-		g.Latitude = lat.Float64
-	}
-	if lon.Valid {
-		g.Longitude = lon.Float64
-	}
-	return &g, nil
-}
-
-func getGeoLocationByID(geoID string) (*UserGeo, error) {
-	q := `
-SELECT user_id, country_code, latitude, longitude
-FROM Geo
-WHERE geo_id = ?
-`
-	var g UserGeo
-	var userID string
-	var lat, lon sql.NullFloat64
-	err := db.QueryRow(q, geoID).Scan(&userID, &g.Country, &lat, &lon)
-	if err != nil {
-		return nil, err
-	}
-
-	if lat.Valid && lon.Valid {
-		g.Latitude = lat.Float64
-		g.Longitude = lon.Float64
-		return &g, nil
-	}
-
-	// Fallback to Primary Address coordinates if explicit node lacked valid geolocation resolving
-	primaryNode, pErr := getUserLocation(userID)
-	if pErr == nil {
-		g.Latitude = primaryNode.Latitude
-		g.Longitude = primaryNode.Longitude
-	}
-
 	return &g, nil
 }
 
@@ -649,7 +589,6 @@ func round2(v float64) float64 {
 
 func shippingHandler(w http.ResponseWriter, r *http.Request) {
 	userID := r.URL.Query().Get("user_id")
-	geoID := r.URL.Query().Get("geo_id")
 	productID := r.URL.Query().Get("product_id")
 	token := r.URL.Query().Get("token")
 
@@ -669,8 +608,8 @@ func shippingHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if (userID == "" && geoID == "") || productID == "" {
-		http.Error(w, "Missing identifier or product_id", http.StatusBadRequest)
+	if userID == "" || productID == "" {
+		http.Error(w, "Missing user_id or product_id", http.StatusBadRequest)
 		return
 	}
 
@@ -679,20 +618,10 @@ func shippingHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Product not found", http.StatusInternalServerError)
 		return
 	}
-
-	var user *UserGeo
-	if geoID != "" {
-		user, err = getGeoLocationByID(geoID)
-		if err != nil {
-			http.Error(w, "Geo location not found", http.StatusInternalServerError)
-			return
-		}
-	} else {
-		user, err = getUserLocation(userID)
-		if err != nil {
-			http.Error(w, "User location not found", http.StatusInternalServerError)
-			return
-		}
+	user, err := getUserLocation(userID)
+	if err != nil {
+		http.Error(w, "User location not found", http.StatusInternalServerError)
+		return
 	}
 
 	if !strings.EqualFold(product.Country, user.Country) {
@@ -889,44 +818,27 @@ func getGeoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := `
-SELECT TRIM(CONCAT(COALESCE(ue.FIRST_NAME, ''), ' ', COALESCE(ue.LAST_NAME, ''))) as user_name, g.geo_id, g.is_primary, g.country_code, g.postal_code, g.prefecture, g.city, g.town, g.building_name, g.room_number
+SELECT TRIM(CONCAT(COALESCE(ue.FIRST_NAME, ''), ' ', COALESCE(ue.LAST_NAME, ''))) as user_name, g.country_code, g.postal_code, g.prefecture, g.city, g.town, g.building_name, g.room_number
 FROM Geo g
 LEFT JOIN USER_ENTITY ue ON g.user_id = ue.EMAIL
 WHERE g.user_id = ?
-ORDER BY g.is_primary DESC, g.geo_id ASC
 `
-	rows, err := db.Query(q, userID)
+	var g GeoResponse
+	err := db.QueryRow(q, userID).Scan(
+		&g.UserName, &g.CountryCode, &g.PostalCode, &g.Prefecture,
+		&g.City, &g.Town, &g.BuildingName, &g.RoomNumber,
+	)
 	if err != nil {
-		log.Printf("DB query error: %v", err)
-		http.Error(w, "Database error", http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	var responses []GeoResponse
-	for rows.Next() {
-		var g GeoResponse
-		err := rows.Scan(
-			&g.UserName, &g.GeoID, &g.IsPrimary, &g.CountryCode, &g.PostalCode, &g.Prefecture,
-			&g.City, &g.Town, &g.BuildingName, &g.RoomNumber,
-		)
-		if err != nil {
-			log.Printf("Row scan error: %v", err)
-			continue
+		if err == sql.ErrNoRows {
+			http.Error(w, "User geo data not found", http.StatusNotFound)
+		} else {
+			log.Printf("DB query error: %v", err)
+			http.Error(w, "Database error", http.StatusInternalServerError)
 		}
-		responses = append(responses, g)
-	}
-
-	if err := rows.Err(); err != nil {
-		log.Printf("Rows error: %v", err)
-	}
-
-	if len(responses) == 0 {
-		http.Error(w, "User geo data not found", http.StatusNotFound)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, responses)
+	writeJSON(w, http.StatusOK, g)
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
