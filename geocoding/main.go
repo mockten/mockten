@@ -86,6 +86,8 @@ type ShippingInternationalResponse struct {
 }
 
 type GeoResponse struct {
+	GeoID        string `json:"geo_id"`
+	IsPrimary    bool   `json:"is_primary"`
 	UserName     string `json:"user_name"`
 	CountryCode  string `json:"country_code"`
 	PostalCode   string `json:"postal_code"`
@@ -289,6 +291,22 @@ func geocodeHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
+
+	if reqBody.UserID == "" {
+		token := r.URL.Query().Get("token")
+		if token == "" {
+			authHeader := r.Header.Get("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				token = strings.TrimPrefix(authHeader, "Bearer ")
+			}
+		}
+		if token != "" {
+			if uid, err := getUserIDFromTokenString(token); err == nil && uid != "" {
+				reqBody.UserID = uid
+			}
+		}
+	}
+
 	params := buildParams(reqBody)
 	lat, lon, found, err := geocodeOnce(params)
 	if err != nil {
@@ -309,12 +327,14 @@ func geocodeHandler(w http.ResponseWriter, r *http.Request) {
 	if found {
 		url := fmt.Sprintf("https://www.google.com/maps?q=%s,%s", lat, lon)
 		fmt.Println("Geocode Result:", url)
-		if err := insertGeo(reqBody, lat, lon); err != nil {
-			log.Printf("DB insert error: %v", err)
-		}
 	} else {
 		fmt.Println("Geocode Result: NOT_FOUND")
 	}
+
+	if err := insertGeo(reqBody, lat, lon); err != nil {
+		log.Printf("DB insert error: %v", err)
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -821,27 +841,44 @@ func getGeoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := `
-SELECT TRIM(CONCAT(COALESCE(ue.FIRST_NAME, ''), ' ', COALESCE(ue.LAST_NAME, ''))) as user_name, g.country_code, g.postal_code, g.prefecture, g.city, g.town, g.building_name, g.room_number
+SELECT TRIM(CONCAT(COALESCE(ue.FIRST_NAME, ''), ' ', COALESCE(ue.LAST_NAME, ''))) as user_name, g.geo_id, g.is_primary, g.country_code, g.postal_code, g.prefecture, g.city, g.town, g.building_name, g.room_number
 FROM Geo g
 LEFT JOIN USER_ENTITY ue ON g.user_id = ue.EMAIL
 WHERE g.user_id = ?
+ORDER BY g.is_primary DESC, g.geo_id ASC
 `
-	var g GeoResponse
-	err := db.QueryRow(q, userID).Scan(
-		&g.UserName, &g.CountryCode, &g.PostalCode, &g.Prefecture,
-		&g.City, &g.Town, &g.BuildingName, &g.RoomNumber,
-	)
+	rows, err := db.Query(q, userID)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			http.Error(w, "User geo data not found", http.StatusNotFound)
-		} else {
-			log.Printf("DB query error: %v", err)
-			http.Error(w, "Database error", http.StatusInternalServerError)
+		log.Printf("DB query error: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var responses []GeoResponse
+	for rows.Next() {
+		var g GeoResponse
+		err := rows.Scan(
+			&g.UserName, &g.GeoID, &g.IsPrimary, &g.CountryCode, &g.PostalCode, &g.Prefecture,
+			&g.City, &g.Town, &g.BuildingName, &g.RoomNumber,
+		)
+		if err != nil {
+			log.Printf("Row scan error: %v", err)
+			continue
 		}
+		responses = append(responses, g)
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Printf("Rows error: %v", err)
+	}
+
+	if len(responses) == 0 {
+		http.Error(w, "User geo data not found", http.StatusNotFound)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, g)
+	writeJSON(w, http.StatusOK, responses)
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
