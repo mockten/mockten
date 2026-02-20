@@ -166,9 +166,28 @@ const MyCartCheckout: React.FC = () => {
             }
           });
           const data = res.data;
-          // By assumption if it's domestic, standard_fee comes back. If cross-border, air_standard_fee or sea_standard_fee.
-          // Fallbacks handled sequentially to ensure we always grab the base value since methods are considered static right now.
-          const fee = data.standard_fee || data.air_standard_fee || data.sea_standard_fee || 0;
+          const type = item.shipping_type || '';
+          let fee = 0;
+
+          if (type.includes('Express')) {
+            if (type.includes('Air') && data.air_express_fee !== undefined) {
+              fee = data.air_express_fee;
+            } else if (type.includes('Sea') && data.sea_express_fee !== undefined) {
+              fee = data.sea_express_fee;
+            } else {
+              fee = data.express_fee || data.air_express_fee || data.sea_express_fee || 0;
+            }
+          } else {
+            // Default to Standard logic
+            if (type.includes('Air') && data.air_standard_fee !== undefined) {
+              fee = data.air_standard_fee;
+            } else if (type.includes('Sea') && data.sea_standard_fee !== undefined) {
+              fee = data.sea_standard_fee;
+            } else {
+              fee = data.standard_fee || data.air_standard_fee || data.sea_standard_fee || 0;
+            }
+          }
+
           cumulativeFee += fee;
         }
         setDynamicShippingFee(cumulativeFee);
