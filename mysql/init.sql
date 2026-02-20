@@ -70,7 +70,8 @@ CREATE TABLE IF NOT EXISTS AirCost (
 );
 
 CREATE TABLE IF NOT EXISTS Geo (
-  user_id VARCHAR(36) PRIMARY KEY,
+  geo_id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(255) NOT NULL,
   country_code VARCHAR(2),
   postal_code VARCHAR(36),
   prefecture VARCHAR(50),
@@ -79,7 +80,8 @@ CREATE TABLE IF NOT EXISTS Geo (
   building_name VARCHAR(100),
   room_number VARCHAR(20),
   latitude DECIMAL(10,7),
-  longitude DECIMAL(10,7)
+  longitude DECIMAL(10,7),
+  UNIQUE KEY uq_geo_user_id (user_id)
 );
 
 CREATE TABLE IF NOT EXISTS `Order` (
@@ -100,12 +102,12 @@ CREATE TABLE IF NOT EXISTS `Order` (
 CREATE TABLE IF NOT EXISTS `Transaction` (
   transaction_id VARCHAR(36) PRIMARY KEY,
   product_id     VARCHAR(36) NOT NULL,
-  user_id        VARCHAR(255) NOT NULL,
+  geo_id         VARCHAR(36) NOT NULL,
   status         ENUM('quoted','booked','picked_up','in_transit','delayed','delivered','canceled','failed') NOT NULL DEFAULT 'quoted',
   leg_type       ENUM('road','air','sea') NOT NULL DEFAULT 'road',
   created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at     DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  KEY idx_tx_user    (user_id),
+  KEY idx_tx_geo     (geo_id),
   KEY idx_tx_product (product_id),
   KEY idx_tx_legtype (leg_type)
 );
@@ -186,52 +188,52 @@ ON DUPLICATE KEY UPDATE
 
 INSERT INTO Product (product_id, product_name, seller_id, price, category_id, summary, product_condition, geo_id, avg_review, review_count)
 VALUES
-('b150d47f-f4fb-40a2-a336-ac8e897af607', 'Bone conduction earphones', 'headphonecompany@example.com', 500, '07', 'Experience clear sound without blocking your ears.', 'new','mocktenHubJP', 0.0, 0),
-('580414f1-e962-4f6c-a461-d88d168e7cb1', 'Lemongrass', 'greengrocer@example.com', 6, '03', 'Fresh and aromatic lemongrass perfect for cooking or tea.', 'new', 'mocktenHubSG', 0.0, 0),
-('91e438c6-f073-4c57-95b3-0f98ccdedf34', 'Playing cards', 'toycompany@example.com', 5, '09', 'Standard deck of playing cards for endless fun.', 'used','mocktenHubJP', 0.0, 0),
-('fe88e32f-678f-403a-bed2-331a4ff406c2', 'Protain bar', 'healthcompany@example.com', 20, '16', 'Delicious protein bars to power your workout.', 'new','mocktenHubJP', 0.0, 0),
-('d82f659a-a1ff-47f5-afb8-c93c02702fa4', 'Snowboard', 'sportscompany@example.com', 100, '12', 'Designed for extreme winter sports with durability and sound clarity.', 'used','mocktenHubJP', 0.0, 0),
-('ad8e41bd-a9ff-4d18-9aed-3bcb8fa3bfc4','Strawberry Chocolate','sweets@example.com',10,'03','Sweet strawberry chocolate snack.','new','mocktenHubJP', 0.0, 0),
-('7b1c5c71-6e88-4b72-9ad0-1e2d6b9b6111','Balsamic Vinegar','cooking@example.com',12,'03','Rich balsamic vinegar ideal for cooking and salads.','new','mocktenHubSG', 0.0, 0),
-('e91b19b6-cb8e-4abd-ae3c-72fb0ea58491','Honey (Hachimitsu)','cooking@example.com',14,'03','Pure natural honey perfect for tea or desserts.','new','mocktenHubJP', 0.0, 0),
-('1da5ef1b-2c41-4c3a-b8d2-e74048e0f92a','Ketchup Bottle','cooking@example.com',8,'03','Classic tomato ketchup for everyday meals.','new','mocktenHubSG', 0.0, 0),
-('0b2cbf64-f73e-4c69-9f89-647db1e19fb4','Nabe Soup Base','cooking@example.com',11,'03','Warm soup base perfect for hot pot dishes.','new','mocktenHubSG', 0.0, 0),
-('fb28d68b-fd2d-4db9-9d6b-dbb13f63f24f','Parmesan Cheese','cooking@example.com',16,'03','Finely grated parmesan cheese for pasta.','new','mocktenHubJP', 0.0, 0),
-('c8ba2aec-ec56-46dd-a62b-067087b22628','Soy Sauce Bottle','cooking@example.com',9,'03','Traditional soy sauce to enhance flavor.','new','mocktenHubJP', 0.0, 0),
-('a0a27644-61f1-47cd-88ea-e4e886f6bb1b','Bottle Can Coffee','drink@example.com',6,'03','Refreshing canned coffee for a quick boost.','new','mocktenHubJP', 0.0, 0),
-('a8c4e635-8502-4d7b-b3e4-c730d7d34fa4','Sparkling Water','drink@example.com',15,'03','Refreshing sparkling water in a classic bottle.','new','mocktenHubSG', 0.0, 0),
-('e63d496d-5a93-4e31-a623-5c55a3b2f941','Grape Juice','drink@example.com',18,'03','Rich grape juice for relaxing moments.','new','mocktenHubJP', 0.0, 0),
-('f203372b-e650-4e98-b67b-269ceaa1d01a','Zero Cola','drink@example.com',7,'03','Sugar-free cola with crisp taste.','new','mocktenHubSG', 0.0, 0),
-('5bd23c48-72b2-4b80-badc-cd56b314d073','Cup Soup','drink@example.com',5,'03','Simple and warm instant cup soup.','new','mocktenHubJP', 0.0, 0),
-('0ef627dd-d8d1-44b3-a340-0c56bebda12d','Energy Drink Can','drink@example.com',8,'03','Energy drink for an instant refreshment.','new','mocktenHubSG', 0.0, 0),
-('404586d7-d357-4659-90fb-91e6aedc2f13','Milk','drink@example.com',9,'03','Fresh milk conveniently packed with cap.','new','mocktenHubJP', 0.0, 0),
-('9a487e3c-8d90-4e8c-8e9c-49f1e801b4af','Yasai Vegetable Juice','drink@example.com',6,'03','Healthy vegetable juice full of nutrients.','new','mocktenHubSG', 0.0, 0),
-('a8cfbaa9-3b6d-4474-9558-28b8983d9332','Salad Chicken','food@example.com',12,'03','Tender salad chicken ready to eat.','new','mocktenHubJP', 0.0, 0),
-('8d13b89f-029d-4621-8ac3-22065d7d25df','Miso Cup Ramen','food@example.com',7,'03','Rich miso-flavored instant ramen.','new','mocktenHubJP', 0.0, 0),
-('f2d5e4f1-e459-4623-b665-995dcde9f5fa','Low-Sodium Cup Ramen','food@example.com',7,'03','Light cup ramen with reduced salt.','new','mocktenHubSG', 0.0, 0),
-('9d37823d-0ad5-4b44-b70f-83aab7b8e2a1','Yakisoba Cup','food@example.com',6,'03','Savory instant yakisoba noodles.','new','mocktenHubSG', 0.0, 0),
-('fc5fb21c-ffe1-46dc-a5cb-bc56071f6203','Freeze-Dried Meal','food@example.com',15,'03','Lightweight freeze-dried food for convenience.','new','mocktenHubJP', 0.0, 0),
-('5c0ed03e-3706-4e1e-b6d8-7cc6b6df3c0f','Strawberry Sandwich','food@example.com',12,'03','Sweet strawberry cream fruit sandwich.','new','mocktenHubJP', 0.0, 0),
-('73d062cf-6d55-434e-b825-c83dfaa5eaf4','Nattou Pack','food@example.com',5,'03','Traditional Japanese fermented soybeans.','new','mocktenHubSG', 0.0, 0),
-('b72c04cf-5571-4a77-bec1-4c4e56d0d965','Yakiniku Meat Set','food@example.com',18,'03','Freshly prepared yakiniku BBQ set.','new','mocktenHubJP', 0.0, 0),
-('d40144ee-e2a3-4740-8090-ccdc92ed8f2f','Oatmeal','food@example.com',10,'03','Healthy oatmeal perfect for breakfast.','new','mocktenHubSG', 0.0, 0),
-('e79e4bbb-3f65-4bdf-9dda-6ce0656c9f8a','Kashipan Sweet Bread Set','food@example.com',6,'03','Soft sweet breads for snacks.','new','mocktenHubJP', 0.0, 0),
-('ff2bf87c-ae70-4cc1-8bb5-fa923c4ba8a7','Laksa','food@example.com',12,'03','Spicy and rich laksa-flavored noodles.','new','mocktenHubSG', 0.0, 0),
-('4e2a7db7-4762-4d55-b5e0-fb9b6053320e','Frozen Shrimp','food@example.com',14,'03','Fresh frozen shrimp for cooking.','new','mocktenHubJP', 0.0, 0),
-('fa55d8e3-291e-4f06-a690-2b0b4f7d8e5b','Retort Curry','food@example.com',9,'03','Ready-to-eat rich curry meal.','new','mocktenHubSG', 0.0, 0),
-('65fd3bbd-2743-4e72-9e63-4d5a3eca6f86','Watermelon (Round)','fruit@example.com',13,'03','Fresh round watermelon.','new','mocktenHubSG', 0.0, 0),
-('8b7460c3-dc13-4a66-915f-2f64d716c607','Watermelon (Square)','fruit@example.com',16,'03','Unique square-shaped watermelon.','new','mocktenHubJP', 0.0, 0),
-('aaf4d6ea-61a0-4afb-a386-34a6a91e6e6a','Strawberry Jam','jam@example.com',8,'03','Sweet strawberry jam for bread.','new','mocktenHubSG', 0.0, 0),
-('c5ec7a88-b4eb-4f47-a832-3fa4c5ca5aa0','Marmalade','jam@example.com',8,'03','Bitter-sweet orange marmalade.','new','mocktenHubJP', 0.0, 0),
-('b91a5d68-6acb-48e7-8e5d-3d85b7e76af2','Blueberry Jam','jam@example.com',9,'03','Rich blueberry jam full of flavor.','new','mocktenHubSG', 0.0, 0),
-('50cbbe87-385e-4a60-b0d5-99b6ac0a969d','Apple Jam','jam@example.com',7,'03','Classic apple jam with mild sweetness.','new','mocktenHubJP', 0.0, 0),
-('9a1ed557-4ea2-4523-959c-712fc3b9b748','PET Bottle Water','water@example.com',5,'03','Refreshing clean bottled water.','new','mocktenHubJP', 0.0, 0),
-('e8f085de-89dd-4574-9dfd-f7c1352f9a25','Vegetables Mix','vegetable@example.com',7,'03','Fresh assorted vegetables.','new','mocktenHubSG', 0.0, 0),
-('4b9f1c23-8e9a-4c26-a347-995046dfbb5d','Cut Vegetables','vegetable@example.com',6,'03','Pre-cut vegetables for easy cooking.','new','mocktenHubJP', 0.0, 0),
-('24f0dd61-4663-4a0b-8cd0-d3c762ddc090','Frozen Vegetables','vegetable@example.com',8,'03','Frozen mixed vegetables.','new','mocktenHubSG', 0.0, 0),
-('12b8cb8c-6ef9-4bb4-a022-2fd8f8d2b878','Donut','sweets@example.com',6,'03','Sweet and fluffy donut snack.','new','mocktenHubJP', 0.0, 0),
-('bfd759cf-a8eb-47b1-a23d-dcba3f17366a','Chocolate','sweets@example.com',11,'03','Cute chocolate perfect for Valentine’s Day.','new','mocktenHubSG', 0.0, 0),
-('c8a1b74b-d2c4-4d5d-a845-176b5457ec36','Space Food','space@example.com',20,'03','Lightweight space-ready food pack.','new','mocktenHubSG', 0.0, 0)
+('b150d47f-f4fb-40a2-a336-ac8e897af607', 'Bone conduction earphones', 'headphonecompany@example.com', 500, '07', 'Experience clear sound without blocking your ears.', 'new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('580414f1-e962-4f6c-a461-d88d168e7cb1', 'Lemongrass', 'greengrocer@example.com', 6, '03', 'Fresh and aromatic lemongrass perfect for cooking or tea.', 'new', 'e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('91e438c6-f073-4c57-95b3-0f98ccdedf34', 'Playing cards', 'toycompany@example.com', 5, '09', 'Standard deck of playing cards for endless fun.', 'used','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('fe88e32f-678f-403a-bed2-331a4ff406c2', 'Protain bar', 'healthcompany@example.com', 20, '16', 'Delicious protein bars to power your workout.', 'new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('d82f659a-a1ff-47f5-afb8-c93c02702fa4', 'Snowboard', 'sportscompany@example.com', 100, '12', 'Designed for extreme winter sports with durability and sound clarity.', 'used','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('ad8e41bd-a9ff-4d18-9aed-3bcb8fa3bfc4','Strawberry Chocolate','sweets@example.com',10,'03','Sweet strawberry chocolate snack.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('7b1c5c71-6e88-4b72-9ad0-1e2d6b9b6111','Balsamic Vinegar','cooking@example.com',12,'03','Rich balsamic vinegar ideal for cooking and salads.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('e91b19b6-cb8e-4abd-ae3c-72fb0ea58491','Honey (Hachimitsu)','cooking@example.com',14,'03','Pure natural honey perfect for tea or desserts.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('1da5ef1b-2c41-4c3a-b8d2-e74048e0f92a','Ketchup Bottle','cooking@example.com',8,'03','Classic tomato ketchup for everyday meals.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('0b2cbf64-f73e-4c69-9f89-647db1e19fb4','Nabe Soup Base','cooking@example.com',11,'03','Warm soup base perfect for hot pot dishes.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('fb28d68b-fd2d-4db9-9d6b-dbb13f63f24f','Parmesan Cheese','cooking@example.com',16,'03','Finely grated parmesan cheese for pasta.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('c8ba2aec-ec56-46dd-a62b-067087b22628','Soy Sauce Bottle','cooking@example.com',9,'03','Traditional soy sauce to enhance flavor.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('a0a27644-61f1-47cd-88ea-e4e886f6bb1b','Bottle Can Coffee','drink@example.com',6,'03','Refreshing canned coffee for a quick boost.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('a8c4e635-8502-4d7b-b3e4-c730d7d34fa4','Sparkling Water','drink@example.com',15,'03','Refreshing sparkling water in a classic bottle.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('e63d496d-5a93-4e31-a623-5c55a3b2f941','Grape Juice','drink@example.com',18,'03','Rich grape juice for relaxing moments.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('f203372b-e650-4e98-b67b-269ceaa1d01a','Zero Cola','drink@example.com',7,'03','Sugar-free cola with crisp taste.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('5bd23c48-72b2-4b80-badc-cd56b314d073','Cup Soup','drink@example.com',5,'03','Simple and warm instant cup soup.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('0ef627dd-d8d1-44b3-a340-0c56bebda12d','Energy Drink Can','drink@example.com',8,'03','Energy drink for an instant refreshment.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('404586d7-d357-4659-90fb-91e6aedc2f13','Milk','drink@example.com',9,'03','Fresh milk conveniently packed with cap.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('9a487e3c-8d90-4e8c-8e9c-49f1e801b4af','Yasai Vegetable Juice','drink@example.com',6,'03','Healthy vegetable juice full of nutrients.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('a8cfbaa9-3b6d-4474-9558-28b8983d9332','Salad Chicken','food@example.com',12,'03','Tender salad chicken ready to eat.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('8d13b89f-029d-4621-8ac3-22065d7d25df','Miso Cup Ramen','food@example.com',7,'03','Rich miso-flavored instant ramen.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('f2d5e4f1-e459-4623-b665-995dcde9f5fa','Low-Sodium Cup Ramen','food@example.com',7,'03','Light cup ramen with reduced salt.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('9d37823d-0ad5-4b44-b70f-83aab7b8e2a1','Yakisoba Cup','food@example.com',6,'03','Savory instant yakisoba noodles.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('fc5fb21c-ffe1-46dc-a5cb-bc56071f6203','Freeze-Dried Meal','food@example.com',15,'03','Lightweight freeze-dried food for convenience.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('5c0ed03e-3706-4e1e-b6d8-7cc6b6df3c0f','Strawberry Sandwich','food@example.com',12,'03','Sweet strawberry cream fruit sandwich.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('73d062cf-6d55-434e-b825-c83dfaa5eaf4','Nattou Pack','food@example.com',5,'03','Traditional Japanese fermented soybeans.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('b72c04cf-5571-4a77-bec1-4c4e56d0d965','Yakiniku Meat Set','food@example.com',18,'03','Freshly prepared yakiniku BBQ set.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('d40144ee-e2a3-4740-8090-ccdc92ed8f2f','Oatmeal','food@example.com',10,'03','Healthy oatmeal perfect for breakfast.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('e79e4bbb-3f65-4bdf-9dda-6ce0656c9f8a','Kashipan Sweet Bread Set','food@example.com',6,'03','Soft sweet breads for snacks.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('ff2bf87c-ae70-4cc1-8bb5-fa923c4ba8a7','Laksa','food@example.com',12,'03','Spicy and rich laksa-flavored noodles.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('4e2a7db7-4762-4d55-b5e0-fb9b6053320e','Frozen Shrimp','food@example.com',14,'03','Fresh frozen shrimp for cooking.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('fa55d8e3-291e-4f06-a690-2b0b4f7d8e5b','Retort Curry','food@example.com',9,'03','Ready-to-eat rich curry meal.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('65fd3bbd-2743-4e72-9e63-4d5a3eca6f86','Watermelon (Round)','fruit@example.com',13,'03','Fresh round watermelon.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('8b7460c3-dc13-4a66-915f-2f64d716c607','Watermelon (Square)','fruit@example.com',16,'03','Unique square-shaped watermelon.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('aaf4d6ea-61a0-4afb-a386-34a6a91e6e6a','Strawberry Jam','jam@example.com',8,'03','Sweet strawberry jam for bread.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('c5ec7a88-b4eb-4f47-a832-3fa4c5ca5aa0','Marmalade','jam@example.com',8,'03','Bitter-sweet orange marmalade.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('b91a5d68-6acb-48e7-8e5d-3d85b7e76af2','Blueberry Jam','jam@example.com',9,'03','Rich blueberry jam full of flavor.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('50cbbe87-385e-4a60-b0d5-99b6ac0a969d','Apple Jam','jam@example.com',7,'03','Classic apple jam with mild sweetness.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('9a1ed557-4ea2-4523-959c-712fc3b9b748','PET Bottle Water','water@example.com',5,'03','Refreshing clean bottled water.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('e8f085de-89dd-4574-9dfd-f7c1352f9a25','Vegetables Mix','vegetable@example.com',7,'03','Fresh assorted vegetables.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('4b9f1c23-8e9a-4c26-a347-995046dfbb5d','Cut Vegetables','vegetable@example.com',6,'03','Pre-cut vegetables for easy cooking.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('24f0dd61-4663-4a0b-8cd0-d3c762ddc090','Frozen Vegetables','vegetable@example.com',8,'03','Frozen mixed vegetables.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('12b8cb8c-6ef9-4bb4-a022-2fd8f8d2b878','Donut','sweets@example.com',6,'03','Sweet and fluffy donut snack.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
+('bfd759cf-a8eb-47b1-a23d-dcba3f17366a','Chocolate','sweets@example.com',11,'03','Cute chocolate perfect for Valentine’s Day.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
+('c8a1b74b-d2c4-4d5d-a845-176b5457ec36','Space Food','space@example.com',20,'03','Lightweight space-ready food pack.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0)
 ON DUPLICATE KEY UPDATE
   product_name       = VALUES(product_name),
   seller_id          = VALUES(seller_id),
@@ -342,22 +344,23 @@ VALUES
 ON DUPLICATE KEY UPDATE
   cost_usd = VALUES(cost_usd);
 
-INSERT INTO Geo (user_id, country_code, postal_code, prefecture, city, town, building_name, latitude, longitude)
+INSERT INTO Geo (geo_id, user_id, country_code, postal_code, prefecture, city, town, building_name, latitude, longitude)
 VALUES
-('mocktenHubJP','JP','143-0006', 'Tokyo', 'Ota-ku', 'Heiwajima', 'Mockten Hub Japan', 35.5774, 139.7516),
-('mocktenHubSG','SG','118423','Singapore','Singapore','2 Pasir Panjang Rd','Mockten Hub Singapore', 1.2754, 103.7957),
-('customer1@gmail.com','JP','810-8660', 'Fukuoka', 'Chuo Ward', 'Jigyohama', 'Paypay Dome', 33.5954, 130.3621),
-('customer2@gmail.com','JP','279-0031', 'Chiba', 'Urayasu', 'Maihama 1-1', 'Tokyo Disney Resort', 35.6329, 139.8804),
-('SIN','SG','819643','Singapore','Singapore','Changi','Singapore Changi Airport', 1.3575574, 103.9884812),
-('SGP','SG','118424','Singapore','Singapore','1 Pasir Panjang Rd','Pasir Panjang Terminal', 1.2702, 103.7669),
-('NRT','JP','286-0104','Chiba','Narita','Narita','Narita International Airport', 35.7758714, 140.3933101),
-('HND','JP','144-0041','Tokyo','Ota-ku','Haneda','Tokyo Haneda Airport', 35.5456924, 139.7760994),
-('KIX','JP','549-0001','Osaka','Izumisano','Senshu','Kansai International Airport', 34.4342, 135.2328),
-('CTS','JP','066-0012','Hokkaido','Chitose','','New Chitose Airport', 42.7752, 141.6923),
-('FUK','JP','812-0003','Fukuoka','Fukuoka','Hakata','Fukuoka Airport', 33.5859, 130.4500),
-('NGO','JP','479-0881','Aichi','Tokoname','Centrair','Chubu Centrair Airport', 34.8584, 136.8054),
-('TYOP','JP','135-0063','Tokyo','Koto-ku','4-chōme-8 Ariake','Tokyo Port', 35.6329, 139.7966)
+('40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 'mocktenHubJP','JP','143-0006', 'Tokyo', 'Ota-ku', 'Heiwajima', 'Mockten Hub Japan', 35.5774, 139.7516),
+('e99da54a-71ea-420a-85d1-9dc55146c2fb', 'mocktenHubSG','SG','118423','Singapore','Singapore','2 Pasir Panjang Rd','Mockten Hub Singapore', 1.2754, 103.7957),
+('2dceee6c-67c4-406c-941c-3407ab6037a1', 'customer1@gmail.com','JP','810-8660', 'Fukuoka', 'Chuo Ward', 'Jigyohama', 'Paypay Dome', 33.5954, 130.3621),
+('f324ad72-68b2-4d56-8e1c-ee0f4c6e9112', 'customer2@gmail.com','JP','279-0031', 'Chiba', 'Urayasu', 'Maihama 1-1', 'Tokyo Disney Resort', 35.6329, 139.8804),
+('c32289c6-fa70-496a-a2b8-f1c5cce481da', 'SIN','SG','819643','Singapore','Singapore','Changi','Singapore Changi Airport', 1.3575574, 103.9884812),
+('db347209-4171-422f-aec8-caac0a030f2c', 'SGP','SG','118424','Singapore','Singapore','1 Pasir Panjang Rd','Pasir Panjang Terminal', 1.2702, 103.7669),
+('25e83344-7f15-46aa-bd46-b6d85915dcc3', 'NRT','JP','286-0104','Chiba','Narita','Narita','Narita International Airport', 35.7758714, 140.3933101),
+('33621aba-5ac3-4fc9-b636-6ac8c6bb0960', 'HND','JP','144-0041','Tokyo','Ota-ku','Haneda','Tokyo Haneda Airport', 35.5456924, 139.7760994),
+('6d925d2b-65c3-4ecc-8bb8-1acfcba9045b', 'KIX','JP','549-0001','Osaka','Izumisano','Senshu','Kansai International Airport', 34.4342, 135.2328),
+('6944c68e-e760-46eb-a9ba-3afcfc2860a7', 'CTS','JP','066-0012','Hokkaido','Chitose','','New Chitose Airport', 42.7752, 141.6923),
+('2bdc5586-beaa-43d7-84fe-b295d886888c', 'FUK','JP','812-0003','Fukuoka','Fukuoka','Hakata','Fukuoka Airport', 33.5859, 130.4500),
+('0fb8de28-a3f2-4df7-ba13-68d1cdceae25', 'NGO','JP','479-0881','Aichi','Tokoname','Centrair','Chubu Centrair Airport', 34.8584, 136.8054),
+('e1d6d45b-7b00-410a-bcc6-de1ec27660dc', 'TYOP','JP','135-0063','Tokyo','Koto-ku','4-chōme-8 Ariake','Tokyo Port', 35.6329, 139.7966)
 ON DUPLICATE KEY UPDATE
+  geo_id       = VALUES(geo_id),
   country_code = VALUES(country_code),
   postal_code  = VALUES(postal_code),
   prefecture   = VALUES(prefecture),
@@ -389,18 +392,18 @@ ON DUPLICATE KEY UPDATE
   is_default               = VALUES(is_default),
   status                   = VALUES(status);
 
-INSERT INTO `Transaction` (transaction_id, product_id, user_id, status, leg_type)
+INSERT INTO `Transaction` (transaction_id, product_id, geo_id, status, leg_type)
 VALUES
-('tx-rl-001', 'b150d47f-f4fb-40a2-a336-ac8e897af607', 'customer1@gmail.com', 'quoted', 'road'),
-('tx-air-001-road1','b150d47f-f4fb-40a2-a336-ac8e897af607','customer2@gmail.com','quoted','road'),
-('tx-air-001-air',  'b150d47f-f4fb-40a2-a336-ac8e897af607','customer2@gmail.com','quoted','air'),
-('tx-air-001-road2','b150d47f-f4fb-40a2-a336-ac8e897af607','customer2@gmail.com','quoted','road'),
-('tx-sea-001-road1','580414f1-e962-4f6c-a461-d88d168e7cb1','customer2@gmail.com','quoted','road'),
-('tx-sea-001-sea',  '580414f1-e962-4f6c-a461-d88d168e7cb1','customer2@gmail.com','quoted','sea'),
-('tx-sea-001-road2','580414f1-e962-4f6c-a461-d88d168e7cb1','customer2@gmail.com','quoted','road')
+('tx-rl-001', 'b150d47f-f4fb-40a2-a336-ac8e897af607', '2dceee6c-67c4-406c-941c-3407ab6037a1', 'quoted', 'road'),
+('tx-air-001-road1','b150d47f-f4fb-40a2-a336-ac8e897af607','f324ad72-68b2-4d56-8e1c-ee0f4c6e9112','quoted','road'),
+('tx-air-001-air',  'b150d47f-f4fb-40a2-a336-ac8e897af607','f324ad72-68b2-4d56-8e1c-ee0f4c6e9112','quoted','air'),
+('tx-air-001-road2','b150d47f-f4fb-40a2-a336-ac8e897af607','f324ad72-68b2-4d56-8e1c-ee0f4c6e9112','quoted','road'),
+('tx-sea-001-road1','580414f1-e962-4f6c-a461-d88d168e7cb1','f324ad72-68b2-4d56-8e1c-ee0f4c6e9112','quoted','road'),
+('tx-sea-001-sea',  '580414f1-e962-4f6c-a461-d88d168e7cb1','f324ad72-68b2-4d56-8e1c-ee0f4c6e9112','quoted','sea'),
+('tx-sea-001-road2','580414f1-e962-4f6c-a461-d88d168e7cb1','f324ad72-68b2-4d56-8e1c-ee0f4c6e9112','quoted','road')
 ON DUPLICATE KEY UPDATE
   product_id = VALUES(product_id),
-  user_id    = VALUES(user_id),
+  geo_id     = VALUES(geo_id),
   status     = VALUES(status),
   leg_type   = VALUES(leg_type);
 

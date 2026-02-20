@@ -253,8 +253,8 @@ func insertGeo(in GeocodeRequest, latStr, lonStr string) error {
 
 	q := `
 INSERT INTO Geo (
-  user_id, country_code, postal_code, prefecture, city, town, building_name, room_number, latitude, longitude
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  geo_id, user_id, country_code, postal_code, prefecture, city, town, building_name, room_number, latitude, longitude
+) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
   country_code = VALUES(country_code),
   postal_code  = VALUES(postal_code),
@@ -416,7 +416,7 @@ func getProductLocation(productID string) (*Product, error) {
 	q := `
 SELECT p.geo_id, g.country_code, g.latitude, g.longitude
 FROM Product p
-JOIN Geo g ON p.geo_id = g.user_id
+JOIN Geo g ON p.geo_id = g.geo_id
 WHERE p.product_id = ?
 `
 	var p Product
