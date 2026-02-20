@@ -457,10 +457,47 @@ FROM Geo
 WHERE user_id = ? AND is_primary = 1
 `
 	var g UserGeo
-	err := db.QueryRow(q, userID).Scan(&g.Country, &g.Latitude, &g.Longitude)
+	var lat, lon sql.NullFloat64
+	err := db.QueryRow(q, userID).Scan(&g.Country, &lat, &lon)
 	if err != nil {
 		return nil, err
 	}
+	if lat.Valid {
+		g.Latitude = lat.Float64
+	}
+	if lon.Valid {
+		g.Longitude = lon.Float64
+	}
+	return &g, nil
+}
+
+func getGeoLocationByID(geoID string) (*UserGeo, error) {
+	q := `
+SELECT user_id, country_code, latitude, longitude
+FROM Geo
+WHERE geo_id = ?
+`
+	var g UserGeo
+	var userID string
+	var lat, lon sql.NullFloat64
+	err := db.QueryRow(q, geoID).Scan(&userID, &g.Country, &lat, &lon)
+	if err != nil {
+		return nil, err
+	}
+
+	if lat.Valid && lon.Valid {
+		g.Latitude = lat.Float64
+		g.Longitude = lon.Float64
+		return &g, nil
+	}
+
+	// Fallback to Primary Address coordinates if explicit node lacked valid geolocation resolving
+	primaryNode, pErr := getUserLocation(userID)
+	if pErr == nil {
+		g.Latitude = primaryNode.Latitude
+		g.Longitude = primaryNode.Longitude
+	}
+
 	return &g, nil
 }
 
@@ -612,6 +649,7 @@ func round2(v float64) float64 {
 
 func shippingHandler(w http.ResponseWriter, r *http.Request) {
 	userID := r.URL.Query().Get("user_id")
+	geoID := r.URL.Query().Get("geo_id")
 	productID := r.URL.Query().Get("product_id")
 	token := r.URL.Query().Get("token")
 
@@ -631,8 +669,8 @@ func shippingHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if userID == "" || productID == "" {
-		http.Error(w, "Missing user_id or product_id", http.StatusBadRequest)
+	if (userID == "" && geoID == "") || productID == "" {
+		http.Error(w, "Missing identifier or product_id", http.StatusBadRequest)
 		return
 	}
 
@@ -641,10 +679,20 @@ func shippingHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Product not found", http.StatusInternalServerError)
 		return
 	}
-	user, err := getUserLocation(userID)
-	if err != nil {
-		http.Error(w, "User location not found", http.StatusInternalServerError)
-		return
+
+	var user *UserGeo
+	if geoID != "" {
+		user, err = getGeoLocationByID(geoID)
+		if err != nil {
+			http.Error(w, "Geo location not found", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		user, err = getUserLocation(userID)
+		if err != nil {
+			http.Error(w, "User location not found", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	if !strings.EqualFold(product.Country, user.Country) {

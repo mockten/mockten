@@ -94,6 +94,9 @@ const MyCartCheckout: React.FC = () => {
     room_number: '',
   });
 
+  const [dynamicShippingFee, setDynamicShippingFee] = useState<number>(shippingFee);
+  const [isCalculatingShipping, setIsCalculatingShipping] = useState<boolean>(false);
+
   const fetchData = async (isInitialLoad: boolean = false): Promise<GeoAddress[]> => {
     try {
       let name = 'User';
@@ -148,10 +151,40 @@ const MyCartCheckout: React.FC = () => {
     fetchData(true);
   }, []);
 
+  useEffect(() => {
+    const calculateDynamicShipping = async () => {
+      if (!shippingAddress || items.length === 0) return;
+      setIsCalculatingShipping(true);
+      try {
+        let cumulativeFee = 0;
+        for (const item of items) {
+          // Attempt to ping the geocoding service using geo_id and product_id
+          const res = await apiClient.get('/api/shipping', {
+            params: {
+              geo_id: shippingAddress.geo_id,
+              product_id: item.productId || item.id
+            }
+          });
+          const data = res.data;
+          // By assumption if it's domestic, standard_fee comes back. If cross-border, air_standard_fee or sea_standard_fee.
+          // Fallbacks handled sequentially to ensure we always grab the base value since methods are considered static right now.
+          const fee = data.standard_fee || data.air_standard_fee || data.sea_standard_fee || 0;
+          cumulativeFee += fee;
+        }
+        setDynamicShippingFee(cumulativeFee);
+      } catch (e) {
+        console.error("Failed to dynamically calculate shipping", e);
+      } finally {
+        setIsCalculatingShipping(false);
+      }
+    };
+    calculateDynamicShipping();
+  }, [shippingAddress, items]);
+
   const orderSummary = {
     subtotal: subtotal,
-    shipping: shippingFee,
-    total: subtotal + shippingFee,
+    shipping: dynamicShippingFee,
+    total: subtotal + dynamicShippingFee,
   };
 
   const savedCards = [
@@ -665,11 +698,11 @@ const MyCartCheckout: React.FC = () => {
                     sx={{
                       fontFamily: 'Noto Sans',
                       fontSize: '16px',
-                      color: 'black',
+                      color: isCalculatingShipping ? '#888' : 'black',
                       textAlign: 'right',
                     }}
                   >
-                    $ {orderSummary.shipping.toLocaleString()}
+                    {isCalculatingShipping ? 'Calculating...' : `$ ${orderSummary.shipping.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -699,10 +732,10 @@ const MyCartCheckout: React.FC = () => {
                         fontFamily: 'Noto Sans',
                         fontWeight: 'bold',
                         fontSize: '20px',
-                        color: 'black',
+                        color: isCalculatingShipping ? '#888' : 'black',
                       }}
                     >
-                      {orderSummary.total.toLocaleString()}
+                      {isCalculatingShipping ? '...' : orderSummary.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </Typography>
                   </Box>
                 </Box>
