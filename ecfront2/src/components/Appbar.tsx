@@ -96,11 +96,6 @@ const Appbar: React.FC<AppbarProps> = ({
     }
   };
 
-  const handleAccountMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    clearAccountMenuCloseTimer();
-    setAccountMenuAnchorEl(event.currentTarget);
-  };
-
   const handleAccountMenuClose = () => {
     clearAccountMenuCloseTimer();
     setAccountMenuAnchorEl(null);
@@ -112,6 +107,11 @@ const Appbar: React.FC<AppbarProps> = ({
       setAccountMenuAnchorEl(null);
       accountMenuCloseTimerRef.current = null;
     }, 150);
+  };
+
+  const handleAccountMenuToggle = (event: React.MouseEvent<HTMLElement>) => {
+    clearAccountMenuCloseTimer();
+    setAccountMenuAnchorEl((prev) => (prev ? null : event.currentTarget));
   };
 
   const handleLogoClick = () => {
@@ -214,9 +214,7 @@ const Appbar: React.FC<AppbarProps> = ({
             aria-haspopup="true"
             aria-expanded={isAccountMenuOpen ? 'true' : undefined}
             sx={{ color: 'black' }}
-            onMouseEnter={handleAccountMenuOpen}
-            onMouseLeave={scheduleAccountMenuClose}
-            onClick={handleAccountMenuOpen}
+            onClick={handleAccountMenuToggle}
           >
             <Person />
           </IconButton>
@@ -248,6 +246,14 @@ const Appbar: React.FC<AppbarProps> = ({
               }}
             >
               Change Password
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                handleAccountMenuClose();
+                navigate('/user/card-settings');
+              }}
+            >
+              Change Card
             </MenuItem>
           </Menu>
         </Box>

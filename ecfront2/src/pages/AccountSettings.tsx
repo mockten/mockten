@@ -104,10 +104,12 @@ const AccountSettingsNew: React.FC = () => {
               variant="outlined"
               value={formData.email}
               onChange={handleInputChange('email')}
+              InputProps={{ readOnly: true }}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '4px',
                   height: '50px',
+                  backgroundColor: '#f0f0f0',
                   '& fieldset': {
                     borderColor: '#dddddd',
                   },
@@ -115,14 +117,16 @@ const AccountSettingsNew: React.FC = () => {
                     borderColor: '#dddddd',
                   },
                   '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
+                    borderColor: '#dddddd',
                   },
                 },
                 '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
+                  color: '#777777',
                   fontFamily: 'Noto Sans',
                   fontSize: '16px',
                   padding: '8px 16px',
+                  cursor: 'text',
+                  userSelect: 'text',
                 },
               }}
             />
@@ -144,11 +148,13 @@ const AccountSettingsNew: React.FC = () => {
               fullWidth
               variant="outlined"
               value={formData.name}
-              onChange={handleInputChange('name')}
+              onChange={handleInputChange('name')} 
+              InputProps={{ readOnly: true }}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '4px',
                   height: '50px',
+                  backgroundColor: '#f0f0f0',
                   '& fieldset': {
                     borderColor: '#dddddd',
                   },
@@ -156,14 +162,16 @@ const AccountSettingsNew: React.FC = () => {
                     borderColor: '#dddddd',
                   },
                   '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
+                    borderColor: '#dddddd',
                   },
                 },
                 '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
+                  color: '#777777',
                   fontFamily: 'Noto Sans',
                   fontSize: '16px',
                   padding: '8px 16px',
+                  cursor: 'text',
+                  userSelect: 'text',
                 },
               }}
             />
