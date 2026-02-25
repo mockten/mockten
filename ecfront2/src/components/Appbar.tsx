@@ -250,7 +250,7 @@ const Appbar: React.FC<AppbarProps> = ({
             <MenuItem
               onClick={() => {
                 handleAccountMenuClose();
-                navigate('/user/card-settings');
+                navigate('/user/creditcard-settings');
               }}
             >
               Change Card
