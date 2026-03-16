@@ -9,12 +9,15 @@ import {
   Select,
   MenuItem,
   SelectChangeEvent,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import {
   ArrowDropDown,
 } from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
+import apiClient from '../module/apiClient';
 
 
 interface AccountFormData {
@@ -22,17 +25,37 @@ interface AccountFormData {
   name: string;
   phoneNumber: string;
   postCode: string;
+  country: string;
   state: string;
   city: string;
   addressLine1: string;
   addressLine2: string;
 }
 
+const regionOptions: Record<string, { value: string; label: string }[]> = {
+  japan: [
+    { value: 'tokyo', label: 'Tokyo' },
+    { value: 'osaka', label: 'Osaka' },
+    { value: 'kyoto', label: 'Kyoto' },
+    { value: 'kanagawa', label: 'Kanagawa' },
+    { value: 'aichi', label: 'Aichi' },
+  ],
+  singapore: [
+    { value: 'central', label: 'Central Region' },
+    { value: 'east', label: 'East Region' },
+    { value: 'north', label: 'North Region' },
+    { value: 'north-east', label: 'North-East Region' },
+    { value: 'west', label: 'West Region' },
+  ],
+};
+
 const AccountSettingsNew: React.FC = () => {
+  const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<AccountFormData>({
     email: 'sample@sample.com',
     name: 'Taro Yamada',
     phoneNumber: '07012345678',
+    country: 'japan',
     postCode: '1234567',
     state: '',
     city: '',
@@ -40,20 +63,49 @@ const AccountSettingsNew: React.FC = () => {
     addressLine2: '',
   });
 
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+
 
   const handleInputChange = (field: keyof AccountFormData) => (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
   ) => {
-    setFormData({
-      ...formData,
-      [field]: (event.target as HTMLInputElement | { value: unknown }).value,
-    });
+    const value = (event.target as HTMLInputElement | { value: unknown }).value as string;
+
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+      ...(field === 'country' ? { state: '' } : {}),
+    }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement form submission logic
-    console.log('Account settings updated:', formData);
+
+    if (!isEditing) return;
+
+    try {
+      await apiClient.post('/api/profile', {
+        phone_number: formData.phoneNumber,
+        postal_code: formData.postCode,
+        prefecture: formData.state,
+        city: formData.city,
+        town: formData.addressLine1,
+        building_name: formData.addressLine2,
+        country_code: formData.country,
+      });
+
+      setSnackbarMessage('Account information updated successfully.');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      setIsEditing(false);
+    } catch (e) {
+      setSnackbarMessage('Failed to update account information.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      console.error('Failed to update account settings', e);
+    }
   };
 
   return (
@@ -148,7 +200,7 @@ const AccountSettingsNew: React.FC = () => {
               fullWidth
               variant="outlined"
               value={formData.name}
-              onChange={handleInputChange('name')} 
+              onChange={handleInputChange('name')}
               InputProps={{ readOnly: true }}
               sx={{
                 '& .MuiOutlinedInput-root': {
@@ -194,25 +246,25 @@ const AccountSettingsNew: React.FC = () => {
               variant="outlined"
               value={formData.phoneNumber}
               onChange={handleInputChange('phoneNumber')}
+              disabled={!isEditing}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '4px',
                   height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
+                  backgroundColor: !isEditing ? '#f0f0f0' : 'white',
+                  '& fieldset': { borderColor: '#dddddd' },
+                  '&:hover fieldset': { borderColor: '#dddddd' },
+                  '&.Mui-focused fieldset': { borderColor: '#5856D6' },
                 },
                 '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
+                  color: !isEditing ? '#777777' : '#aaaaaa',
                   fontFamily: 'Noto Sans',
                   fontSize: '16px',
                   padding: '8px 16px',
+                },
+                '& .MuiInputBase-input.Mui-disabled': {
+                  WebkitTextFillColor: '#777777',
+                  opacity: 1,
                 },
               }}
             />
@@ -235,28 +287,76 @@ const AccountSettingsNew: React.FC = () => {
               variant="outlined"
               value={formData.postCode}
               onChange={handleInputChange('postCode')}
+              disabled={!isEditing}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '4px',
                   height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
+                  backgroundColor: !isEditing ? '#f0f0f0' : 'white',
+                  '& fieldset': { borderColor: '#dddddd' },
+                  '&:hover fieldset': { borderColor: '#dddddd' },
+                  '&.Mui-focused fieldset': { borderColor: '#5856D6' },
                 },
                 '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
+                  color: !isEditing ? '#777777' : '#aaaaaa',
                   fontFamily: 'Noto Sans',
                   fontSize: '16px',
                   padding: '8px 16px',
                 },
+                '& .MuiInputBase-input.Mui-disabled': {
+                  WebkitTextFillColor: '#777777',
+                  opacity: 1,
+                },
               }}
             />
+          </Box>
+
+          {/* Country */}
+          <Box sx={{ marginBottom: '32px' }}>
+            <Typography
+              sx={{
+                fontFamily: 'Noto Sans',
+                fontSize: '14px',
+                color: 'black',
+                marginBottom: '8px',
+              }}
+            >
+              Country
+            </Typography>
+            <FormControl
+              fullWidth
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '4px',
+                  height: '50px',
+                  backgroundColor: !isEditing ? '#f0f0f0' : 'white',
+                  '& fieldset': { borderColor: '#dddddd' },
+                  '&:hover fieldset': { borderColor: '#dddddd' },
+                  '&.Mui-focused fieldset': { borderColor: '#5856D6' },
+                },
+                '& .MuiInputBase-input': {
+                  color: !isEditing ? '#777777' : '#aaaaaa',
+                  fontFamily: 'Noto Sans',
+                  fontSize: '16px',
+                  padding: '8px 16px',
+                },
+                '& .MuiInputBase-input.Mui-disabled': {
+                  WebkitTextFillColor: '#777777',
+                  opacity: 1,
+                },
+              }}
+            >
+              <Select
+                value={formData.country}
+                onChange={handleInputChange('country')}
+                displayEmpty
+                disabled={!isEditing}
+                IconComponent={ArrowDropDown}
+              >
+                <MenuItem value="japan">Japan</MenuItem>
+                <MenuItem value="singapore">Singapore</MenuItem>
+              </Select>
+            </FormControl>
           </Box>
 
           {/* State/Province/Region */}
@@ -269,7 +369,7 @@ const AccountSettingsNew: React.FC = () => {
                 marginBottom: '8px',
               }}
             >
-              State/Province/Region
+              Region / Prefecture
             </Typography>
             <FormControl
               fullWidth
@@ -277,21 +377,20 @@ const AccountSettingsNew: React.FC = () => {
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '4px',
                   height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
+                  backgroundColor: !isEditing ? '#f0f0f0' : 'white',
+                  '& fieldset': { borderColor: '#dddddd' },
+                  '&:hover fieldset': { borderColor: '#dddddd' },
+                  '&.Mui-focused fieldset': { borderColor: '#5856D6' },
                 },
-                '& .MuiSelect-select': {
-                  color: '#aaaaaa',
-                  fontFamily: 'Roboto',
+                '& .MuiInputBase-input': {
+                  color: !isEditing ? '#777777' : '#aaaaaa',
+                  fontFamily: 'Noto Sans',
                   fontSize: '16px',
-                  padding: '16px',
+                  padding: '8px 16px',
+                },
+                '& .MuiInputBase-input.Mui-disabled': {
+                  WebkitTextFillColor: '#777777',
+                  opacity: 1,
                 },
               }}
             >
@@ -299,16 +398,22 @@ const AccountSettingsNew: React.FC = () => {
                 value={formData.state}
                 onChange={handleInputChange('state')}
                 displayEmpty
+                disabled={!isEditing}
                 IconComponent={ArrowDropDown}
               >
                 <MenuItem value="">
-                  <em>Choose your region</em>
+                  <em>
+                    {formData.country === 'singapore'
+                      ? 'Choose your region'
+                      : 'Choose your prefecture'}
+                  </em>
                 </MenuItem>
-                <MenuItem value="tokyo">Tokyo</MenuItem>
-                <MenuItem value="osaka">Osaka</MenuItem>
-                <MenuItem value="kyoto">Kyoto</MenuItem>
-                <MenuItem value="yokohama">Yokohama</MenuItem>
-                <MenuItem value="nagoya">Nagoya</MenuItem>
+
+                {regionOptions[formData.country]?.map((region) => (
+                  <MenuItem key={region.value} value={region.value}>
+                    {region.label}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Box>
@@ -328,32 +433,27 @@ const AccountSettingsNew: React.FC = () => {
             <TextField
               fullWidth
               variant="outlined"
-              placeholder="ex: Setagaya-ku, kasuya"
               value={formData.city}
               onChange={handleInputChange('city')}
+              disabled={!isEditing}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '4px',
                   height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
+                  backgroundColor: !isEditing ? '#f0f0f0' : 'white',
+                  '& fieldset': { borderColor: '#dddddd' },
+                  '&:hover fieldset': { borderColor: '#dddddd' },
+                  '&.Mui-focused fieldset': { borderColor: '#5856D6' },
                 },
                 '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
+                  color: !isEditing ? '#777777' : '#aaaaaa',
                   fontFamily: 'Noto Sans',
                   fontSize: '16px',
                   padding: '8px 16px',
-                  '&::placeholder': {
-                    color: '#aaaaaa',
-                    opacity: 1,
-                  },
+                },
+                '& .MuiInputBase-input.Mui-disabled': {
+                  WebkitTextFillColor: '#777777',
+                  opacity: 1,
                 },
               }}
             />
@@ -374,32 +474,27 @@ const AccountSettingsNew: React.FC = () => {
             <TextField
               fullWidth
               variant="outlined"
-              placeholder="ex: 1-2-3"
               value={formData.addressLine1}
               onChange={handleInputChange('addressLine1')}
+              disabled={!isEditing}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '4px',
                   height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
+                  backgroundColor: !isEditing ? '#f0f0f0' : 'white',
+                  '& fieldset': { borderColor: '#dddddd' },
+                  '&:hover fieldset': { borderColor: '#dddddd' },
+                  '&.Mui-focused fieldset': { borderColor: '#5856D6' },
                 },
                 '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
+                  color: !isEditing ? '#777777' : '#aaaaaa',
                   fontFamily: 'Noto Sans',
                   fontSize: '16px',
                   padding: '8px 16px',
-                  '&::placeholder': {
-                    color: '#aaaaaa',
-                    opacity: 1,
-                  },
+                },
+                '& .MuiInputBase-input.Mui-disabled': {
+                  WebkitTextFillColor: '#777777',
+                  opacity: 1,
                 },
               }}
             />
@@ -420,65 +515,116 @@ const AccountSettingsNew: React.FC = () => {
             <TextField
               fullWidth
               variant="outlined"
-              placeholder="ex: Domes House 10XX"
               value={formData.addressLine2}
               onChange={handleInputChange('addressLine2')}
+              disabled={!isEditing}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '4px',
                   height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
+                  backgroundColor: !isEditing ? '#f0f0f0' : 'white',
+                  '& fieldset': { borderColor: '#dddddd' },
+                  '&:hover fieldset': { borderColor: '#dddddd' },
+                  '&.Mui-focused fieldset': { borderColor: '#5856D6' },
                 },
                 '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
+                  color: !isEditing ? '#777777' : '#aaaaaa',
                   fontFamily: 'Noto Sans',
                   fontSize: '16px',
                   padding: '8px 16px',
-                  '&::placeholder': {
-                    color: '#aaaaaa',
-                    opacity: 1,
-                  },
+                },
+                '& .MuiInputBase-input.Mui-disabled': {
+                  WebkitTextFillColor: '#777777',
+                  opacity: 1,
                 },
               }}
             />
           </Box>
 
           {/* Submit Button */}
-          <Box sx={{ display: 'flex', justifyContent: 'center', marginTop: '32px' }}>
-            <Button
-              type="submit"
-              variant="contained"
-              sx={{
-                backgroundColor: 'black',
-                color: 'white',
-                padding: '16px 32px',
-                borderRadius: '4px',
-                fontFamily: 'Noto Sans',
-                fontWeight: 'bold',
-                fontSize: '16px',
-                textTransform: 'none',
-                minWidth: '400px',
-                '&:hover': {
-                  backgroundColor: '#333',
-                },
-              }}
-            >
-              Register
-            </Button>
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '32px' }}>
+            {!isEditing ? (
+              <Button
+                type="button"
+                variant="contained"
+                onClick={() => setIsEditing(true)}
+                sx={{
+                  backgroundColor: 'black',
+                  color: 'white',
+                  padding: '16px 32px',
+                  borderRadius: '4px',
+                  fontFamily: 'Noto Sans',
+                  fontWeight: 'bold',
+                  fontSize: '16px',
+                  textTransform: 'none',
+                  minWidth: '400px',
+                  '&:hover': { backgroundColor: '#333' },
+                }}
+              >
+                Edit
+              </Button>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="outlined"
+                  onClick={() => setIsEditing(false)}
+                  sx={{
+                    borderColor: '#dddddd',
+                    color: 'black',
+                    padding: '16px 32px',
+                    borderRadius: '4px',
+                    fontFamily: 'Noto Sans',
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                    textTransform: 'none',
+                    minWidth: '190px',
+                    '&:hover': { borderColor: '#cccccc', backgroundColor: '#f5f5f5' },
+                  }}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  type="submit"
+                  variant="contained"
+                  sx={{
+                    backgroundColor: 'black',
+                    color: 'white',
+                    padding: '16px 32px',
+                    borderRadius: '4px',
+                    fontFamily: 'Noto Sans',
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                    textTransform: 'none',
+                    minWidth: '190px',
+                    '&:hover': { backgroundColor: '#333' },
+                  }}
+                >
+                  Save
+                </Button>
+              </>
+            )}
           </Box>
         </Box>
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={3000}
+          onClose={() => setSnackbarOpen(false)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert
+            onClose={() => setSnackbarOpen(false)}
+            severity={snackbarSeverity}
+            sx={{ width: '100%' }}
+          >
+            {snackbarMessage}
+          </Alert>
+        </Snackbar>
       </Container>
 
       {/* Footer */}
-      <Footer/>
+      <Footer />
     </Box>
   );
 };

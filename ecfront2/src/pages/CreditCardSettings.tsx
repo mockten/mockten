@@ -11,9 +11,19 @@ import {
   Divider,
   Stack,
   Chip,
+  Menu,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
+import apiClient from '../module/apiClient';
+
 
 interface CreditCardFormData {
   cardHolderName: string;
@@ -32,7 +42,17 @@ type SavedCard = {
 };
 
 const CreditCardSettings: React.FC = () => {
-  const [savedCard] = useState<SavedCard | null>({
+  const [isEditing, setIsEditing] = useState(false);
+  const [manageMenuAnchorEl, setManageMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const isManageMenuOpen = Boolean(manageMenuAnchorEl);
+
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+
+  const [savedCard, setSavedCard] = useState<SavedCard | null>({
     brand: 'VISA',
     last4: '1234',
     expMonth: '08',
@@ -68,6 +88,25 @@ const CreditCardSettings: React.FC = () => {
     return `${brand} •••• ${savedCard.last4}`;
   }, [savedCard]);
 
+  const handleDeleteCard = async () => {
+    try {
+      // TODO: APIに合わせて修正
+      await apiClient.delete('/api/payment-method');
+
+      setSavedCard(null);
+      setDeleteDialogOpen(false);
+
+      setSnackbarMessage('Card deleted successfully.');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    } catch (e) {
+      console.error('Failed to delete card', e);
+      setSnackbarMessage('Failed to delete card.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
+
   return (
     <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       <Appbar />
@@ -95,6 +134,7 @@ const CreditCardSettings: React.FC = () => {
           </Typography>
         </Box>
 
+        {/* Current Card Area */}
         <Box sx={{ maxWidth: '680px', margin: '0 auto 24px' }}>
           <Card
             variant="outlined"
@@ -105,11 +145,17 @@ const CreditCardSettings: React.FC = () => {
             }}
           >
             <CardContent sx={{ padding: '16px' }}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                spacing={2}
+              >
                 <Box>
                   <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: '#333' }}>
                     Current Card
                   </Typography>
+
                   <Typography
                     sx={{
                       fontFamily: 'Noto Sans',
@@ -140,31 +186,55 @@ const CreditCardSettings: React.FC = () => {
                       )}
                     </Stack>
                   ) : (
-                    <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '12px', color: '#777', mt: 1 }}>
-                      You can register a new card below.
+                    <Typography
+                      sx={{
+                        fontFamily: 'Noto Sans',
+                        fontSize: '12px',
+                        color: '#777',
+                        mt: 1,
+                      }}
+                    >
+                      No card is currently registered.
                     </Typography>
                   )}
                 </Box>
 
-                {/* 任意：カードがある時だけ表示したい操作ボタン */}
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    variant="outlined"
-                    sx={{
-                      borderColor: '#dddddd',
-                      color: 'black',
-                      textTransform: 'none',
-                      fontFamily: 'Noto Sans',
-                      '&:hover': { borderColor: '#cccccc', backgroundColor: '#f5f5f5' },
-                    }}
-                    onClick={() => {
-                      // TODO: Implement "remove card" or "change card" flow
-                      console.log('Change/Remove clicked');
-                    }}
-                  >
-                    Manage
-                  </Button>
-                </Stack>
+                {savedCard && !isEditing && (
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      variant="outlined"
+                      sx={{
+                        borderColor: '#dddddd',
+                        color: 'black',
+                        textTransform: 'none',
+                        fontFamily: 'Noto Sans',
+                        '&:hover': {
+                          borderColor: '#cccccc',
+                          backgroundColor: '#f5f5f5',
+                        },
+                      }}
+                      onClick={(event) => {
+                        setManageMenuAnchorEl(event.currentTarget);
+                      }}
+                    >
+                      Manage
+                    </Button>
+                    <Menu
+                      anchorEl={manageMenuAnchorEl}
+                      open={isManageMenuOpen}
+                      onClose={() => setManageMenuAnchorEl(null)}
+                    >
+                      <MenuItem
+                        onClick={() => {
+                          setManageMenuAnchorEl(null);
+                          setDeleteDialogOpen(true);
+                        }}
+                      >
+                        Delete
+                      </MenuItem>
+                    </Menu>
+                  </Stack>
+                )}
               </Stack>
 
               <Divider sx={{ my: 2, borderColor: '#eeeeee' }} />
@@ -175,112 +245,32 @@ const CreditCardSettings: React.FC = () => {
             </CardContent>
           </Card>
         </Box>
-        <Box
-          sx={{
-            borderLeft: '5px solid black',
-            paddingLeft: '20px',
-            paddingY: '8px',
-            marginBottom: '24px',
-            marginLeft: '16px',
-          }}
-        >
-          <Typography
-            sx={{
-              fontFamily: 'Noto Sans',
-              fontWeight: 'bold',
-              fontSize: '20px',
-              color: 'black',
-            }}
-          >
-            New Credit Card
-          </Typography>
-        </Box>
-        {/* Form */}
-        <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: '680px', margin: '0 auto' }}>
-          {/* Card Holder Name */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
-              Card Holder Name
+
+        <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+          <DialogTitle>Delete Card</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to delete this card?
             </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              placeholder="ex: TARO YAMADA"
-              value={formData.cardHolderName}
-              onChange={handleInputChange('cardHolderName')}
-              sx={textFieldSx}
-            />
-          </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+            <Button
+              color="error"
+              onClick={handleDeleteCard}
+            >
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
 
-          {/* Card Number */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
-              Card Number
-            </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              placeholder="1234 5678 9012 3456"
-              value={formData.cardNumber}
-              onChange={handleInputChange('cardNumber')}
-              inputProps={{ inputMode: 'numeric' }}
-              sx={textFieldSx}
-            />
-          </Box>
-
-          {/* Expiry + CVC */}
-          <Grid container spacing={2} sx={{ marginBottom: '48px' }}>
-            <Grid item xs={12} sm={4}>
-              <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
-                Expiry Month
-              </Typography>
-              <TextField
-                fullWidth
-                variant="outlined"
-                placeholder="MM"
-                value={formData.expiryMonth}
-                onChange={handleInputChange('expiryMonth')}
-                inputProps={{ inputMode: 'numeric' }}
-                sx={textFieldSx}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={4}>
-              <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
-                Expiry Year
-              </Typography>
-              <TextField
-                fullWidth
-                variant="outlined"
-                placeholder="YY"
-                value={formData.expiryYear}
-                onChange={handleInputChange('expiryYear')}
-                inputProps={{ inputMode: 'numeric' }}
-                sx={textFieldSx}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={4}>
-              <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
-                CVC
-              </Typography>
-              <TextField
-                fullWidth
-                variant="outlined"
-                placeholder="123"
-                value={formData.cvc}
-                onChange={handleInputChange('cvc')}
-                inputProps={{ inputMode: 'numeric' }}
-                sx={textFieldSx}
-              />
-            </Grid>
-          </Grid>
-
-          {/* Submit Button */}
+        {/* Display mode */}
+        {!isEditing && (
           <Box sx={{ display: 'flex', justifyContent: 'center', marginTop: '32px' }}>
             <Button
-              type="submit"
+              type="button"
               variant="contained"
+              onClick={() => setIsEditing(true)}
               sx={{
                 backgroundColor: 'black',
                 color: 'white',
@@ -291,16 +281,186 @@ const CreditCardSettings: React.FC = () => {
                 fontSize: '16px',
                 textTransform: 'none',
                 minWidth: '400px',
-                '&:hover': {
-                  backgroundColor: '#333',
-                },
+                '&:hover': { backgroundColor: '#333' },
               }}
             >
-              Register Card
+              Add new card
             </Button>
           </Box>
-        </Box>
+        )}
+
+
+        {/* Add new card mode */}
+        {isEditing && (
+          <>
+            <Box
+              sx={{
+                borderLeft: '5px solid black',
+                paddingLeft: '20px',
+                paddingY: '8px',
+                marginBottom: '24px',
+                marginLeft: '16px',
+                marginTop: '32px',
+              }}
+            >
+              <Typography
+                sx={{
+                  fontFamily: 'Noto Sans',
+                  fontWeight: 'bold',
+                  fontSize: '20px',
+                  color: 'black',
+                }}
+              >
+                New Credit Card
+              </Typography>
+            </Box>
+
+            <Box
+              component="form"
+              onSubmit={handleSubmit}
+              sx={{ maxWidth: '680px', margin: '0 auto' }}
+            >
+              {/* Card Holder Name */}
+              <Box sx={{ marginBottom: '32px' }}>
+                <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
+                  Card Holder Name
+                </Typography>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  placeholder="ex: TARO YAMADA"
+                  value={formData.cardHolderName}
+                  onChange={handleInputChange('cardHolderName')}
+                  sx={textFieldSx}
+                />
+              </Box>
+
+              {/* Card Number */}
+              <Box sx={{ marginBottom: '32px' }}>
+                <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
+                  Card Number
+                </Typography>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  placeholder="1234 5678 9012 3456"
+                  value={formData.cardNumber}
+                  onChange={handleInputChange('cardNumber')}
+                  inputProps={{ inputMode: 'numeric' }}
+                  sx={textFieldSx}
+                />
+              </Box>
+
+              {/* Expiry + CVC */}
+              <Grid container spacing={2} sx={{ marginBottom: '48px' }}>
+                <Grid item xs={12} sm={4}>
+                  <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
+                    Expiry Month
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    placeholder="MM"
+                    value={formData.expiryMonth}
+                    onChange={handleInputChange('expiryMonth')}
+                    inputProps={{ inputMode: 'numeric' }}
+                    sx={textFieldSx}
+                  />
+                </Grid>
+
+                <Grid item xs={12} sm={4}>
+                  <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
+                    Expiry Year
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    placeholder="YY"
+                    value={formData.expiryYear}
+                    onChange={handleInputChange('expiryYear')}
+                    inputProps={{ inputMode: 'numeric' }}
+                    sx={textFieldSx}
+                  />
+                </Grid>
+
+                <Grid item xs={12} sm={4}>
+                  <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
+                    CVC
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    placeholder="123"
+                    value={formData.cvc}
+                    onChange={handleInputChange('cvc')}
+                    inputProps={{ inputMode: 'numeric' }}
+                    sx={textFieldSx}
+                  />
+                </Grid>
+              </Grid>
+
+              {/* Form buttons */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '32px' }}>
+                <Button
+                  type="button"
+                  variant="outlined"
+                  onClick={() => setIsEditing(false)}
+                  sx={{
+                    borderColor: '#dddddd',
+                    color: 'black',
+                    padding: '16px 32px',
+                    borderRadius: '4px',
+                    fontFamily: 'Noto Sans',
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                    textTransform: 'none',
+                    minWidth: '190px',
+                    '&:hover': {
+                      borderColor: '#cccccc',
+                      backgroundColor: '#f5f5f5',
+                    },
+                  }}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  type="submit"
+                  variant="contained"
+                  sx={{
+                    backgroundColor: 'black',
+                    color: 'white',
+                    padding: '16px 32px',
+                    borderRadius: '4px',
+                    fontFamily: 'Noto Sans',
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                    textTransform: 'none',
+                    minWidth: '190px',
+                    '&:hover': { backgroundColor: '#333' },
+                  }}
+                >
+                  Save
+                </Button>
+              </Box>
+            </Box>
+          </>
+        )}
       </Container>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbarOpen(false)}
+          severity={snackbarSeverity}
+          sx={{ width: '100%' }}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
 
       <Footer />
     </Box>
