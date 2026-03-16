@@ -5,67 +5,62 @@ import {
   TextField,
   Typography,
   Button,
-  FormControl,
-  Select,
-  MenuItem,
   SelectChangeEvent,
   Snackbar,
   Alert,
 } from '@mui/material';
-import {
-  ArrowDropDown,
-} from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 import apiClient from '../module/apiClient';
+import { useEffect } from 'react';
 
 
 interface AccountFormData {
   email: string;
   name: string;
   phoneNumber: string;
-  postCode: string;
-  country: string;
-  state: string;
-  city: string;
-  addressLine1: string;
-  addressLine2: string;
 }
 
-const regionOptions: Record<string, { value: string; label: string }[]> = {
-  japan: [
-    { value: 'tokyo', label: 'Tokyo' },
-    { value: 'osaka', label: 'Osaka' },
-    { value: 'kyoto', label: 'Kyoto' },
-    { value: 'kanagawa', label: 'Kanagawa' },
-    { value: 'aichi', label: 'Aichi' },
-  ],
-  singapore: [
-    { value: 'central', label: 'Central Region' },
-    { value: 'east', label: 'East Region' },
-    { value: 'north', label: 'North Region' },
-    { value: 'north-east', label: 'North-East Region' },
-    { value: 'west', label: 'West Region' },
-  ],
-};
 
 const AccountSettingsNew: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<AccountFormData>({
-    email: 'sample@sample.com',
-    name: 'Taro Yamada',
-    phoneNumber: '07012345678',
-    country: 'japan',
-    postCode: '1234567',
-    state: '',
-    city: '',
-    addressLine1: '',
-    addressLine2: '',
+    email: '',
+    name: '',
+    phoneNumber: '',
   });
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const userinfoRes = await apiClient.get('/api/uam/userinfo');
+        const userData = userinfoRes.data;
+
+        const name =
+          userData.name ||
+          userData.given_name ||
+          userData.preferred_username ||
+          userData.email ||
+          'User';
+
+        const email = userData.email || '';
+
+        setFormData((prev) => ({
+          ...prev,
+          name,
+          email,
+        }));
+      } catch (e) {
+        console.error('Failed to fetch user info', e);
+      }
+    };
+
+    fetchUserInfo();
+  }, []);
 
 
   const handleInputChange = (field: keyof AccountFormData) => (
@@ -76,7 +71,6 @@ const AccountSettingsNew: React.FC = () => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
-      ...(field === 'country' ? { state: '' } : {}),
     }));
   };
 
@@ -88,12 +82,6 @@ const AccountSettingsNew: React.FC = () => {
     try {
       await apiClient.post('/api/profile', {
         phone_number: formData.phoneNumber,
-        postal_code: formData.postCode,
-        prefecture: formData.state,
-        city: formData.city,
-        town: formData.addressLine1,
-        building_name: formData.addressLine2,
-        country_code: formData.country,
       });
 
       setSnackbarMessage('Account information updated successfully.');
@@ -244,6 +232,9 @@ const AccountSettingsNew: React.FC = () => {
             <TextField
               fullWidth
               variant="outlined"
+              type="tel"
+              inputMode="tel"
+
               value={formData.phoneNumber}
               onChange={handleInputChange('phoneNumber')}
               disabled={!isEditing}
@@ -257,7 +248,7 @@ const AccountSettingsNew: React.FC = () => {
                   '&.Mui-focused fieldset': { borderColor: '#5856D6' },
                 },
                 '& .MuiInputBase-input': {
-                  color: !isEditing ? '#777777' : '#aaaaaa',
+                  color: !isEditing ? '#000000ff' : '#000000ff',
                   fontFamily: 'Noto Sans',
                   fontSize: '16px',
                   padding: '8px 16px',
@@ -270,276 +261,6 @@ const AccountSettingsNew: React.FC = () => {
             />
           </Box>
 
-          {/* Post Code */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Post Code
-            </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              value={formData.postCode}
-              onChange={handleInputChange('postCode')}
-              disabled={!isEditing}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  backgroundColor: !isEditing ? '#f0f0f0' : 'white',
-                  '& fieldset': { borderColor: '#dddddd' },
-                  '&:hover fieldset': { borderColor: '#dddddd' },
-                  '&.Mui-focused fieldset': { borderColor: '#5856D6' },
-                },
-                '& .MuiInputBase-input': {
-                  color: !isEditing ? '#777777' : '#aaaaaa',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
-                },
-                '& .MuiInputBase-input.Mui-disabled': {
-                  WebkitTextFillColor: '#777777',
-                  opacity: 1,
-                },
-              }}
-            />
-          </Box>
-
-          {/* Country */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Country
-            </Typography>
-            <FormControl
-              fullWidth
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  backgroundColor: !isEditing ? '#f0f0f0' : 'white',
-                  '& fieldset': { borderColor: '#dddddd' },
-                  '&:hover fieldset': { borderColor: '#dddddd' },
-                  '&.Mui-focused fieldset': { borderColor: '#5856D6' },
-                },
-                '& .MuiInputBase-input': {
-                  color: !isEditing ? '#777777' : '#aaaaaa',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
-                },
-                '& .MuiInputBase-input.Mui-disabled': {
-                  WebkitTextFillColor: '#777777',
-                  opacity: 1,
-                },
-              }}
-            >
-              <Select
-                value={formData.country}
-                onChange={handleInputChange('country')}
-                displayEmpty
-                disabled={!isEditing}
-                IconComponent={ArrowDropDown}
-              >
-                <MenuItem value="japan">Japan</MenuItem>
-                <MenuItem value="singapore">Singapore</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-
-          {/* State/Province/Region */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Region / Prefecture
-            </Typography>
-            <FormControl
-              fullWidth
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  backgroundColor: !isEditing ? '#f0f0f0' : 'white',
-                  '& fieldset': { borderColor: '#dddddd' },
-                  '&:hover fieldset': { borderColor: '#dddddd' },
-                  '&.Mui-focused fieldset': { borderColor: '#5856D6' },
-                },
-                '& .MuiInputBase-input': {
-                  color: !isEditing ? '#777777' : '#aaaaaa',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
-                },
-                '& .MuiInputBase-input.Mui-disabled': {
-                  WebkitTextFillColor: '#777777',
-                  opacity: 1,
-                },
-              }}
-            >
-              <Select
-                value={formData.state}
-                onChange={handleInputChange('state')}
-                displayEmpty
-                disabled={!isEditing}
-                IconComponent={ArrowDropDown}
-              >
-                <MenuItem value="">
-                  <em>
-                    {formData.country === 'singapore'
-                      ? 'Choose your region'
-                      : 'Choose your prefecture'}
-                  </em>
-                </MenuItem>
-
-                {regionOptions[formData.country]?.map((region) => (
-                  <MenuItem key={region.value} value={region.value}>
-                    {region.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-
-          {/* City */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              City
-            </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              value={formData.city}
-              onChange={handleInputChange('city')}
-              disabled={!isEditing}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  backgroundColor: !isEditing ? '#f0f0f0' : 'white',
-                  '& fieldset': { borderColor: '#dddddd' },
-                  '&:hover fieldset': { borderColor: '#dddddd' },
-                  '&.Mui-focused fieldset': { borderColor: '#5856D6' },
-                },
-                '& .MuiInputBase-input': {
-                  color: !isEditing ? '#777777' : '#aaaaaa',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
-                },
-                '& .MuiInputBase-input.Mui-disabled': {
-                  WebkitTextFillColor: '#777777',
-                  opacity: 1,
-                },
-              }}
-            />
-          </Box>
-
-          {/* Address Line 1 */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Address Line 1
-            </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              value={formData.addressLine1}
-              onChange={handleInputChange('addressLine1')}
-              disabled={!isEditing}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  backgroundColor: !isEditing ? '#f0f0f0' : 'white',
-                  '& fieldset': { borderColor: '#dddddd' },
-                  '&:hover fieldset': { borderColor: '#dddddd' },
-                  '&.Mui-focused fieldset': { borderColor: '#5856D6' },
-                },
-                '& .MuiInputBase-input': {
-                  color: !isEditing ? '#777777' : '#aaaaaa',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
-                },
-                '& .MuiInputBase-input.Mui-disabled': {
-                  WebkitTextFillColor: '#777777',
-                  opacity: 1,
-                },
-              }}
-            />
-          </Box>
-
-          {/* Address Line 2 */}
-          <Box sx={{ marginBottom: '48px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Address Line 2
-            </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              value={formData.addressLine2}
-              onChange={handleInputChange('addressLine2')}
-              disabled={!isEditing}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  backgroundColor: !isEditing ? '#f0f0f0' : 'white',
-                  '& fieldset': { borderColor: '#dddddd' },
-                  '&:hover fieldset': { borderColor: '#dddddd' },
-                  '&.Mui-focused fieldset': { borderColor: '#5856D6' },
-                },
-                '& .MuiInputBase-input': {
-                  color: !isEditing ? '#777777' : '#aaaaaa',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
-                },
-                '& .MuiInputBase-input.Mui-disabled': {
-                  WebkitTextFillColor: '#777777',
-                  opacity: 1,
-                },
-              }}
-            />
-          </Box>
 
           {/* Submit Button */}
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '32px' }}>

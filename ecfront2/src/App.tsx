@@ -5,6 +5,7 @@ import SearchResultDashboard from './pages/SearchResultDashboard';
 import UserLogin from './pages/UserLogin';
 import UserSignUp from './pages/UserSignUp';
 import AccountSettings from './pages/AccountSettings';
+import AddressSettings from './pages/AddressesSettings';
 import CreditCardSettings from './pages/CreditCardSettings';
 import ItemDetail from './pages/ItemDetail';
 import ItemReview from './pages/ItemReview';
@@ -37,8 +38,9 @@ const App: React.FC = () => {
           <Route path="/search" element={<PrivateRoute><SearchResultDashboard /></PrivateRoute>} />
           <Route path="/user/login" element={<UserLogin />} />
           <Route path="/user/signup" element={<UserSignUp />} />
-          <Route path="/user/account-settings" element={<PrivateRoute><AccountSettings /></PrivateRoute>} />
-          <Route path="/user/creditcard-settings" element={<PrivateRoute><CreditCardSettings /></PrivateRoute>} />
+          <Route path="/user/account" element={<PrivateRoute><AccountSettings /></PrivateRoute>} />
+          <Route path="/user/address" element={<PrivateRoute><AddressSettings /></PrivateRoute>} />
+          <Route path="/user/payment" element={<PrivateRoute><CreditCardSettings /></PrivateRoute>} />
           <Route path="/item/:id" element={<PrivateRoute><ItemDetail /></PrivateRoute>} />
           <Route path="/item/:id/review" element={<PrivateRoute><ItemReview /></PrivateRoute>} />
           <Route path="/cart/list" element={<PrivateRoute><MyCartList /></PrivateRoute>} />

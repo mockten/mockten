@@ -85,7 +85,7 @@ const Appbar: React.FC<AppbarProps> = ({
     if (onProfileClick) {
       onProfileClick();
     } else {
-      navigate('/user/account-settings');
+      navigate('/user/account');
     }
   };
 
@@ -242,18 +242,18 @@ const Appbar: React.FC<AppbarProps> = ({
             <MenuItem
               onClick={() => {
                 handleAccountMenuClose();
-                navigate('/user/password-settings');
+                navigate('/user/address');
               }}
             >
-              Change Password
+              Addresses
             </MenuItem>
             <MenuItem
               onClick={() => {
                 handleAccountMenuClose();
-                navigate('/user/creditcard-settings');
+                navigate('/user/payment');
               }}
             >
-              Change Card
+              Payment Options
             </MenuItem>
           </Menu>
         </Box>
