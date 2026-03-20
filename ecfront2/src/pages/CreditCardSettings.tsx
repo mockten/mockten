@@ -68,6 +68,35 @@ const CreditCardSettings: React.FC = () => {
     cvc: '',
   });
 
+
+  const savedCardTitle = savedCard
+    ? `${savedCard.brand ?? 'Card'} •••• ${savedCard.last4}`
+    : 'No card registered';
+
+  const isCardExpired = (expMonth?: string, expYear?: string) => {
+    if (!expMonth || !expYear) return false;
+
+    const month = Number(expMonth);
+    let year = Number(expYear);
+
+    if (year < 100) {
+      year += 2000;
+    }
+    const expiryDate = new Date(year, month, 0, 23, 59, 59, 999);
+    const now = new Date();
+
+    return now > expiryDate;
+  };
+
+  const expired = savedCard ? isCardExpired(savedCard.expMonth, savedCard.expYear) : false;
+
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // TODO: Implement API call (tokenization recommended; do NOT send raw card data to your server unless PCI compliant)
+    console.log('Credit card registered:', formData);
+  };
+
   const handleInputChange =
     (field: keyof CreditCardFormData) => (event: React.ChangeEvent<HTMLInputElement>) => {
       setFormData((prev) => ({
@@ -76,17 +105,6 @@ const CreditCardSettings: React.FC = () => {
       }));
     };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: Implement API call (tokenization recommended; do NOT send raw card data to your server unless PCI compliant)
-    console.log('Credit card registered:', formData);
-  };
-
-  const savedCardTitle = useMemo(() => {
-    if (!savedCard) return 'No card registered';
-    const brand = savedCard.brand ?? 'CARD';
-    return `${brand} •••• ${savedCard.last4}`;
-  }, [savedCard]);
 
   const handleDeleteCard = async () => {
     try {
@@ -165,7 +183,7 @@ const CreditCardSettings: React.FC = () => {
                       mt: 0.5,
                     }}
                   >
-                    {savedCardTitle}
+                    {savedCard ? `${savedCard.brand ?? 'Card'} •••• ${savedCard.last4}` : 'No card registered'}
                   </Typography>
 
                   {savedCard ? (
@@ -177,6 +195,24 @@ const CreditCardSettings: React.FC = () => {
                           sx={{ fontFamily: 'Noto Sans' }}
                         />
                       )}
+
+                      {isCardExpired(savedCard.expMonth, savedCard.expYear) && (
+                        <Chip
+                          size="small"
+                          label="Expired"
+                          color="error"
+                          sx={{ fontFamily: 'Noto Sans' }}
+                        />
+                      )}
+
+                      {savedCard.brand && (
+                        <Chip
+                          size="small"
+                          label={savedCard.brand}
+                          sx={{ fontFamily: 'Noto Sans' }}
+                        />
+                      )}
+
                       {savedCard.cardHolderName && (
                         <Chip
                           size="small"
