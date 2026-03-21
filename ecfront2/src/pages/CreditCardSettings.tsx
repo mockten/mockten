@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Container,
@@ -303,6 +303,9 @@ const CreditCardSettings: React.FC = () => {
                     {savedCard?.brand === 'VISA' && <VisaLogo width={56} height={24} />}
                     {savedCard?.brand === 'Mastercard' && <Mastercard width={56} height={24} />}
                     {savedCard?.brand === 'JCB' && <Jcb width={56} height={24} />}
+                    {savedCard?.brand === 'AMEX' && <Amex width={56} height={24} />}
+                    {savedCard?.brand === 'Discover' && <Discover width={56} height={24} />}
+                    {savedCard?.brand === 'Diners' && <Diners width={56} height={24} />}
 
                     <Typography
                       sx={{
