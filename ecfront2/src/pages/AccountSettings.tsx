@@ -5,59 +5,95 @@ import {
   TextField,
   Typography,
   Button,
-  FormControl,
-  Select,
-  MenuItem,
   SelectChangeEvent,
+  Snackbar,
+  Alert,
 } from '@mui/material';
-import {
-  ArrowDropDown,
-} from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
+import apiClient from '../module/apiClient';
+import { useEffect } from 'react';
 
 
 interface AccountFormData {
   email: string;
-  password: string;
-  confirmPassword: string;
   name: string;
   phoneNumber: string;
-  postCode: string;
-  state: string;
-  city: string;
-  addressLine1: string;
-  addressLine2: string;
 }
 
+
 const AccountSettingsNew: React.FC = () => {
+  const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<AccountFormData>({
-    email: 'sample@sample.com',
-    password: '****',
-    confirmPassword: '****',
-    name: 'Taro Yamada',
-    phoneNumber: '07012345678',
-    postCode: '1234567',
-    state: '',
-    city: '',
-    addressLine1: '',
-    addressLine2: '',
+    email: '',
+    name: '',
+    phoneNumber: '',
   });
+
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const userinfoRes = await apiClient.get('/api/uam/userinfo');
+        const userData = userinfoRes.data;
+
+        const name =
+          userData.name ||
+          userData.given_name ||
+          userData.preferred_username ||
+          userData.email ||
+          'User';
+
+        const email = userData.email || '';
+
+        setFormData((prev) => ({
+          ...prev,
+          name,
+          email,
+        }));
+      } catch (e) {
+        console.error('Failed to fetch user info', e);
+      }
+    };
+
+    fetchUserInfo();
+  }, []);
 
 
   const handleInputChange = (field: keyof AccountFormData) => (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
   ) => {
-    setFormData({
-      ...formData,
-      [field]: (event.target as HTMLInputElement | { value: unknown }).value,
-    });
+    const value = (event.target as HTMLInputElement | { value: unknown }).value as string;
+
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement form submission logic
-    console.log('Account settings updated:', formData);
+
+    if (!isEditing) return;
+
+    try {
+      await apiClient.post('/api/profile', {
+        phone_number: formData.phoneNumber,
+      });
+
+      setSnackbarMessage('Account information updated successfully.');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      setIsEditing(false);
+    } catch (e) {
+      setSnackbarMessage('Failed to update account information.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      console.error('Failed to update account settings', e);
+    }
   };
 
   return (
@@ -108,10 +144,12 @@ const AccountSettingsNew: React.FC = () => {
               variant="outlined"
               value={formData.email}
               onChange={handleInputChange('email')}
+              InputProps={{ readOnly: true }}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '4px',
                   height: '50px',
+                  backgroundColor: '#f0f0f0',
                   '& fieldset': {
                     borderColor: '#dddddd',
                   },
@@ -119,98 +157,16 @@ const AccountSettingsNew: React.FC = () => {
                     borderColor: '#dddddd',
                   },
                   '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
+                    borderColor: '#dddddd',
                   },
                 },
                 '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
+                  color: '#777777',
                   fontFamily: 'Noto Sans',
                   fontSize: '16px',
                   padding: '8px 16px',
-                },
-              }}
-            />
-          </Box>
-
-          {/* Password */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Password
-            </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              type="password"
-              value={formData.password}
-              onChange={handleInputChange('password')}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
-                },
-                '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
-                },
-              }}
-            />
-          </Box>
-
-          {/* Confirm Password */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Confirm Password
-            </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              type="password"
-              value={formData.confirmPassword}
-              onChange={handleInputChange('confirmPassword')}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
-                },
-                '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
+                  cursor: 'text',
+                  userSelect: 'text',
                 },
               }}
             />
@@ -233,10 +189,12 @@ const AccountSettingsNew: React.FC = () => {
               variant="outlined"
               value={formData.name}
               onChange={handleInputChange('name')}
+              InputProps={{ readOnly: true }}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '4px',
                   height: '50px',
+                  backgroundColor: '#f0f0f0',
                   '& fieldset': {
                     borderColor: '#dddddd',
                   },
@@ -244,14 +202,16 @@ const AccountSettingsNew: React.FC = () => {
                     borderColor: '#dddddd',
                   },
                   '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
+                    borderColor: '#dddddd',
                   },
                 },
                 '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
+                  color: '#777777',
                   fontFamily: 'Noto Sans',
                   fontSize: '16px',
                   padding: '8px 16px',
+                  cursor: 'text',
+                  userSelect: 'text',
                 },
               }}
             />
@@ -272,293 +232,120 @@ const AccountSettingsNew: React.FC = () => {
             <TextField
               fullWidth
               variant="outlined"
+              type="tel"
+              inputMode="tel"
+
               value={formData.phoneNumber}
               onChange={handleInputChange('phoneNumber')}
+              disabled={!isEditing}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '4px',
                   height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
+                  backgroundColor: !isEditing ? '#f0f0f0' : 'white',
+                  '& fieldset': { borderColor: '#dddddd' },
+                  '&:hover fieldset': { borderColor: '#dddddd' },
+                  '&.Mui-focused fieldset': { borderColor: '#5856D6' },
                 },
                 '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
+                  color: !isEditing ? '#000000ff' : '#000000ff',
                   fontFamily: 'Noto Sans',
                   fontSize: '16px',
                   padding: '8px 16px',
+                },
+                '& .MuiInputBase-input.Mui-disabled': {
+                  WebkitTextFillColor: '#777777',
+                  opacity: 1,
                 },
               }}
             />
           </Box>
 
-          {/* Post Code */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Post Code
-            </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              value={formData.postCode}
-              onChange={handleInputChange('postCode')}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
-                },
-                '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
-                },
-              }}
-            />
-          </Box>
-
-          {/* State/Province/Region */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              State/Province/Region
-            </Typography>
-            <FormControl
-              fullWidth
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
-                },
-                '& .MuiSelect-select': {
-                  color: '#aaaaaa',
-                  fontFamily: 'Roboto',
-                  fontSize: '16px',
-                  padding: '16px',
-                },
-              }}
-            >
-              <Select
-                value={formData.state}
-                onChange={handleInputChange('state')}
-                displayEmpty
-                IconComponent={ArrowDropDown}
-              >
-                <MenuItem value="">
-                  <em>Choose your region</em>
-                </MenuItem>
-                <MenuItem value="tokyo">Tokyo</MenuItem>
-                <MenuItem value="osaka">Osaka</MenuItem>
-                <MenuItem value="kyoto">Kyoto</MenuItem>
-                <MenuItem value="yokohama">Yokohama</MenuItem>
-                <MenuItem value="nagoya">Nagoya</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-
-          {/* City */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              City
-            </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              placeholder="ex: Setagaya-ku, kasuya"
-              value={formData.city}
-              onChange={handleInputChange('city')}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
-                },
-                '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
-                  '&::placeholder': {
-                    color: '#aaaaaa',
-                    opacity: 1,
-                  },
-                },
-              }}
-            />
-          </Box>
-
-          {/* Address Line 1 */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Address Line 1
-            </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              placeholder="ex: 1-2-3"
-              value={formData.addressLine1}
-              onChange={handleInputChange('addressLine1')}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
-                },
-                '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
-                  '&::placeholder': {
-                    color: '#aaaaaa',
-                    opacity: 1,
-                  },
-                },
-              }}
-            />
-          </Box>
-
-          {/* Address Line 2 */}
-          <Box sx={{ marginBottom: '48px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Address Line 2
-            </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              placeholder="ex: Domes House 10XX"
-              value={formData.addressLine2}
-              onChange={handleInputChange('addressLine2')}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#5856D6',
-                  },
-                },
-                '& .MuiInputBase-input': {
-                  color: '#aaaaaa',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
-                  '&::placeholder': {
-                    color: '#aaaaaa',
-                    opacity: 1,
-                  },
-                },
-              }}
-            />
-          </Box>
 
           {/* Submit Button */}
-          <Box sx={{ display: 'flex', justifyContent: 'center', marginTop: '32px' }}>
-            <Button
-              type="submit"
-              variant="contained"
-              sx={{
-                backgroundColor: 'black',
-                color: 'white',
-                padding: '16px 32px',
-                borderRadius: '4px',
-                fontFamily: 'Noto Sans',
-                fontWeight: 'bold',
-                fontSize: '16px',
-                textTransform: 'none',
-                minWidth: '400px',
-                '&:hover': {
-                  backgroundColor: '#333',
-                },
-              }}
-            >
-              Register
-            </Button>
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '32px' }}>
+            {!isEditing ? (
+              <Button
+                type="button"
+                variant="contained"
+                onClick={() => setIsEditing(true)}
+                sx={{
+                  backgroundColor: 'black',
+                  color: 'white',
+                  padding: '16px 32px',
+                  borderRadius: '4px',
+                  fontFamily: 'Noto Sans',
+                  fontWeight: 'bold',
+                  fontSize: '16px',
+                  textTransform: 'none',
+                  minWidth: '400px',
+                  '&:hover': { backgroundColor: '#333' },
+                }}
+              >
+                Edit
+              </Button>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="outlined"
+                  onClick={() => setIsEditing(false)}
+                  sx={{
+                    borderColor: '#dddddd',
+                    color: 'black',
+                    padding: '16px 32px',
+                    borderRadius: '4px',
+                    fontFamily: 'Noto Sans',
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                    textTransform: 'none',
+                    minWidth: '190px',
+                    '&:hover': { borderColor: '#cccccc', backgroundColor: '#f5f5f5' },
+                  }}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  type="submit"
+                  variant="contained"
+                  sx={{
+                    backgroundColor: 'black',
+                    color: 'white',
+                    padding: '16px 32px',
+                    borderRadius: '4px',
+                    fontFamily: 'Noto Sans',
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                    textTransform: 'none',
+                    minWidth: '190px',
+                    '&:hover': { backgroundColor: '#333' },
+                  }}
+                >
+                  Save
+                </Button>
+              </>
+            )}
           </Box>
         </Box>
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={3000}
+          onClose={() => setSnackbarOpen(false)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert
+            onClose={() => setSnackbarOpen(false)}
+            severity={snackbarSeverity}
+            sx={{ width: '100%' }}
+          >
+            {snackbarMessage}
+          </Alert>
+        </Snackbar>
       </Container>
 
       {/* Footer */}
-      <Footer/>
+      <Footer />
     </Box>
   );
 };
