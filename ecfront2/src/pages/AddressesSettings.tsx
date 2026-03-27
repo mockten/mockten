@@ -108,6 +108,7 @@ const regionOptions: Record<string, { value: string; label: string }[]> = {
 
 const AddressesSettings: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
+  const [editingGeoId, setEditingGeoId] = useState<string | null>(null);
   const [formData, setFormData] = useState<AddressFormData>({
     country: '',
     postCode: '',
@@ -181,6 +182,25 @@ const AddressesSettings: React.FC = () => {
     }
   };
 
+  const handleEdit = (address: GeoAddress) => {
+    let countryVal = 'japan';
+    if (address.country_code.toLowerCase() === 'sg') countryVal = 'singapore';
+    else if (address.country_code.toLowerCase() === 'jp') countryVal = 'japan';
+    else countryVal = address.country_code.toLowerCase();
+
+    setFormData({
+      country: countryVal,
+      postCode: address.postal_code,
+      state: address.prefecture,
+      city: address.city,
+      addressLine1: address.town,
+      addressLine2: address.building_name,
+      roomNumber: address.room_number,
+    });
+    setEditingGeoId(address.geo_id);
+    setIsEditing(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -195,7 +215,7 @@ const AddressesSettings: React.FC = () => {
     }
 
     try {
-      await apiClient.post('/api/profile', {
+      const payload = {
         user_id: userId,
         postal_code: formData.postCode,
         prefecture: formData.state,
@@ -204,18 +224,29 @@ const AddressesSettings: React.FC = () => {
         building_name: formData.addressLine2,
         room_number: formData.roomNumber,
         country_code: formData.country === 'japan' ? 'jp' : (formData.country === 'singapore' ? 'sg' : formData.country),
-      });
+      };
 
-      setSnackbarMessage('Account information updated successfully.');
+      if (editingGeoId) {
+        await apiClient.put('/api/geo', {
+          ...payload,
+          geo_id: editingGeoId,
+        });
+        setSnackbarMessage('Address updated successfully.');
+      } else {
+        await apiClient.post('/api/profile', payload);
+        setSnackbarMessage('New address added successfully.');
+      }
+
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
       setIsEditing(false);
+      setEditingGeoId(null);
       fetchAddressInfo(); // Refresh the list
     } catch (e) {
-      setSnackbarMessage('Failed to update account information.');
+      setSnackbarMessage(editingGeoId ? 'Failed to update address.' : 'Failed to add address.');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
-      console.error('Failed to update account settings', e);
+      console.error('Failed to submit address form', e);
     }
   };
 
@@ -261,7 +292,20 @@ const AddressesSettings: React.FC = () => {
                     backgroundColor: '#fafafa',
                   }}
                 >
-                  <CardContent sx={{ padding: '16px' }}>
+                  <CardContent sx={{ padding: '16px', position: 'relative' }}>
+                    <Button
+                      onClick={() => handleEdit(address)}
+                      sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        textTransform: 'none',
+                        color: '#5856D6',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      Edit
+                    </Button>
                     <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
                       {address.country_code} / {address.prefecture}
                     </Typography>
@@ -311,6 +355,7 @@ const AddressesSettings: React.FC = () => {
                   addressLine2: '',
                   roomNumber: '',
                 });
+                setEditingGeoId(null);
                 setIsEditing(true);
               }}
               sx={{
@@ -351,7 +396,7 @@ const AddressesSettings: React.FC = () => {
                   color: 'black',
                 }}
               >
-                New Address
+                {editingGeoId ? 'Edit Address' : 'New Address'}
               </Typography>
             </Box>
 

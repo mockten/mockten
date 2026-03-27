@@ -259,3 +259,4 @@ services:
         strip_path: true
         methods:
           - GET
+          - PUT

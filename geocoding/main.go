@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	crand "crypto/rand"
 
 	"github.com/MicahParks/keyfunc/v3"
 	_ "github.com/go-sql-driver/mysql"
@@ -37,6 +38,7 @@ type Config struct {
 }
 
 type GeocodeRequest struct {
+	GeoID        string `json:"geo_id"`
 	UserID       string `json:"user_id"`
 	PostalCode   string `json:"postal_code"`
 	Prefecture   string `json:"prefecture"`
@@ -44,6 +46,7 @@ type GeocodeRequest struct {
 	Town         string `json:"town"`
 	BuildingName string `json:"building_name"`
 	RoomNumber   string `json:"room_number"`
+	PhoneNumber  string `json:"phone_number"`
 	CountryCode  string `json:"country_code"`
 }
 
@@ -241,6 +244,77 @@ func geocodeOnce(params url.Values) (lat string, lon string, found bool, err err
 	return items[0].Lat, items[0].Lon, true, nil
 }
 
+func generateUUID() string {
+	b := make([]byte, 16)
+	_, err := crand.Read(b)
+	if err != nil {
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+}
+
+func updateUserPhoneNumber(userID, phoneNumber string) error {
+	if phoneNumber == "" {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var internalID string
+	err := db.QueryRowContext(ctx, "SELECT ID FROM USER_ENTITY WHERE EMAIL = ? OR USERNAME = ?", userID, userID).Scan(&internalID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("User not found in USER_ENTITY for phone update: %s", userID)
+			return nil
+		}
+		return fmt.Errorf("user lookup error: %v", err)
+	}
+
+	var attrID string
+	err = db.QueryRowContext(ctx, "SELECT ID FROM USER_ATTRIBUTE WHERE USER_ID = ? AND NAME = 'phoneNumber'", internalID).Scan(&attrID)
+	if err == sql.ErrNoRows {
+		// Insert
+		newID := generateUUID()
+		_, err = db.ExecContext(ctx, "INSERT INTO USER_ATTRIBUTE (ID, NAME, VALUE, USER_ID) VALUES (?, 'phoneNumber', ?, ?)", newID, phoneNumber, internalID)
+	} else if err == nil {
+		// Update
+		_, err = db.ExecContext(ctx, "UPDATE USER_ATTRIBUTE SET VALUE = ? WHERE ID = ?", phoneNumber, attrID)
+	}
+	return err
+}
+
+func updateGeo(in GeocodeRequest, latStr, lonStr string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var lat, lon sql.NullFloat64
+	if v, err := strconv.ParseFloat(latStr, 64); err == nil {
+		lat = sql.NullFloat64{Float64: v, Valid: true}
+	}
+	if v, err := strconv.ParseFloat(lonStr, 64); err == nil {
+		lon = sql.NullFloat64{Float64: v, Valid: true}
+	}
+
+	q := `
+UPDATE Geo SET
+  country_code = ?, postal_code = ?, prefecture = ?, city = ?, town = ?, building_name = ?, room_number = ?, latitude = ?, longitude = ?
+WHERE geo_id = ? AND user_id = ?
+`
+	_, err := db.ExecContext(ctx, q,
+		strings.ToUpper(strings.TrimSpace(in.CountryCode)),
+		in.PostalCode,
+		in.Prefecture,
+		in.City,
+		in.Town,
+		in.BuildingName,
+		in.RoomNumber,
+		lat, lon,
+		in.GeoID,
+		in.UserID,
+	)
+	return err
+}
+
 func insertGeo(in GeocodeRequest, latStr, lonStr string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -333,6 +407,12 @@ func geocodeHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err := insertGeo(reqBody, lat, lon); err != nil {
 		log.Printf("DB insert error: %v", err)
+	}
+
+	if reqBody.PhoneNumber != "" {
+		if err := updateUserPhoneNumber(reqBody.UserID, reqBody.PhoneNumber); err != nil {
+			log.Printf("Phone update error: %v", err)
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -864,6 +944,49 @@ func handleInternational(w http.ResponseWriter, product *Product, user *UserGeo)
 }
 
 func getGeoHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPut {
+		var reqBody GeocodeRequest
+		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		if reqBody.UserID == "" {
+			token := r.URL.Query().Get("token")
+			if token == "" {
+				authHeader := r.Header.Get("Authorization")
+				if strings.HasPrefix(authHeader, "Bearer ") {
+					token = strings.TrimPrefix(authHeader, "Bearer ")
+				}
+			}
+			if token != "" {
+				if uid, err := getUserIDFromTokenString(token); err == nil && uid != "" {
+					reqBody.UserID = uid
+				}
+			}
+		}
+
+		if reqBody.GeoID == "" {
+			http.Error(w, "Missing geo_id for update", http.StatusBadRequest)
+			return
+		}
+
+		params := buildParams(reqBody)
+		lat, lon, _, err := geocodeOnce(params)
+		if err != nil {
+			log.Printf("Geocode error: %v", err)
+		}
+
+		if err := updateGeo(reqBody, lat, lon); err != nil {
+			log.Printf("DB update error: %v", err)
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	userID := r.URL.Query().Get("user_id")
 	token := r.URL.Query().Get("token")
 

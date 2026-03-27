@@ -17,7 +17,6 @@ import { useEffect } from 'react';
 
 interface AccountFormData {
   email: string;
-  name: string;
   phoneNumber: string;
 }
 
@@ -26,7 +25,6 @@ const AccountSettingsNew: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<AccountFormData>({
     email: '',
-    name: '',
     phoneNumber: '',
   });
 
@@ -40,19 +38,13 @@ const AccountSettingsNew: React.FC = () => {
         const userinfoRes = await apiClient.get('/api/uam/userinfo');
         const userData = userinfoRes.data;
 
-        const name =
-          userData.name ||
-          userData.given_name ||
-          userData.preferred_username ||
-          userData.email ||
-          'User';
-
         const email = userData.email || '';
+        const phoneNumber = userData.phone_number || (userData.attributes && userData.attributes.phoneNumber ? userData.attributes.phoneNumber[0] : '');
 
         setFormData((prev) => ({
           ...prev,
-          name,
           email,
+          phoneNumber,
         }));
       } catch (e) {
         console.error('Failed to fetch user info', e);
@@ -172,50 +164,6 @@ const AccountSettingsNew: React.FC = () => {
             />
           </Box>
 
-          {/* Name */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Name
-            </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              value={formData.name}
-              onChange={handleInputChange('name')}
-              InputProps={{ readOnly: true }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  backgroundColor: '#f0f0f0',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                },
-                '& .MuiInputBase-input': {
-                  color: '#777777',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
-                  cursor: 'text',
-                  userSelect: 'text',
-                },
-              }}
-            />
-          </Box>
 
           {/* Phone Number */}
           <Box sx={{ marginBottom: '32px' }}>
