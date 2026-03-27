@@ -31,6 +31,7 @@ interface AddressFormData {
   city: string;
   addressLine1: string;
   addressLine2: string;
+  roomNumber: string;
 }
 
 interface GeoAddress {
@@ -114,6 +115,7 @@ const AddressesSettings: React.FC = () => {
     city: '',
     addressLine1: '',
     addressLine2: '',
+    roomNumber: '',
   });
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -121,24 +123,24 @@ const AddressesSettings: React.FC = () => {
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
   const [addresses, setAddresses] = useState<GeoAddress[]>([]);
 
-  useEffect(() => {
-    const fetchAddressInfo = async () => {
-      try {
-        const response = await apiClient.get('/api/geo');
-        let geoArray: GeoAddress[] = [];
+  const fetchAddressInfo = async () => {
+    try {
+      const response = await apiClient.get('/api/geo');
+      let geoArray: GeoAddress[] = [];
 
-        if (Array.isArray(response.data)) {
-          geoArray = response.data;
-        } else if (response.data) {
-          geoArray = [response.data];
-        }
-
-        setAddresses(geoArray);
-      } catch (e) {
-        console.error('Failed to fetch address info', e);
+      if (Array.isArray(response.data)) {
+        geoArray = response.data;
+      } else if (response.data) {
+        geoArray = [response.data];
       }
-    };
 
+      setAddresses(geoArray);
+    } catch (e) {
+      console.error('Failed to fetch address info', e);
+    }
+  };
+
+  useEffect(() => {
     fetchAddressInfo();
   }, []);
 
@@ -161,25 +163,54 @@ const AddressesSettings: React.FC = () => {
     }));
   };
 
+  const getUserIdFromToken = () => {
+    const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken') || localStorage.getItem('mockten_access_token');
+    if (!token) return '';
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      const decoded = JSON.parse(jsonPayload);
+      // Backend prefers email, then preferred_username, then sub as user_id identifier
+      return decoded.email || decoded.preferred_username || decoded.sub || '';
+    } catch (e) {
+      console.error('Failed to decode JWT token', e);
+      return '';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!isEditing) return;
 
+    const userId = getUserIdFromToken();
+    if (!userId) {
+      setSnackbarMessage('Error: User not authenticated.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      return;
+    }
+
     try {
       await apiClient.post('/api/profile', {
+        user_id: userId,
         postal_code: formData.postCode,
         prefecture: formData.state,
         city: formData.city,
         town: formData.addressLine1,
         building_name: formData.addressLine2,
-        country_code: formData.country,
+        room_number: formData.roomNumber,
+        country_code: formData.country === 'japan' ? 'jp' : (formData.country === 'singapore' ? 'sg' : formData.country),
       });
 
       setSnackbarMessage('Account information updated successfully.');
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
       setIsEditing(false);
+      fetchAddressInfo(); // Refresh the list
     } catch (e) {
       setSnackbarMessage('Failed to update account information.');
       setSnackbarSeverity('error');
@@ -278,6 +309,7 @@ const AddressesSettings: React.FC = () => {
                   city: '',
                   addressLine1: '',
                   addressLine2: '',
+                  roomNumber: '',
                 });
                 setIsEditing(true);
               }}
@@ -558,7 +590,7 @@ const AddressesSettings: React.FC = () => {
               </Box>
 
               {/* Address Line 2 */}
-              <Box sx={{ marginBottom: '48px' }}>
+              <Box sx={{ marginBottom: '32px' }}>
                 <Typography
                   sx={{
                     fontFamily: 'Noto Sans',
@@ -574,6 +606,47 @@ const AddressesSettings: React.FC = () => {
                   variant="outlined"
                   value={formData.addressLine2}
                   onChange={handleInputChange('addressLine2')}
+                  disabled={!isEditing}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '4px',
+                      height: '50px',
+                      backgroundColor: !isEditing ? '#f0f0f0' : 'white',
+                      '& fieldset': { borderColor: '#dddddd' },
+                      '&:hover fieldset': { borderColor: '#dddddd' },
+                      '&.Mui-focused fieldset': { borderColor: '#5856D6' },
+                    },
+                    '& .MuiInputBase-input': {
+                      color: !isEditing ? '#000000ff' : '#000000ff',
+                      fontFamily: 'Noto Sans',
+                      fontSize: '16px',
+                      padding: '8px 16px',
+                    },
+                    '& .MuiInputBase-input.Mui-disabled': {
+                      WebkitTextFillColor: '#777777',
+                      opacity: 1,
+                    },
+                  }}
+                />
+              </Box>
+
+              {/* Room Number */}
+              <Box sx={{ marginBottom: '48px' }}>
+                <Typography
+                  sx={{
+                    fontFamily: 'Noto Sans',
+                    fontSize: '14px',
+                    color: 'black',
+                    marginBottom: '8px',
+                  }}
+                >
+                  Room Number
+                </Typography>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  value={formData.roomNumber}
+                  onChange={handleInputChange('roomNumber')}
                   disabled={!isEditing}
                   sx={{
                     '& .MuiOutlinedInput-root': {
