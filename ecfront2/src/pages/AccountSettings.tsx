@@ -8,6 +8,8 @@ import {
   SelectChangeEvent,
   Snackbar,
   Alert,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
@@ -17,7 +19,7 @@ import { useEffect } from 'react';
 
 interface AccountFormData {
   email: string;
-  name: string;
+  countryCode: string;
   phoneNumber: string;
 }
 
@@ -26,7 +28,7 @@ const AccountSettingsNew: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<AccountFormData>({
     email: '',
-    name: '',
+    countryCode: '+81',
     phoneNumber: '',
   });
 
@@ -34,25 +36,55 @@ const AccountSettingsNew: React.FC = () => {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
 
+  const getUserIdFromToken = () => {
+    const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken') || localStorage.getItem('mockten_access_token');
+    if (!token) return '';
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      const decoded = JSON.parse(jsonPayload);
+      return decoded.email || decoded.preferred_username || decoded.sub || '';
+    } catch (e) {
+      console.error('Failed to decode JWT token', e);
+      return '';
+    }
+  };
+
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
         const userinfoRes = await apiClient.get('/api/uam/userinfo');
         const userData = userinfoRes.data;
 
-        const name =
-          userData.name ||
-          userData.given_name ||
-          userData.preferred_username ||
-          userData.email ||
-          'User';
-
         const email = userData.email || '';
+        let phoneNumber = userData.phone_number || (userData.attributes && userData.attributes.phoneNumber ? userData.attributes.phoneNumber[0] : '');
+        let countryCode = '+81';
+
+        const currentUserId = getUserIdFromToken();
+        if (currentUserId) {
+          try {
+            const profileRes = await apiClient.get(`/api/profile?user_id=${currentUserId}`);
+            if (profileRes.data) {
+              if (profileRes.data.phoneNumber) {
+                phoneNumber = profileRes.data.phoneNumber;
+              }
+              if (profileRes.data.countryCode) {
+                countryCode = profileRes.data.countryCode;
+              }
+            }
+          } catch (err) {
+            console.error('Failed to fetch profile from geocoding service', err);
+          }
+        }
 
         setFormData((prev) => ({
           ...prev,
-          name,
           email,
+          countryCode,
+          phoneNumber,
         }));
       } catch (e) {
         console.error('Failed to fetch user info', e);
@@ -80,7 +112,10 @@ const AccountSettingsNew: React.FC = () => {
     if (!isEditing) return;
 
     try {
+      const userId = getUserIdFromToken();
       await apiClient.post('/api/profile', {
+        user_id: userId,
+        country_code: formData.countryCode,
         phone_number: formData.phoneNumber,
       });
 
@@ -172,50 +207,6 @@ const AccountSettingsNew: React.FC = () => {
             />
           </Box>
 
-          {/* Name */}
-          <Box sx={{ marginBottom: '32px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '14px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Name
-            </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              value={formData.name}
-              onChange={handleInputChange('name')}
-              InputProps={{ readOnly: true }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
-                  height: '50px',
-                  backgroundColor: '#f0f0f0',
-                  '& fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#dddddd',
-                  },
-                },
-                '& .MuiInputBase-input': {
-                  color: '#777777',
-                  fontFamily: 'Noto Sans',
-                  fontSize: '16px',
-                  padding: '8px 16px',
-                  cursor: 'text',
-                  userSelect: 'text',
-                },
-              }}
-            />
-          </Box>
 
           {/* Phone Number */}
           <Box sx={{ marginBottom: '32px' }}>
@@ -229,36 +220,58 @@ const AccountSettingsNew: React.FC = () => {
             >
               Phone Number
             </Typography>
-            <TextField
-              fullWidth
-              variant="outlined"
-              type="tel"
-              inputMode="tel"
-
-              value={formData.phoneNumber}
-              onChange={handleInputChange('phoneNumber')}
-              disabled={!isEditing}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '4px',
+            <Box sx={{ display: 'flex', gap: '8px' }}>
+              <Select
+                value={formData.countryCode}
+                onChange={handleInputChange('countryCode')}
+                disabled={!isEditing}
+                sx={{
+                  width: '100px',
                   height: '50px',
+                  borderRadius: '4px',
                   backgroundColor: !isEditing ? '#f0f0f0' : 'white',
-                  '& fieldset': { borderColor: '#dddddd' },
-                  '&:hover fieldset': { borderColor: '#dddddd' },
-                  '&.Mui-focused fieldset': { borderColor: '#5856D6' },
-                },
-                '& .MuiInputBase-input': {
-                  color: !isEditing ? '#000000ff' : '#000000ff',
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: '#dddddd' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#dddddd' },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#5856D6' },
                   fontFamily: 'Noto Sans',
                   fontSize: '16px',
-                  padding: '8px 16px',
-                },
-                '& .MuiInputBase-input.Mui-disabled': {
-                  WebkitTextFillColor: '#777777',
-                  opacity: 1,
-                },
-              }}
-            />
+                }}
+              >
+                <MenuItem value="+81">🇯🇵 +81</MenuItem>
+                <MenuItem value="+65">🇸🇬 +65</MenuItem>
+              </Select>
+              <TextField
+                fullWidth
+                variant="outlined"
+                type="tel"
+                inputMode="tel"
+                placeholder="08012345678"
+                value={formData.phoneNumber}
+                onChange={handleInputChange('phoneNumber')}
+                disabled={!isEditing}
+                sx={{
+                  flexGrow: 1,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '4px',
+                    height: '50px',
+                    backgroundColor: !isEditing ? '#f0f0f0' : 'white',
+                    '& fieldset': { borderColor: '#dddddd' },
+                    '&:hover fieldset': { borderColor: '#dddddd' },
+                    '&.Mui-focused fieldset': { borderColor: '#5856D6' },
+                  },
+                  '& .MuiInputBase-input': {
+                    color: !isEditing ? '#000000ff' : '#000000ff',
+                    fontFamily: 'Noto Sans',
+                    fontSize: '16px',
+                    padding: '8px 16px',
+                  },
+                  '& .MuiInputBase-input.Mui-disabled': {
+                    WebkitTextFillColor: '#777777',
+                    opacity: 1,
+                  },
+                }}
+              />
+            </Box>
           </Box>
 
 

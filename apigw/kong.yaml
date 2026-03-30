@@ -241,6 +241,7 @@ services:
         strip_path: true
         methods:
           - POST
+          - GET
   - name: shipping-fee-calculator
     url: http://geocoding-service.default.svc.cluster.local:8080/shipping
     routes:
@@ -259,3 +260,4 @@ services:
         strip_path: true
         methods:
           - GET
+          - PUT
