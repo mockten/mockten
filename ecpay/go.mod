@@ -3,11 +3,13 @@ module github.com/mockten/mockten/ecpay
 go 1.23.2
 
 require (
+	github.com/gin-contrib/cors v1.4.0
+	github.com/gin-gonic/gin v1.9.1
 	github.com/go-sql-driver/mysql v1.7.0
 	github.com/google/uuid v1.3.0
 	github.com/mockten/mockten_interfaces v0.0.0-20230410100840-8f135ee4b165
 	github.com/prometheus/client_golang v1.14.0
-	github.com/stripe/stripe-go v70.15.0+incompatible
+	github.com/stripe/stripe-go/v74 v74.30.0
 	github.com/yabamuro/gocelery v0.0.0-20220202112357-4918ceca9092
 	google.golang.org/grpc v1.54.0
 	gopkg.in/ini.v1 v1.67.0
