@@ -1,6 +1,6 @@
 module github.com/mockten/mockten/ecpay
 
-go 1.25.0
+go 1.23.2
 
 require (
 	github.com/go-sql-driver/mysql v1.7.0

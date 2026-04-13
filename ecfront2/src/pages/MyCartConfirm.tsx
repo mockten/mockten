@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import apiClient from '../module/apiClient';
 import {
@@ -17,13 +17,6 @@ import Footer from '../components/Footer';
 import photoSvg from "../assets/photo.svg";
 const arrowRightIcon = "http://localhost:3845/assets/ce1540ba1f8cb0bde2e26ff8f9fc566f7be994a6.svg";
 
-interface CartItem {
-  id: number;
-  name: string;
-  description: string;
-  quantity: number;
-  image: string;
-}
 
 const MyCartConfirm: React.FC = () => {
   const navigate = useNavigate();
