@@ -3,7 +3,7 @@ module github.com/mockten/mockten/ecpay
 go 1.23.2
 
 require (
-	github.com/gin-contrib/cors v1.4.0
+	github.com/gin-contrib/cors v1.6.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-sql-driver/mysql v1.7.0
 	github.com/google/uuid v1.3.0
