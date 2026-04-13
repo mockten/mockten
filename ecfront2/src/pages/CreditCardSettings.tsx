@@ -23,6 +23,11 @@ import {
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 import apiClient from '../module/apiClient';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
+
 
 
 interface CreditCardFormData {
@@ -34,11 +39,13 @@ interface CreditCardFormData {
 }
 
 type SavedCard = {
+  id: string;
   brand?: 'VISA' | 'Mastercard' | 'JCB' | 'AMEX' | 'Diners' | 'Discover' | 'Unknown';
   last4: string;
   expMonth?: string;
   expYear?: string;
   cardHolderName?: string;
+  isDefault?: boolean;
 };
 
 const CreditCardSettings: React.FC = () => {
@@ -51,14 +58,10 @@ const CreditCardSettings: React.FC = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [savedCard, setSavedCard] = useState<SavedCard | null>({
-    brand: 'JCB',
-    last4: '1234',
-    expMonth: '08',
-    expYear: '24',
-    cardHolderName: 'TARO YAMADA',
-  });
+  const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
+  const [activeCardId, setActiveCardId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<CreditCardFormData>({
     cardHolderName: '',
@@ -84,10 +87,80 @@ const CreditCardSettings: React.FC = () => {
   };
 
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const fetchMethods = async () => {
+    try {
+      setIsLoading(true);
+      const res = await apiClient.get('/api/payment-method');
+      if (res.data && res.data.length > 0) {
+        const cards: SavedCard[] = res.data.map((m: any) => ({
+          id: m.id,
+          brand: (m.brand || 'VISA') as any, // keep original casing or lowercase from stripe
+          last4: m.last4,
+          expMonth: String(m.exp_month).padStart(2, '0'),
+          expYear: String(m.exp_year).slice(-2),
+          cardHolderName: m.cardHolderName || '',
+          isDefault: m.is_default,
+        }));
+        setSavedCards(cards);
+        setIsEditing(cards.length === 0);
+      } else {
+        setSavedCards([]);
+        setIsEditing(true);
+      }
+    } catch (e) {
+      console.error('Failed to fetch payment methods', e);
+      setSavedCards([]);
+      setIsEditing(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch saved cards from backend
+  React.useEffect(() => {
+    fetchMethods();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent, stripe: any, elements: any) => {
     e.preventDefault();
-    // TODO: Implement API call (tokenization recommended; do NOT send raw card data to your server unless PCI compliant)
-    console.log('Credit card registered:', formData);
+    if (!stripe || !elements) return;
+
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) return;
+
+    const { error, paymentMethod } = await stripe.createPaymentMethod({
+      type: 'card',
+      card: cardElement,
+      billing_details: {
+        name: formData.cardHolderName,
+      },
+    });
+
+    if (error) {
+      setSnackbarMessage(error.message || 'Error configuring card.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    try {
+      const result = await apiClient.post('/api/payment-method', {
+        payment_method_id: paymentMethod.id,
+      });
+      if (result.status === 200) {
+        setSnackbarMessage('Card successfully saved!');
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
+        setIsEditing(false);
+        // Refresh cards
+        await fetchMethods();
+      }
+    } catch (apiError) {
+      console.error(apiError);
+      setSnackbarMessage('Failed to save to server.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
   };
 
   const handleInputChange =
@@ -98,21 +171,39 @@ const CreditCardSettings: React.FC = () => {
       }));
     };
 
-
   const handleDeleteCard = async () => {
+    if (!activeCardId) return;
     try {
-      // TODO: APIに合わせて修正
-      await apiClient.delete('/api/payment-method');
-
-      setSavedCard(null);
+      await apiClient.delete('/api/payment-method', {
+        data: { payment_method_id: activeCardId }
+      });
       setDeleteDialogOpen(false);
-
       setSnackbarMessage('Card deleted successfully.');
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
+      await fetchMethods();
     } catch (e) {
       console.error('Failed to delete card', e);
       setSnackbarMessage('Failed to delete card.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
+
+  const handleMakePrimary = async () => {
+    if (!activeCardId) return;
+    try {
+      await apiClient.put('/api/payment-method/default', {
+        payment_method_id: activeCardId
+      });
+      setManageMenuAnchorEl(null);
+      setSnackbarMessage('Primary card updated successfully.');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      await fetchMethods();
+    } catch (e) {
+      console.error('Failed to set primary card', e);
+      setSnackbarMessage('Failed to set primary card.');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
     }
@@ -277,136 +368,99 @@ const CreditCardSettings: React.FC = () => {
           </Typography>
         </Box>
 
-        {/* Current Card Area */}
-        <Box sx={{ maxWidth: '680px', margin: '0 auto 24px' }}>
-          <Card
-            variant="outlined"
-            sx={{
-              borderColor: '#dddddd',
-              borderRadius: '4px',
-              backgroundColor: '#fafafa',
-            }}
-          >
-            <CardContent sx={{ padding: '16px' }}>
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                spacing={2}
-              >
-                <Box>
-                  <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: '#333' }}>
-                    Current Card
-                  </Typography>
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+            <Typography>Loading...</Typography>
+          </Box>
+        ) : (
+          <>
+            {/* Current Card Area */}
+            {savedCards.length > 0 && (
+              <Box sx={{ maxWidth: '680px', margin: '0 auto 24px' }}>
+                <Typography sx={{ mb: 2, fontFamily: 'Noto Sans', fontWeight: 'bold' }}>
+                  Registered Cards
+                </Typography>
+                
+                {savedCards.map((card) => (
+                  <Card
+                    key={card.id}
+                    variant="outlined"
+                    sx={{
+                      borderColor: '#dddddd',
+                      borderRadius: '4px',
+                      backgroundColor: '#fafafa',
+                      mb: 2
+                    }}
+                  >
+                    <CardContent sx={{ padding: '16px' }}>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+                        <Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}>
+                            {card.brand?.toLowerCase() === 'visa' && <VisaLogo width={56} height={24} />}
+                            {card.brand?.toLowerCase() === 'mastercard' && <Mastercard width={56} height={24} />}
+                            {card.brand?.toLowerCase() === 'jcb' && <Jcb width={56} height={24} />}
+                            {card.brand?.toLowerCase() === 'amex' && <Amex width={56} height={24} />}
+                            {card.brand?.toLowerCase() === 'discover' && <Discover width={56} height={24} />}
+                            {card.brand?.toLowerCase() === 'diners' && <Diners width={56} height={24} />}
 
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}>
-                    {savedCard?.brand === 'VISA' && <VisaLogo width={56} height={24} />}
-                    {savedCard?.brand === 'Mastercard' && <Mastercard width={56} height={24} />}
-                    {savedCard?.brand === 'JCB' && <Jcb width={56} height={24} />}
-                    {savedCard?.brand === 'AMEX' && <Amex width={56} height={24} />}
-                    {savedCard?.brand === 'Discover' && <Discover width={56} height={24} />}
-                    {savedCard?.brand === 'Diners' && <Diners width={56} height={24} />}
+                            <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '18px' }}>
+                              •••• {card.last4}
+                            </Typography>
+                            {card.isDefault && (
+                              <Chip size="small" label="Primary" color="primary" sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold' }} />
+                            )}
+                          </Box>
 
-                    <Typography
-                      sx={{
-                        fontFamily: 'Noto Sans',
-                        fontWeight: 'bold',
-                        fontSize: '18px',
-                        color: 'black',
-                      }}
-                    >
-                      •••• {savedCard?.last4}
-                    </Typography>
-                  </Box>
+                          <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap">
+                            {card.cardHolderName && (
+                              <Chip size="small" label={card.cardHolderName} sx={{ fontFamily: 'Noto Sans' }} />
+                            )}
+                            {card.expMonth && card.expYear && (
+                              <Chip size="small" label={`Exp ${card.expMonth}/${card.expYear}`} sx={{ fontFamily: 'Noto Sans' }} />
+                            )}
+                            {isCardExpired(card.expMonth, card.expYear) && (
+                              <Chip size="small" label="Expired" color="error" sx={{ fontFamily: 'Noto Sans' }} />
+                            )}
+                          </Stack>
+                        </Box>
 
-                  {savedCard ? (
-                    <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap">
-
-                      {savedCard.cardHolderName && (
-                        <Chip
-                          size="small"
-                          label={savedCard.cardHolderName}
-                          sx={{ fontFamily: 'Noto Sans' }}
-                        />
-                      )}
-                      {savedCard.expMonth && savedCard.expYear && (
-                        <Chip
-                          size="small"
-                          label={`Exp ${savedCard.expMonth}/${savedCard.expYear}`}
-                          sx={{ fontFamily: 'Noto Sans' }}
-                        />
-                      )}
-
-                      {isCardExpired(savedCard.expMonth, savedCard.expYear) && (
-                        <Chip
-                          size="small"
-                          label="Expired"
-                          color="error"
-                          sx={{ fontFamily: 'Noto Sans' }}
-                        />
-                      )}
-
-                    </Stack>
-                  ) : (
-                    <Typography
-                      sx={{
-                        fontFamily: 'Noto Sans',
-                        fontSize: '12px',
-                        color: '#777',
-                        mt: 1,
-                      }}
-                    >
-                      No card is currently registered.
-                    </Typography>
-                  )}
-                </Box>
-
-                {savedCard && !isEditing && (
-                  <Stack direction="row" spacing={1}>
-                    <Button
-                      variant="outlined"
-                      sx={{
-                        borderColor: '#dddddd',
-                        color: 'black',
-                        textTransform: 'none',
-                        fontFamily: 'Noto Sans',
-                        '&:hover': {
-                          borderColor: '#cccccc',
-                          backgroundColor: '#f5f5f5',
-                        },
-                      }}
-                      onClick={(event) => {
-                        setManageMenuAnchorEl(event.currentTarget);
-                      }}
-                    >
-                      Manage
-                    </Button>
-                    <Menu
-                      anchorEl={manageMenuAnchorEl}
-                      open={isManageMenuOpen}
-                      onClose={() => setManageMenuAnchorEl(null)}
-                    >
-                      <MenuItem
-                        onClick={() => {
-                          setManageMenuAnchorEl(null);
-                          setDeleteDialogOpen(true);
-                        }}
-                      >
-                        Delete
-                      </MenuItem>
-                    </Menu>
-                  </Stack>
-                )}
-              </Stack>
-
-              <Divider sx={{ my: 2, borderColor: '#eeeeee' }} />
-
-              <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '12px', color: '#777' }}>
-                For security reasons, we only display the last 4 digits.
-              </Typography>
-            </CardContent>
-          </Card>
-        </Box>
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            variant="outlined"
+                            sx={{
+                              borderColor: '#dddddd', color: 'black', textTransform: 'none', fontFamily: 'Noto Sans',
+                              '&:hover': { borderColor: '#cccccc', backgroundColor: '#f5f5f5' }
+                            }}
+                            onClick={(event) => {
+                              setActiveCardId(card.id);
+                              setManageMenuAnchorEl(event.currentTarget);
+                            }}
+                          >
+                            Manage
+                          </Button>
+                          <Menu
+                            anchorEl={manageMenuAnchorEl}
+                            open={isManageMenuOpen && activeCardId === card.id}
+                            onClose={() => setManageMenuAnchorEl(null)}
+                          >
+                            {!card.isDefault && (
+                              <MenuItem onClick={handleMakePrimary}>Make Primary</MenuItem>
+                            )}
+                            <MenuItem onClick={() => { setManageMenuAnchorEl(null); setDeleteDialogOpen(true); }}>
+                              Delete
+                            </MenuItem>
+                          </Menu>
+                        </Stack>
+                      </Stack>
+                      <Divider sx={{ my: 2, borderColor: '#eeeeee' }} />
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '12px', color: '#777' }}>
+                        For security reasons, we only display the last 4 digits.
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+            )}
 
         <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
           <DialogTitle>Delete Card</DialogTitle>
@@ -477,135 +531,16 @@ const CreditCardSettings: React.FC = () => {
               </Typography>
             </Box>
 
-            <Box
-              component="form"
-              onSubmit={handleSubmit}
-              sx={{ maxWidth: '680px', margin: '0 auto' }}
-            >
-              {/* Card Holder Name */}
-              <Box sx={{ marginBottom: '32px' }}>
-                <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
-                  Card Holder Name
-                </Typography>
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  placeholder="ex: TARO YAMADA"
-                  value={formData.cardHolderName}
-                  onChange={handleInputChange('cardHolderName')}
-                  sx={textFieldSx}
-                />
-              </Box>
-
-              {/* Card Number */}
-              <Box sx={{ marginBottom: '32px' }}>
-                <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
-                  Card Number
-                </Typography>
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  placeholder="1234 5678 9012 3456"
-                  value={formData.cardNumber}
-                  onChange={handleInputChange('cardNumber')}
-                  inputProps={{ inputMode: 'numeric' }}
-                  sx={textFieldSx}
-                />
-              </Box>
-
-              {/* Expiry + CVC */}
-              <Grid container spacing={2} sx={{ marginBottom: '48px' }}>
-                <Grid item xs={12} sm={4}>
-                  <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
-                    Expiry Month
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    variant="outlined"
-                    placeholder="MM"
-                    value={formData.expiryMonth}
-                    onChange={handleInputChange('expiryMonth')}
-                    inputProps={{ inputMode: 'numeric' }}
-                    sx={textFieldSx}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={4}>
-                  <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
-                    Expiry Year
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    variant="outlined"
-                    placeholder="YY"
-                    value={formData.expiryYear}
-                    onChange={handleInputChange('expiryYear')}
-                    inputProps={{ inputMode: 'numeric' }}
-                    sx={textFieldSx}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={4}>
-                  <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
-                    CVC
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    variant="outlined"
-                    placeholder="123"
-                    value={formData.cvc}
-                    onChange={handleInputChange('cvc')}
-                    inputProps={{ inputMode: 'numeric' }}
-                    sx={textFieldSx}
-                  />
-                </Grid>
-              </Grid>
-
-              {/* Form buttons */}
-              <Box sx={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '32px' }}>
-                <Button
-                  type="button"
-                  variant="outlined"
-                  onClick={() => setIsEditing(false)}
-                  sx={{
-                    borderColor: '#dddddd',
-                    color: 'black',
-                    padding: '16px 32px',
-                    borderRadius: '4px',
-                    fontFamily: 'Noto Sans',
-                    fontWeight: 'bold',
-                    fontSize: '16px',
-                    textTransform: 'none',
-                    minWidth: '190px',
-                    '&:hover': {
-                      borderColor: '#cccccc',
-                      backgroundColor: '#f5f5f5',
-                    },
-                  }}
-                >
-                  Cancel
-                </Button>
-
-                <Button
-                  type="submit"
-                  variant="contained"
-                  sx={{
-                    backgroundColor: 'black',
-                    color: 'white',
-                    padding: '16px 32px',
-                    borderRadius: '4px',
-                    fontFamily: 'Noto Sans',
-                    fontWeight: 'bold',
-                    fontSize: '16px',
-                    textTransform: 'none',
-                    minWidth: '190px',
-                    '&:hover': { backgroundColor: '#333' },
-                  }}
-                >
-                  Save
-                </Button>
-              </Box>
-            </Box>
+            <Elements stripe={stripePromise}>
+              <CardForm 
+                formData={formData} 
+                handleInputChange={handleInputChange} 
+                handleSubmit={handleSubmit} 
+                setIsEditing={setIsEditing} 
+              />
+            </Elements>
+          </>
+        )}
           </>
         )}
       </Container>
@@ -654,5 +589,104 @@ const textFieldSx = {
     },
   },
 } as const;
+
+const CardForm: React.FC<any> = ({ formData, handleInputChange, handleSubmit, setIsEditing }) => {
+  const stripe = useStripe();
+  const elements = useElements();
+
+  return (
+    <Box
+      component="form"
+      onSubmit={(e) => handleSubmit(e, stripe, elements)}
+      sx={{ maxWidth: '680px', margin: '0 auto' }}
+    >
+      <Box sx={{ marginBottom: '32px' }}>
+        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
+          Card Holder Name
+        </Typography>
+        <TextField
+          fullWidth
+          variant="outlined"
+          placeholder="ex: TARO YAMADA"
+          value={formData.cardHolderName}
+          onChange={handleInputChange('cardHolderName')}
+          sx={textFieldSx}
+        />
+      </Box>
+
+      <Box sx={{ marginBottom: '32px' }}>
+        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
+          Secure Stripe Details (Card Number, Expiry, CVC)
+        </Typography>
+        <Box sx={{
+          padding: '16px',
+          border: '1px solid #ddd',
+          borderRadius: '4px',
+          backgroundColor: '#fafafa'
+        }}>
+          <CardElement options={{
+            style: {
+              base: {
+                fontSize: '16px',
+                color: '#424770',
+                '::placeholder': {
+                  color: '#aab7c4',
+                },
+              },
+              invalid: {
+                color: '#9e2146',
+              },
+            },
+          }} />
+        </Box>
+      </Box>
+
+      <Box sx={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '32px' }}>
+        <Button
+          type="button"
+          variant="outlined"
+          onClick={() => setIsEditing(false)}
+          sx={{
+            borderColor: '#dddddd',
+            color: 'black',
+            padding: '16px 32px',
+            borderRadius: '4px',
+            fontFamily: 'Noto Sans',
+            fontWeight: 'bold',
+            fontSize: '16px',
+            textTransform: 'none',
+            minWidth: '190px',
+            '&:hover': {
+              borderColor: '#cccccc',
+              backgroundColor: '#f5f5f5',
+            },
+          }}
+        >
+          Cancel
+        </Button>
+
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={!stripe}
+          sx={{
+            backgroundColor: 'black',
+            color: 'white',
+            padding: '16px 32px',
+            borderRadius: '4px',
+            fontFamily: 'Noto Sans',
+            fontWeight: 'bold',
+            fontSize: '16px',
+            textTransform: 'none',
+            minWidth: '190px',
+            '&:hover': { backgroundColor: '#333' },
+          }}
+        >
+          Save
+        </Button>
+      </Box>
+    </Box>
+  );
+};
 
 export default CreditCardSettings;

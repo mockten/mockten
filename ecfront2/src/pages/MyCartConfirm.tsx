@@ -1,5 +1,6 @@
-import React from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import apiClient from '../module/apiClient';
 import {
   Box,
   Container,
@@ -26,69 +27,38 @@ interface CartItem {
 
 const MyCartConfirm: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Mock data - replace with actual API calls
-  const shippingAddress = {
-    name: 'Taro Yamada',
-    postalCode: '1530064',
-    address: '103, Hikari Building, 5-3-11 Nakamachi, Shibuya-ku, Tokyo',
-  };
-
-  const dubbingDateTime = {
-    date: 'April 1, 2023',
-    timeSlot: '19:00〜21:00',
-  };
+  // Retrieve state passed from checkout page. Fallbacks provided for safety.
+  const { 
+    shippingAddress = {}, 
+    selectedDate = '', 
+    selectedTime = '', 
+    cartItems = [], 
+    orderSummary = { subtotal: 0, shipping: 0, total: 0 },
+    selectedCardId = ''
+  } = location.state || {};
 
   const cancelPolicy = `Returns and Exchanges for Initial Defects We do not accept returns except in cases where there is a defect on our part. In the unlikely event of a defective product, please contact us by e-mail within 7 days of receipt of the product. If the initial defect is confirmed, we will contact you back with return shipping instructions. We will bear the shipping costs.`;
 
-  const cartItems: CartItem[] = [
-    {
-      id: 1,
-      name: 'Sample',
-      description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
-      quantity: 1,
-      image: photoSvg,
-    },
-    {
-      id: 2,
-      name: 'Sample',
-      description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
-      quantity: 1,
-      image: photoSvg,
-    },
-    {
-      id: 3,
-      name: 'Sample',
-      description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
-      quantity: 1,
-      image: photoSvg,
-    },
-    {
-      id: 4,
-      name: 'Sample',
-      description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
-      quantity: 1,
-      image: photoSvg,
-    },
-    {
-      id: 5,
-      name: 'Sample',
-      description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
-      quantity: 1,
-      image: photoSvg,
-    },
-  ];
-
-  const orderSummary = {
-    subtotal: 18200,
-    shipping: 1820,
-    total: 20020,
-  };
-
-  const handlePlaceOrder = () => {
-    // TODO: Implement order placement logic
-    console.log('Place order clicked');
-    navigate('/cart/complete');
+  const handlePlaceOrder = async () => {
+    if (!selectedCardId) {
+      alert("No payment method selected.");
+      return;
+    }
+    try {
+      const res = await apiClient.post('/api/payment', {
+        payment_method_id: selectedCardId,
+        amount: Math.round(orderSummary.total),
+      });
+      if (res.status === 200) {
+        console.log('Payment successful:', res.data);
+        navigate('/cart/complete', { state: { paymentId: res.data.payment_id } });
+      }
+    } catch (e) {
+      console.error('Payment failed', e);
+      alert('Payment failed. Please try again.');
+    }
   };
 
   const SectionTitle: React.FC<{ title: string }> = ({ title }) => (
@@ -158,7 +128,7 @@ const MyCartConfirm: React.FC = () => {
                 marginBottom: '16px',
               }}
             >
-              {shippingAddress.name}
+              {shippingAddress.user_name || shippingAddress.name || 'Sample Name'}
             </Typography>
             <Typography
               sx={{
@@ -169,12 +139,12 @@ const MyCartConfirm: React.FC = () => {
                 lineHeight: 1.8,
               }}
             >
-              {shippingAddress.postalCode}<br />
-              {shippingAddress.address}
+              {shippingAddress.postal_code || shippingAddress.postalCode || '000-0000'}<br />
+              {[shippingAddress.prefecture, shippingAddress.city, shippingAddress.town, shippingAddress.building_name, shippingAddress.room_number].filter(Boolean).join(' ') || shippingAddress.address || 'Sample Address'}
             </Typography>
 
             {/* Date and Time of Dubbing */}
-            <SectionTitle title="Date and Time of Dubbing" />
+            <SectionTitle title="Delivery Date and Time" />
             <Paper
               variant="outlined"
               sx={{
@@ -192,8 +162,8 @@ const MyCartConfirm: React.FC = () => {
                   lineHeight: 1.8,
                 }}
               >
-                {dubbingDateTime.date}<br />
-                {dubbingDateTime.timeSlot}
+                {selectedDate || 'April 1, 2023'}<br />
+                {selectedTime || '19:00〜21:00'}
               </Typography>
             </Paper>
 
@@ -246,9 +216,9 @@ const MyCartConfirm: React.FC = () => {
             {/* Item List */}
             <SectionTitle title="Item List" />
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {cartItems.map((item) => (
+              {cartItems.length > 0 ? cartItems.map((item: any) => (
                 <Box
-                  key={item.id}
+                  key={item.id || Math.random()}
                   sx={{
                     display: 'flex',
                     alignItems: 'flex-start',
@@ -269,7 +239,12 @@ const MyCartConfirm: React.FC = () => {
                       flexShrink: 0,
                     }}
                   >
-                    <img src={item.image} alt={item.name} style={{ width: '64px', height: '64px' }} />
+                    <img 
+                      src={item.image || photoSvg} 
+                      alt={item.name} 
+                      style={{ width: '64px', height: '64px', objectFit: 'contain' }}
+                      onError={(e) => { e.currentTarget.src = photoSvg; }}
+                    />
                   </Box>
 
                   {/* Product Details */}
@@ -284,7 +259,7 @@ const MyCartConfirm: React.FC = () => {
                         marginBottom: '8px',
                       }}
                     >
-                      {item.name}
+                      {item.name || 'Sample Item'}
                     </Typography>
                     <Typography
                       sx={{
@@ -295,7 +270,7 @@ const MyCartConfirm: React.FC = () => {
                         marginBottom: '8px',
                       }}
                     >
-                      {item.description}
+                      {item.description || ''}
                     </Typography>
                     <Typography
                       sx={{
@@ -304,11 +279,24 @@ const MyCartConfirm: React.FC = () => {
                         color: '#666666',
                       }}
                     >
-                      Quantity：{item.quantity}
+                      Quantity：{item.quantity || 1}
                     </Typography>
+                    {item.shipping_type && (
+                       <Typography
+                       sx={{
+                         fontFamily: 'Noto Sans',
+                         fontSize: '16px',
+                         color: '#666666',
+                       }}
+                     >
+                       Shipping：{item.shipping_type}
+                     </Typography>
+                    )}
                   </Box>
                 </Box>
-              ))}
+              )) : (
+                <Typography>No items in the order.</Typography>
+              )}
             </Box>
           </Grid>
 

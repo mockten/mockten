@@ -261,3 +261,18 @@ services:
         methods:
           - GET
           - PUT
+
+  - name: ecpay-service
+    url: http://ecpay-service.default.svc.cluster.local:8080
+    routes:
+      - name: ecpay-service-route
+        paths:
+          - /api/payment-method
+          - /api/payment
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
