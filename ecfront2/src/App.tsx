@@ -1,6 +1,12 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import TermsPage from './pages/TermsPage';
+import CancellationPolicyPage from './pages/CancellationPolicy';
+import AboutUsPage from './pages/AboutUsPages';
+import CareerPage from './pages/CareerPage';
+import ContactUsPage from './pages/ContactUsPage';
+import IRPage from './pages/IRPage';
+import UserGuidePage from './pages/UserGuidePage';
 import Dashboard from './pages/Dashboard';
 import SearchResultDashboard from './pages/SearchResultDashboard';
 import UserLogin from './pages/UserLogin';
@@ -37,6 +43,12 @@ const App: React.FC = () => {
       <Router>
         <Routes>
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="/cancellation-policy" element={<CancellationPolicyPage />} />
+          <Route path="/about-us" element={<AboutUsPage />} />
+          <Route path="/career" element={<CareerPage />} />
+          <Route path="/contact-us" element={<ContactUsPage />} />
+          <Route path="/ir" element={<IRPage />} />
+          <Route path="/user-guide" element={<UserGuidePage />} />
           <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/search" element={<PrivateRoute><SearchResultDashboard /></PrivateRoute>} />
           <Route path="/user/login" element={<UserLogin />} />

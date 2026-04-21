@@ -1,6 +1,5 @@
-import React, { useState, useEffect, FormEvent } from 'react';
+import React, { useState, useEffect } from 'react';
 // Login API (returns both tokens)
-import { login } from '../module/login';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../Auth';
 import googleIcon from '../assets/google.png';
@@ -10,49 +9,18 @@ import mocktenIcon from '../assets/mockten.png';
 import {
   Box,
   Container,
-  TextField,
   Button,
   Typography,
-  Checkbox,
-  FormControlLabel,
-  Divider,
   Paper,
-  IconButton,
-  InputAdornment,
 } from '@mui/material';
-import { Visibility, VisibilityOff, Email, Lock } from '@mui/icons-material';
 
 const REDIRECT_URI = `${window.location.origin}/user/login`;
 
 const UserLoginNew: React.FC = () => {
-  const [userID, setUserID] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
   const auth = useAuth();
   const [codeProcessed, setCodeProcessed] = useState(false);
 
-  const handleLogin = async (e: FormEvent) => {
-    e.preventDefault();
-    try {
-      // 1. Get both tokens from the API
-      const { token, refreshToken } = await login(userID, password);
-
-      const decodedToken = JSON.parse(atob(token.split('.')[1]));
-      const roles = decodedToken.roles || [];
-      if (!roles.includes('customer')) {
-        throw new Error('You are not authorized as a customer');
-      }
-
-      // 2. Pass BOTH tokens to Auth Context to save them
-      auth.login(token, refreshToken);
-
-      navigate('/');
-    } catch (error) {
-      alert(error instanceof Error ? error.message : 'Login failed');
-    }
-  };
 
   const handleSignUp = () => {
     navigate('/user/signup');

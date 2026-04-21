@@ -42,7 +42,7 @@ const Footer: React.FC<FooterProps> = ({
           >
             MOCKTEN
           </Typography>
-          
+
           <Grid container spacing={3}>
             {footerLinks.map((link, index) => (
               <Grid item xs={12} sm={6} md={4} key={index}>
@@ -59,6 +59,19 @@ const Footer: React.FC<FooterProps> = ({
                     '&:hover': {
                       backgroundColor: 'transparent',
                     },
+                  }}
+                  onClick={() => {
+                    if (link === 'About us') {
+                      window.location.href = '/about-us';
+                    } else if (link === 'CAREERS') {
+                      window.location.href = '/career';
+                    } else if (link === 'user guide') {
+                      window.location.href = '/user-guide';
+                    } else if (link === 'IR') {
+                      window.location.href = '/ir';
+                    } else if (link === 'COntact us') {
+                      window.location.href = '/contact-us';
+                    }
                   }}
                 >
                   <Typography
@@ -78,7 +91,7 @@ const Footer: React.FC<FooterProps> = ({
           </Grid>
         </Box>
       </Container>
-      
+
       <Box
         sx={{
           backgroundColor: 'black',

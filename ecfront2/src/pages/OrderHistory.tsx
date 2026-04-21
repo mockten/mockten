@@ -13,6 +13,9 @@ import {
   Inventory,
   LocalShipping,
   Home,
+  Star,
+  StarHalf,
+  StarBorder,
 } from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
@@ -112,26 +115,29 @@ const OrderHistoryNew: React.FC = () => {
     },
   ];
 
+
   const renderStars = (rating: number) => {
     const stars = [];
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 !== 0;
 
     for (let i = 0; i < fullStars; i++) {
-      stars.push(<Box key={i} sx={{ width: '16px', height: '16px', backgroundColor: '#ffc107', borderRadius: '50%' }} />);
+      stars.push(<Star key={i} sx={{ color: '#ffc107', fontSize: '16px' }} />);
     }
 
     if (hasHalfStar) {
-      stars.push(<Box key="half" sx={{ width: '16px', height: '16px', backgroundColor: '#ffc107', borderRadius: '50%', opacity: 0.5 }} />);
+      stars.push(<StarHalf key="half" sx={{ color: '#ffc107', fontSize: '16px' }} />);
     }
 
     const emptyStars = 5 - Math.ceil(rating);
     for (let i = 0; i < emptyStars; i++) {
-      stars.push(<Box key={`empty-${i}`} sx={{ width: '16px', height: '16px', backgroundColor: '#ddd', borderRadius: '50%' }} />);
+      stars.push(<StarBorder key={`empty-${i}`} sx={{ color: '#ffc107', fontSize: '16px' }} />);
     }
 
     return stars;
   };
+
+
 
   const getStatusProgress = (status: Order['status']) => {
     switch (status) {
@@ -147,7 +153,7 @@ const OrderHistoryNew: React.FC = () => {
   };
 
   return (
-    <Box sx={{  width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
+    <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       {/* App Bar */}
       <Appbar />
 
@@ -332,7 +338,7 @@ const OrderHistoryNew: React.FC = () => {
                       boxShadow: 3,
                     },
                   }}
-                  onClick={() => navigate(`/item-new/${product.id}`)}
+                  onClick={() => navigate(`/item/${product.id}`)}
                 >
                   <Box
                     sx={{
