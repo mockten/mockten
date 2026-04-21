@@ -11,7 +11,7 @@ please do not use the service.`,
     },
     {
         title: '2. Account Registration',
-        body: `You may need to sign in using a supported third-party authentication provider such as
+        body: `You need to sign in using a supported third-party authentication provider such as
 Google or Facebook. You are responsible for maintaining the security of your account
 and for any activity conducted through it.`,
     },
