@@ -38,7 +38,7 @@ const UserLoginNew: React.FC = () => {
     try {
       // 1. Get both tokens from the API
       const { token, refreshToken } = await login(userID, password);
-      
+
       const decodedToken = JSON.parse(atob(token.split('.')[1]));
       const roles = decodedToken.roles || [];
       if (!roles.includes('customer')) {
@@ -47,7 +47,7 @@ const UserLoginNew: React.FC = () => {
 
       // 2. Pass BOTH tokens to Auth Context to save them
       auth.login(token, refreshToken);
-      
+
       navigate('/');
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Login failed');
@@ -104,14 +104,14 @@ const UserLoginNew: React.FC = () => {
         );
         const data = await res.json();
         if (!res.ok) throw new Error(data.error_description || 'Token exchange failed');
-        
+
         // Extract both tokens from social login response
         const accessToken = data.access_token;
         const refreshToken = data.refresh_token;
 
         // Pass BOTH to Auth Context
         auth.login(accessToken, refreshToken);
-        
+
         navigate('/');
       } catch (err: any) {
         alert(err?.message || 'Google login failed');
@@ -131,27 +131,6 @@ const UserLoginNew: React.FC = () => {
         padding: '12px',
       }}
     >
-      {/* Mockten Icon */}
-      <Box
-        sx={{
-          position: 'absolute',
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 0,
-        }}
-      >
-        <img
-          src={mocktenIcon}
-          alt="Mockten Logo"
-          style={{
-            width: '400px',
-            height: '400px',
-            objectFit: 'cover',
-            opacity: 0.1,
-          }}
-        />
-      </Box>
 
       {/* Login Form Container */}
       <Paper
@@ -165,290 +144,152 @@ const UserLoginNew: React.FC = () => {
           boxShadow: '0px 0px 4px 0px rgba(0,0,0,0.08)',
           position: 'relative',
           zIndex: 1,
+          display: 'flex',
         }}
       >
-        <Container maxWidth={false} sx={{ padding: '28px' }}>
-          {/* Welcome Header */}
-          <Box sx={{ marginBottom: '28px' }}>
-            <Typography
-              variant="h3"
-              sx={{
-                fontFamily: 'Poppins',
-                fontWeight: 500,
-                fontSize: '36px',
-                color: '#2F2F2F',
-                marginBottom: 0,
-                lineHeight: 1.355,
-              }}
-            >
-              Welcome to{' '}
+        <Container
+          maxWidth={false}
+          sx={{
+            padding: '28px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            width: '100%',
+          }}
+        >
+          {/* Center Area */}
+          <Box
+            sx={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+            }}
+          >
+            {/* Welcome Header */}
+            <Box sx={{ marginBottom: '32px', textAlign: 'center' }}>
               <Typography
-                component="span"
+                variant="h3"
                 sx={{
                   fontFamily: 'Poppins',
-                  fontWeight: 900,
-                  fontSize: '46px',
-                  color: '#6358DC',
+                  fontWeight: 500,
+                  fontSize: '36px',
+                  color: '#2F2F2F',
                   lineHeight: 1.355,
                 }}
               >
-                Mockten
+                Welcome to{' '}
+                <Typography
+                  component="span"
+                  sx={{
+                    fontFamily: 'Poppins',
+                    fontWeight: 900,
+                    fontSize: '46px',
+                    color: '#6358DC',
+                    lineHeight: 1.355,
+                  }}
+                >
+                  Mockten
+                </Typography>
               </Typography>
-            </Typography>
-          </Box>
-
-          {/* Social Login Buttons */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '28px', marginBottom: '28px' }}>
-            {/* Google Login */}
-            <Button
-              variant="outlined"
-              onClick={() => startGoogleAuth('login')}
-              sx={{
-                height: '82px',
-                width: '681px',
-                backgroundColor: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.11)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '16px',
-                textTransform: 'none',
-                '&:hover': {
-                  backgroundColor: '#f5f5f5',
-                  boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.15)',
-                },
-              }}
-            >
-              <img src={googleIcon} alt="Google" style={{ width: '32px', height: '32px' }} />
-              <Typography
-                sx={{
-                  fontFamily: 'Poppins',
-                  fontWeight: 400,
-                  fontSize: '16px',
-                  color: '#2F2F2F',
-                }}
-              >
-                Login with Google
-              </Typography>
-            </Button>
-
-            {/* Facebook Login */}
-            <Button
-              variant="outlined"
-              onClick={() => startFacebookAuth('login')}
-              sx={{
-                height: '82px',
-                width: '681px',
-                backgroundColor: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.11)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '16px',
-                textTransform: 'none',
-                '&:hover': {
-                  backgroundColor: '#f5f5f5',
-                  boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.15)',
-                },
-              }}
-            >
-              <img src={facebookIcon} alt="Facebook" style={{ width: '34px', height: '34px' }} />
-              <Typography
-                sx={{
-                  fontFamily: 'Poppins',
-                  fontWeight: 400,
-                  fontSize: '16px',
-                  color: '#2F2F2F',
-                }}
-              >
-                Login with Facebook
-              </Typography>
-            </Button>
-          </Box>
-
-          {/* OR Divider */}
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '35px',
-              marginBottom: '28px',
-              padding: '24px 28px',
-            }}
-          >
-            <Divider sx={{ flex: 1, borderColor: '#D9D9D9' }} />
-            <Typography
-              sx={{
-                fontFamily: 'Poppins',
-                fontWeight: 400,
-                fontSize: '16px',
-                color: '#2F2F2F',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              OR
-            </Typography>
-            <Divider sx={{ flex: 1, borderColor: '#D9D9D9' }} />
-          </Box>
-
-          {/* Email and Password Form */}
-          <Box component="form" onSubmit={handleLogin} sx={{ marginBottom: '28px' }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px 32px' }}>
-              {/* Email Field */}
-              <Box
-                sx={{
-                  backgroundColor: '#ECECEC',
-                  borderRadius: '10px',
-                  padding: '16px 32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px',
-                }}
-              >
-                <Email sx={{ color: '#2F2F2F', width: '30px', height: '25px' }} />
-                <Box sx={{ flexGrow: 1 }}>
-                  <Typography
-                    sx={{
-                      fontFamily: 'Poppins',
-                      fontWeight: 400,
-                      fontSize: '12px',
-                      color: '#2F2F2F',
-                      marginBottom: '12px',
-                    }}
-                  >
-                    Email
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    variant="standard"
-                    placeholder="example@gmail.com"
-                    value={userID}
-                    onChange={(e) => setUserID(e.target.value)}
-                    InputProps={{
-                      disableUnderline: true,
-                      sx: {
-                        fontFamily: 'Poppins',
-                        fontWeight: 700,
-                        fontSize: '16px',
-                        color: '#2F2F2F',
-                      },
-                    }}
-                  />
-                </Box>
-              </Box>
-
-              {/* Password Field */}
-              <Box
-                sx={{
-                  backgroundColor: '#ECECEC',
-                  borderRadius: '10px',
-                  padding: '16px 32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px',
-                }}
-              >
-                <Lock sx={{ color: '#2F2F2F', width: '27px', height: '27px' }} />
-                <Box sx={{ flexGrow: 1 }}>
-                  <Typography
-                    sx={{
-                      fontFamily: 'Poppins',
-                      fontWeight: 400,
-                      fontSize: '12px',
-                      color: '#2F2F2F',
-                      marginBottom: '12px',
-                    }}
-                  >
-                    Password
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    variant="standard"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="***********"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    InputProps={{
-                      disableUnderline: true,
-                      sx: {
-                        fontFamily: 'Poppins',
-                        fontWeight: 700,
-                        fontSize: '16px',
-                        color: '#2F2F2F',
-                      },
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton
-                            onClick={() => setShowPassword(!showPassword)}
-                            edge="end"
-                            sx={{ color: '#2F2F2F' }}
-                          >
-                            {showPassword ? <VisibilityOff /> : <Visibility />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                </Box>
-              </Box>
             </Box>
 
-            {/* Remember Me */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '0 32px', marginBottom: '28px' }}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    sx={{
-                      color: '#D9D9D9',
-                      '&.Mui-checked': {
-                        color: '#6358DC',
-                      },
-                    }}
-                  />
-                }
-                label={
-                  <Typography
-                    sx={{
-                      fontFamily: 'Poppins',
-                      fontWeight: 400,
-                      fontSize: '16px',
-                      color: '#2F2F2F',
-                    }}
-                  >
-                    Remember me
-                  </Typography>
-                }
-                sx={{ margin: 0 }}
+            {/* Product Icon */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                marginBottom: '40px',
+              }}
+            >
+              <Box
+                component="img"
+                src={mocktenIcon}
+                alt="Mockten Logo"
+                sx={{
+                  width: '140px',
+                  height: '140px',
+                  objectFit: 'contain',
+                  opacity: 1,
+                }}
               />
             </Box>
 
-            {/* Login Button */}
-            <Box sx={{ padding: '16px 32px' }}>
+            {/* Social Login Buttons */}
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '28px',
+                alignItems: 'center',
+              }}
+            >
               <Button
-                type="submit"
-                fullWidth
+                variant="outlined"
+                onClick={() => startGoogleAuth('login')}
                 sx={{
-                  height: '54px',
-                  backgroundColor: '#6358DC',
+                  height: '82px',
+                  width: '681px',
+                  backgroundColor: 'white',
+                  border: 'none',
                   borderRadius: '8px',
-                  fontFamily: 'Poppins',
-                  fontWeight: 600,
-                  fontSize: '16px',
-                  color: 'white',
+                  boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.11)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '16px',
                   textTransform: 'none',
                   '&:hover': {
-                    backgroundColor: '#5a4bc7',
+                    backgroundColor: '#f5f5f5',
+                    boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.15)',
                   },
                 }}
               >
-                Login
+                <img src={googleIcon} alt="Google" style={{ width: '32px', height: '32px' }} />
+                <Typography
+                  sx={{
+                    fontFamily: 'Poppins',
+                    fontWeight: 400,
+                    fontSize: '16px',
+                    color: '#2F2F2F',
+                  }}
+                >
+                  Login with Google
+                </Typography>
+              </Button>
+
+              <Button
+                variant="outlined"
+                onClick={() => startFacebookAuth('login')}
+                sx={{
+                  height: '82px',
+                  width: '681px',
+                  backgroundColor: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.11)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '16px',
+                  textTransform: 'none',
+                  '&:hover': {
+                    backgroundColor: '#f5f5f5',
+                    boxShadow: '0px 4px 15px 0px rgba(0,0,0,0.15)',
+                  },
+                }}
+              >
+                <img src={facebookIcon} alt="Facebook" style={{ width: '34px', height: '34px' }} />
+                <Typography
+                  sx={{
+                    fontFamily: 'Poppins',
+                    fontWeight: 400,
+                    fontSize: '16px',
+                    color: '#2F2F2F',
+                  }}
+                >
+                  Login with Facebook
+                </Typography>
               </Button>
             </Box>
           </Box>
@@ -458,24 +299,11 @@ const UserLoginNew: React.FC = () => {
             sx={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'center',
               padding: '0 32px',
+              pt: 4,
             }}
           >
-            <Typography
-              sx={{
-                fontFamily: 'Poppins',
-                fontWeight: 400,
-                fontSize: '16px',
-                color: '#6358DC',
-                cursor: 'pointer',
-                '&:hover': {
-                  textDecoration: 'underline',
-                },
-              }}
-            >
-              Forgot Password?
-            </Typography>
             <Typography
               sx={{
                 fontFamily: 'Poppins',
