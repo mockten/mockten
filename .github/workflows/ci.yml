@@ -59,21 +59,17 @@ jobs:
         working-directory: ecfront2
     steps:
       - uses: actions/checkout@v3
-
+  
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18.x'
-
-      - name: Clear npm cache
-        run: npm cache clean --force
-
-      - name: Remove package-lock and node_modules
-        run: rm -rf package-lock.json node_modules
-
-      - name: Install dependencies
-        run: npm install
-
+  
+      - name: Clean install dependencies
+        run: |
+          rm -rf package-lock.json node_modules
+          npm ci
+  
       - name: Build TypeScript
         run: npm run build:dev
 
