@@ -10,7 +10,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Button from '@mui/material/Button';
 
-const stripePromise = loadStripe('pk_test_j5fvxJmoN3TlTaNTgcATv0W000HRwOI317');
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
 
 const CheckoutForm = () => {
   const stripe = useStripe();

@@ -290,6 +290,9 @@ func (s *server) CreateTransaction(ctx context.Context, in *pb.RegisterRequest) 
 func main() {
 	// exec node-export service
 	go exportMetrics()
+
+	// exec HTTP server for payment REST endpoints
+	go startHttpServer()
 	// Gin setting
 	lis, err := net.Listen("tcp", Port)
 	if err != nil {

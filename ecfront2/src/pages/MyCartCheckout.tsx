@@ -74,7 +74,8 @@ const MyCartCheckout: React.FC = () => {
 
   const [selectedTime, setSelectedTime] = useState('10:00〜12:00');
   const [paymentMethod, setPaymentMethod] = useState('credit-card');
-  const [selectedCard, setSelectedCard] = useState('************1234');
+  const [savedCards, setSavedCards] = useState<any[]>([]);
+  const [selectedCardId, setSelectedCardId] = useState('');
   const [securityCode, setSecurityCode] = useState('');
 
   const [addresses, setAddresses] = useState<GeoAddress[]>([]);
@@ -206,10 +207,20 @@ const MyCartCheckout: React.FC = () => {
     total: subtotal + dynamicShippingFee,
   };
 
-  const savedCards = [
-    '************1234',
-    '************5678',
-  ];
+  useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      try {
+        const res = await apiClient.get('/api/payment-method');
+        if (res.data && res.data.length > 0) {
+          setSavedCards(res.data);
+          setSelectedCardId(res.data[0].id);
+        }
+      } catch (e) {
+        console.error('Failed to fetch payment methods', e);
+      }
+    };
+    fetchPaymentMethods();
+  }, []);
 
   const handleDateChange = (event: SelectChangeEvent) => {
     setSelectedDate(event.target.value);
@@ -224,13 +235,25 @@ const MyCartCheckout: React.FC = () => {
   };
 
   const handleCardChange = (event: SelectChangeEvent) => {
-    setSelectedCard(event.target.value);
+    setSelectedCardId(event.target.value);
   };
 
   const handleConfirmOrder = () => {
-    // TODO: Implement order confirmation logic
-    console.log('Confirm order clicked');
-    navigate('/cart/confirm');
+    if (!selectedCardId) {
+      alert("Please select a registered credit card.");
+      return;
+    }
+    
+    navigate('/cart/confirm', {
+      state: {
+        shippingAddress,
+        selectedDate,
+        selectedTime,
+        cartItems: items,
+        orderSummary,
+        selectedCardId
+      }
+    });
   };
 
   const handleBackToCart = () => {
@@ -553,7 +576,7 @@ const MyCartCheckout: React.FC = () => {
                 }}
               >
                 <Select
-                  value={selectedCard}
+                  value={selectedCardId}
                   onChange={handleCardChange}
                   displayEmpty
                   IconComponent={ArrowDropDown}
@@ -563,11 +586,13 @@ const MyCartCheckout: React.FC = () => {
                     color: 'black',
                   }}
                 >
-                  {savedCards.map((card) => (
-                    <MenuItem key={card} value={card}>
-                      {card}
+                  {savedCards.length > 0 ? savedCards.map((card) => (
+                    <MenuItem key={card.id} value={card.id}>
+                      {card.brand} •••• {card.last4}
                     </MenuItem>
-                  ))}
+                  )) : (
+                     <MenuItem value="" disabled>No saved cards</MenuItem>
+                  )}
                 </Select>
               </FormControl>
               <Box sx={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '32px' }}>

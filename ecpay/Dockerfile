@@ -1,4 +1,4 @@
-FROM golang:1.20.1 as builder
+FROM golang:1.25 AS builder
 
 RUN apt-get update &&\
     apt-get -y install sysv-rc-conf &&\
@@ -9,8 +9,11 @@ RUN apt-get update &&\
 RUN mkdir -p /go/src/ecpay
 WORKDIR /go/src/ecpay
 COPY . .
-RUN go build .
-
+RUN go get github.com/gin-contrib/cors && \
+    go get github.com/gin-gonic/gin && \
+    go get github.com/stripe/stripe-go/v74 && \
+    go mod tidy && \
+    go build .
 FROM alpine:3
 RUN apk add --no-cache ca-certificates &&\
     apk add gcompat &&\

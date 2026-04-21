@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -29,9 +29,8 @@ interface RecommendedProduct {
 
 const MyCartOrderComplete: React.FC = () => {
   const navigate = useNavigate();
-
-  // Mock data - replace with actual API calls
-  const purchaseId = '000-000-000';
+  const location = useLocation();
+  const purchaseId = location.state?.paymentId || '000-000-000';
 
   const recommendedProducts: RecommendedProduct[] = [
     {

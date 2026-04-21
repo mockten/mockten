@@ -1,14 +1,14 @@
-go 1.23.2
+go 1.25.0
 
 use (
+	./adder
 	./cart
 	./common
-	./product
-	./adder
 	./ecpay
-	./notification
-	./searchitem
-	./payexecution
-	./ranking
 	./geocoding
+	./notification
+	./payexecution
+	./product
+	./ranking
+	./searchitem
 )
