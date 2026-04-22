@@ -454,6 +454,8 @@ const SearchResultNew: React.FC = () => {
             backgroundColor: '#f5f5f5',
             minHeight: 'calc(100vh - 72px)',
             padding: '16px',
+            marginTop: '16px',
+            marginBottom: '16px',
             borderRight: '1px solid #dddddd',
           }}
         >
@@ -464,7 +466,7 @@ const SearchResultNew: React.FC = () => {
                 fontWeight: 'bold',
                 fontSize: '16px',
                 color: 'black',
-                marginBottom: '16px',
+                marginBottom: '24px',
                 paddingLeft: '20px',
               }}
             >

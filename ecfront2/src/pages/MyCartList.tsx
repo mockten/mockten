@@ -529,7 +529,7 @@ const CartListNew: React.FC = () => {
               </Button>
 
               {/* Cancellation Policy */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => navigate('/cancellation-policy')}>
                 <Typography
                   sx={{
                     fontFamily: 'Noto Sans',

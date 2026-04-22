@@ -14,13 +14,13 @@ import {
   Star,
   StarHalf,
   StarBorder,
+  Close,
 } from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 
 // Sample photo icon when a customer does not set prodct image.
 import photoSvg from "../assets/photo.svg";
-import closeIcon from "../assets/close.png";
 
 interface FavoriteItem {
   id: number;
@@ -155,7 +155,7 @@ const FavoritesListNew: React.FC = () => {
   };
 
   return (
-    <Box sx={{  width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
+    <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       {/* App Bar */}
       <Appbar />
 
@@ -198,7 +198,7 @@ const FavoritesListNew: React.FC = () => {
         <Box sx={{ marginBottom: '64px' }}>
           {favoriteItems.length > 0 ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-              {favoriteItems.map((item, index) => (
+              {favoriteItems.map((item) => (
                 <Box
                   key={item.id}
                   sx={{
@@ -227,7 +227,7 @@ const FavoritesListNew: React.FC = () => {
                       },
                     }}
                   >
-                    <img src={closeIcon} alt="Remove" style={{ width: '16px', height: '16px' }} />
+                    <Close sx={{ width: '16px', height: '16px' }} />
                   </IconButton>
 
                   {/* Product Image */}
@@ -281,34 +281,32 @@ const FavoritesListNew: React.FC = () => {
                       Quantity: {item.quantity}
                     </Typography>
                   </Box>
-
-                  {/* Remove All Button (only show on first item) */}
-                  {index === 0 && (
-                    <Box sx={{ marginTop: '16px' }}>
-                      <Button
-                        variant="contained"
-                        onClick={handleRemoveAll}
-                        sx={{
-                          backgroundColor: 'black',
-                          color: 'white',
-                          padding: '16px 32px',
-                          borderRadius: '4px',
-                          fontFamily: 'Noto Sans',
-                          fontWeight: 'bold',
-                          fontSize: '16px',
-                          textTransform: 'none',
-                          minWidth: '384px',
-                          '&:hover': {
-                            backgroundColor: '#333',
-                          },
-                        }}
-                      >
-                        Remove All
-                      </Button>
-                    </Box>
-                  )}
                 </Box>
               ))}
+
+              {/* Remove All Button */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', marginTop: '8px' }}>
+                <Button
+                  variant="contained"
+                  onClick={handleRemoveAll}
+                  sx={{
+                    backgroundColor: 'black',
+                    color: 'white',
+                    padding: '16px 32px',
+                    borderRadius: '4px',
+                    fontFamily: 'Noto Sans',
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                    textTransform: 'none',
+                    minWidth: '384px',
+                    '&:hover': {
+                      backgroundColor: '#333',
+                    },
+                  }}
+                >
+                  Remove All
+                </Button>
+              </Box>
             </Box>
           ) : (
             <Box

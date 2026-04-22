@@ -1,5 +1,12 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import TermsPage from './pages/TermsPage';
+import CancellationPolicyPage from './pages/CancellationPolicy';
+import AboutUsPage from './pages/AboutUsPages';
+import CareerPage from './pages/CareerPage';
+import ContactUsPage from './pages/ContactUsPage';
+import IRPage from './pages/IRPage';
+import UserGuidePage from './pages/UserGuidePage';
 import Dashboard from './pages/Dashboard';
 import SearchResultDashboard from './pages/SearchResultDashboard';
 import UserLogin from './pages/UserLogin';
@@ -9,8 +16,9 @@ import AddressSettings from './pages/AddressesSettings';
 import CreditCardSettings from './pages/CreditCardSettings';
 import ItemDetail from './pages/ItemDetail';
 import ItemReview from './pages/ItemReview';
-import SellerDashboard from './pages/seller/SellerDashboard';
-import SellerLoginPage from './pages/seller/SellerLogin';
+import { SellerLoginPage } from './pages/seller/src/components/SellerLoginPage';
+import { SellerPortal } from './pages/seller/src/components/SellerPortal';
+import { SellerSignUpPage } from './pages/seller/src/components/SellerSignUpPage';
 import MyCartList from './pages/MyCartList';
 import MyCartCheckout from './pages/MyCartCheckout';
 import MyCartConfirm from './pages/MyCartConfirm';
@@ -34,6 +42,13 @@ const App: React.FC = () => {
     <AuthProvider>
       <Router>
         <Routes>
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/cancellation-policy" element={<CancellationPolicyPage />} />
+          <Route path="/about-us" element={<AboutUsPage />} />
+          <Route path="/career" element={<CareerPage />} />
+          <Route path="/contact-us" element={<ContactUsPage />} />
+          <Route path="/ir" element={<IRPage />} />
+          <Route path="/user-guide" element={<UserGuidePage />} />
           <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/search" element={<PrivateRoute><SearchResultDashboard /></PrivateRoute>} />
           <Route path="/user/login" element={<UserLogin />} />
@@ -49,8 +64,10 @@ const App: React.FC = () => {
           <Route path="/cart/complete" element={<PrivateRoute><MyCartOrderComplete /></PrivateRoute>} />
           <Route path="/fav/list" element={<PrivateRoute><MyFavoriteList /></PrivateRoute>} />
           <Route path="/order-history" element={<PrivateRoute><OrderHistory /></PrivateRoute>} />
-          <Route path="/seller/login" element={<PrivateRoute><SellerLoginPage /></PrivateRoute>} />
-          <Route path="/seller/:id" element={<PrivateRoute><SellerDashboard /></PrivateRoute>} />
+
+          <Route path="/seller/login" element={<SellerLoginPage />} />
+          <Route path="/seller/signup" element={<SellerSignUpPage />} />
+          <Route path="/seller/portal" element={<SellerPortal />} />
 
           <Route path="/admin/" element={<Admin />} />
           <Route path="/admin/login" element={<AdminLogin />} />

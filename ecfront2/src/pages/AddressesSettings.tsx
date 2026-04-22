@@ -403,47 +403,6 @@ const AddressesSettings: React.FC = () => {
             {/* Form */}
             <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: '680px', margin: '0 auto' }}>
 
-              {/* Post Code */}
-              <Box sx={{ marginBottom: '32px' }}>
-                <Typography
-                  sx={{
-                    fontFamily: 'Noto Sans',
-                    fontSize: '14px',
-                    color: 'black',
-                    marginBottom: '8px',
-                  }}
-                >
-                  Post Code
-                </Typography>
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  value={formData.postCode}
-                  onChange={handleInputChange('postCode')}
-                  disabled={!isEditing}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '4px',
-                      height: '50px',
-                      backgroundColor: !isEditing ? '#f0f0f0' : 'white',
-                      '& fieldset': { borderColor: '#dddddd' },
-                      '&:hover fieldset': { borderColor: '#dddddd' },
-                      '&.Mui-focused fieldset': { borderColor: '#5856D6' },
-                    },
-                    '& .MuiInputBase-input': {
-                      color: !isEditing ? '#000000ff' : '#000000ff',
-                      fontFamily: 'Noto Sans',
-                      fontSize: '16px',
-                      padding: '8px 16px',
-                    },
-                    '& .MuiInputBase-input.Mui-disabled': {
-                      WebkitTextFillColor: '#777777',
-                      opacity: 1,
-                    },
-                  }}
-                />
-              </Box>
-
               {/* Country */}
               <Box sx={{ marginBottom: '32px' }}>
                 <Typography
@@ -490,6 +449,47 @@ const AddressesSettings: React.FC = () => {
                     <MenuItem value="singapore">Singapore</MenuItem>
                   </Select>
                 </FormControl>
+              </Box>
+
+              {/* Post Code */}
+              <Box sx={{ marginBottom: '32px' }}>
+                <Typography
+                  sx={{
+                    fontFamily: 'Noto Sans',
+                    fontSize: '14px',
+                    color: 'black',
+                    marginBottom: '8px',
+                  }}
+                >
+                  Postal Code
+                </Typography>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  value={formData.postCode}
+                  onChange={handleInputChange('postCode')}
+                  disabled={!isEditing}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '4px',
+                      height: '50px',
+                      backgroundColor: !isEditing ? '#f0f0f0' : 'white',
+                      '& fieldset': { borderColor: '#dddddd' },
+                      '&:hover fieldset': { borderColor: '#dddddd' },
+                      '&.Mui-focused fieldset': { borderColor: '#5856D6' },
+                    },
+                    '& .MuiInputBase-input': {
+                      color: !isEditing ? '#000000ff' : '#000000ff',
+                      fontFamily: 'Noto Sans',
+                      fontSize: '16px',
+                      padding: '8px 16px',
+                    },
+                    '& .MuiInputBase-input.Mui-disabled': {
+                      WebkitTextFillColor: '#777777',
+                      opacity: 1,
+                    },
+                  }}
+                />
               </Box>
 
               {/* State/Province/Region */}

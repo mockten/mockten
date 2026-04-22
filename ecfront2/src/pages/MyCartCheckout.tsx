@@ -24,12 +24,12 @@ import {
 } from '@mui/material';
 import {
   ArrowDropDown,
+  KeyboardArrowRight,
 } from '@mui/icons-material';
+
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 
-// Mock image URLs - replace with actual asset URLs from your project
-const arrowRightIcon = "http://localhost:3845/assets/ce1540ba1f8cb0bde2e26ff8f9fc566f7be994a6.svg";
 
 export interface GeoAddress {
   geo_id: string;
@@ -805,10 +805,11 @@ const MyCartCheckout: React.FC = () => {
                     fontSize: '16px',
                     color: 'black',
                   }}
+                  onClick={() => navigate('/cancellation-policy')}
                 >
                   Cancellation Policy
                 </Typography>
-                <img src={arrowRightIcon} alt="Arrow" style={{ width: '24px', height: '24px' }} />
+                <KeyboardArrowRight sx={{ width: '16px', height: '16px' }} />
               </Box>
             </Box>
           </Grid>

@@ -53,19 +53,24 @@ jobs:
 
   build_ecfront:
     runs-on: ubuntu-22.04
-    # if: contains(github.event.head_commit.modified, 'ecfront2/')
     defaults:
       run:
         working-directory: ecfront2
+
     steps:
-      - uses: actions/checkout@v3
-  
+      - uses: actions/checkout@v4
+
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
-  
-      - name: Install dependencies
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ecfront2/package-lock.json
+
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      - name: Clean install dependencies
         run: npm ci
 
       - name: Build TypeScript
