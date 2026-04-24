@@ -409,13 +409,42 @@ const ItemDetailNew: React.FC = () => {
 
   const handlePurchase = () => {
     console.log('Purchase clicked', { productId: product?.product_id, quantity });
+    if (!product?.product_id) {
+      console.error('Product ID is missing');
+      return;
+    }
     if (!selectedShipping) {
       setSnackbarMessage('Please select a delivery method');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
       return;
     }
-    navigate('/cart/checkout', { state: { shippingFee: selectedShipping.fee } });
+    
+    const fee = selectedShipping.fee * quantity;
+    const itemSubtotal = product.price * quantity;
+
+    const singleItem = {
+      id: product.product_id,
+      productId: product.product_id,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      quantity: quantity,
+      shipping_fee: selectedShipping.fee,
+      shipping_type: selectedShipping.label,
+      shipping_days: selectedShipping.days,
+      stocks: product.stocks,
+      image: `/api/storage/${product.product_id}.png`,
+    };
+
+    navigate('/cart/checkout', { 
+      state: { 
+        shippingFee: fee, 
+        subtotal: itemSubtotal,
+        maxDays: selectedShipping.days,
+        items: [singleItem]
+      } 
+    });
   };
 
   const handleAddtocart = async () => {
