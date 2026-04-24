@@ -767,10 +767,12 @@ const SearchResultNew: React.FC = () => {
               <Grid item xs={12} sm={6} md={4} lg={3} key={product.product_id}>
                 <Card
                   sx={{
-                    cursor: 'pointer',
-                    '&:hover': { boxShadow: 3 },
+                    cursor: product.stocks === 0 ? 'default' : 'pointer',
+                    '&:hover': product.stocks === 0 ? {} : { boxShadow: 3 },
+                    opacity: product.stocks === 0 ? 0.6 : 1,
+                    position: 'relative',
                   }}
-                  onClick={() => handleProductClick(product.product_id)}
+                  onClick={() => product.stocks !== 0 && handleProductClick(product.product_id)}
                 >
                   <Box
                     sx={{
@@ -779,16 +781,36 @@ const SearchResultNew: React.FC = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      position: 'relative',
                     }}
                   >
                     <img
                       src={`/api/storage/${product.product_id}.png`}
                       alt="Product"
-                      style={{ width: '64px', height: '64px' }}
+                      style={{ width: '64px', height: '64px', filter: product.stocks === 0 ? 'grayscale(100%)' : 'none' }}
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = photoSvg;
                       }}
                     />
+                    {product.stocks === 0 && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          backgroundColor: 'rgba(0,0,0,0.6)',
+                          color: 'white',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontFamily: 'Noto Sans',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        Out of stock
+                      </Box>
+                    )}
                   </Box>
 
                   <CardContent sx={{ padding: '8px' }}>
