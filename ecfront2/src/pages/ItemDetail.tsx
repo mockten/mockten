@@ -66,6 +66,7 @@ interface Product {
   };
   vendorDescription: string;
   reviews: Review[];
+  stocks: number;
 }
 
 interface ApiReview {
@@ -233,6 +234,7 @@ const mapApiToProduct = (api: ApiItemDetailResponse, fallbackId: string): Produc
     },
     vendorDescription: vendorDesc,
     reviews,
+    stocks: api.stocks || 0,
   };
 };
 
@@ -407,13 +409,42 @@ const ItemDetailNew: React.FC = () => {
 
   const handlePurchase = () => {
     console.log('Purchase clicked', { productId: product?.product_id, quantity });
+    if (!product?.product_id) {
+      console.error('Product ID is missing');
+      return;
+    }
     if (!selectedShipping) {
       setSnackbarMessage('Please select a delivery method');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
       return;
     }
-    navigate('/cart/checkout', { state: { shippingFee: selectedShipping.fee } });
+    
+    const fee = selectedShipping.fee * quantity;
+    const itemSubtotal = product.price * quantity;
+
+    const singleItem = {
+      id: product.product_id,
+      productId: product.product_id,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      quantity: quantity,
+      shipping_fee: selectedShipping.fee,
+      shipping_type: selectedShipping.label,
+      shipping_days: selectedShipping.days,
+      stocks: product.stocks,
+      image: `/api/storage/${product.product_id}.png`,
+    };
+
+    navigate('/cart/checkout', { 
+      state: { 
+        shippingFee: fee, 
+        subtotal: itemSubtotal,
+        maxDays: selectedShipping.days,
+        items: [singleItem]
+      } 
+    });
   };
 
   const handleAddtocart = async () => {
@@ -751,6 +782,7 @@ const ItemDetailNew: React.FC = () => {
                     value={quantity}
                     onChange={(e) => setQuantity(Number(e.target.value))}
                     displayEmpty
+                    disabled={product.stocks === 0}
                     sx={{
                       backgroundColor: 'white',
                       border: '1px solid #cccccc',
@@ -760,11 +792,15 @@ const ItemDetailNew: React.FC = () => {
                       },
                     }}
                   >
-                    {Array.from({ length: 10 }, (_, i) => (
-                      <MenuItem key={i + 1} value={i + 1}>
-                        {i + 1}
-                      </MenuItem>
-                    ))}
+                    {product.stocks === 0 ? (
+                      <MenuItem value={1}>Out of stock</MenuItem>
+                    ) : (
+                      Array.from({ length: Math.min(10, product.stocks) }, (_, i) => (
+                        <MenuItem key={i + 1} value={i + 1}>
+                          {i + 1}
+                        </MenuItem>
+                      ))
+                    )}
                   </Select>
                 </FormControl>
               </Box>
@@ -773,6 +809,7 @@ const ItemDetailNew: React.FC = () => {
                 fullWidth
                 variant="contained"
                 onClick={handleAddtocart}
+                disabled={product.stocks === 0}
                 sx={{
                   backgroundColor: 'gray',
                   color: 'white',
@@ -788,7 +825,7 @@ const ItemDetailNew: React.FC = () => {
                   },
                 }}
               >
-                Add to Cart
+                {product.stocks === 0 ? 'Out of Stock' : 'Add to Cart'}
               </Button>
               <Snackbar
                 open={snackbarOpen}

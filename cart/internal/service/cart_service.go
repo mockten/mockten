@@ -81,6 +81,7 @@ func (s *CartService) GetCartView(ctx context.Context, userID string) (*model.Ca
 			GeoID:            p.GeoID,
 			RegistDay:        p.RegistDay,
 			LastUpdate:       p.LastUpdate,
+			Stocks:           p.Stocks,
 		}
 		items = append(items, model.CartViewItem{
 			ID:           it.ID,
