@@ -43,9 +43,18 @@ const MyCartConfirm: React.FC = () => {
       const res = await apiClient.post('/api/payment', {
         payment_method_id: selectedCardId,
         amount: Math.round(orderSummary.total),
+        items: cartItems.map((item: any) => ({
+          product_id: item.productId || item.id,
+          quantity: item.quantity,
+        })),
       });
       if (res.status === 200) {
         console.log('Payment successful:', res.data);
+        try {
+          await apiClient.delete('/api/cart');
+        } catch (e) {
+          console.error('Failed to clear cart after payment', e);
+        }
         navigate('/cart/complete', { state: { paymentId: res.data.payment_id } });
       }
     } catch (e) {

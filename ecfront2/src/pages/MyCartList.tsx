@@ -39,6 +39,7 @@ interface ProductBackend {
   geo_id: string;
   regist_day: string;
   last_update: string;
+  stocks: number;
 }
 
 interface CartItemBackend {
@@ -59,6 +60,7 @@ interface CartItem {
   shipping_fee: number;
   shipping_type: string;
   shipping_days: number;
+  stocks: number;
 }
 
 interface RecommendedProduct {
@@ -103,6 +105,7 @@ const CartListNew: React.FC = () => {
           shipping_fee: item.shipping_fee || 0,
           shipping_type: item.shipping_type || 'Standard',
           shipping_days: item.shipping_days || 3,
+          stocks: item.product.stocks || 0,
         }));
         setCartItems(mappedItems);
       }
@@ -365,6 +368,7 @@ const CartListNew: React.FC = () => {
                           value={item.quantity}
                           onChange={(e) => handleUpdateQuantity(item.id, Number(e.target.value))}
                           disableUnderline
+                          disabled={item.stocks === 0}
                           sx={{
                             fontFamily: 'Noto Sans',
                             fontSize: '16px',
@@ -375,11 +379,15 @@ const CartListNew: React.FC = () => {
                             }
                           }}
                         >
-                          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                            <MenuItem key={num} value={num}>
-                              {num === 0 ? '0 (Remove)' : num}
-                            </MenuItem>
-                          ))}
+                          {item.stocks === 0 ? (
+                            <MenuItem value={item.quantity}>0 (Out of stock)</MenuItem>
+                          ) : (
+                            [0, ...Array.from({ length: Math.min(10, item.stocks) }, (_, i) => i + 1)].map((num) => (
+                              <MenuItem key={num} value={num}>
+                                {num === 0 ? '0 (Remove)' : num}
+                              </MenuItem>
+                            ))
+                          )}
                         </Select>
                       </FormControl>
                     </Box>
