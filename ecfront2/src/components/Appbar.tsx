@@ -19,6 +19,7 @@ import {
   FavoriteBorder,
   Person,
 } from '@mui/icons-material';
+import { useAuth } from '../Auth';
 
 interface AppbarProps {
   onCartClick?: () => void;
@@ -40,6 +41,8 @@ const Appbar: React.FC<AppbarProps> = ({
   const [accountMenuAnchorEl, setAccountMenuAnchorEl] = useState<null | HTMLElement>(null);
   const accountMenuCloseTimerRef = useRef<number | null>(null);
   const isAccountMenuOpen = Boolean(accountMenuAnchorEl);
+  const auth = useAuth();
+
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +90,18 @@ const Appbar: React.FC<AppbarProps> = ({
     } else {
       navigate('/user/account');
     }
+  };
+
+
+  const handleLogout = () => {
+    handleAccountMenuClose();
+
+    auth.logout?.();
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('id_token');
+    localStorage.removeItem('refresh_token');
+
+    navigate('/user/login');
   };
 
   const clearAccountMenuCloseTimer = () => {
@@ -254,6 +269,14 @@ const Appbar: React.FC<AppbarProps> = ({
               }}
             >
               Payment Options
+            </MenuItem>
+            <MenuItem
+              onClick={handleLogout}
+              sx={{
+                color: '#d32f2f',
+              }}
+            >
+              Logout
             </MenuItem>
           </Menu>
         </Box>
