@@ -14,7 +14,8 @@ tasks:
       - (cd cart && docker run --rm --name cart-service.default.svc.cluster.local --network mockten_nw -p 50053:50053 -dit cart)
       - (cd sync && docker run --rm --name mockten-sync --network mockten_nw -dit mockten-sync)
       - (cd geocoding && docker run --rm -d -v "$PWD/config.json:/app/config.json:ro" --name geocoding-service.default.svc.cluster.local --network mockten_nw mockten-geocoding)
-      - (cd ecpay && docker run --rm -d --name ecpay-service.default.svc.cluster.local -e SecretKeyString=${STRIPE_SECRET_KEY} -e MysqlUser=mocktenusr -e MysqlPassword=mocktenpassword -e DbHost="mysql-service.default.svc.cluster.local:3306" -e MysqlDB=mocktendb --network mockten_nw mockten-ecpay)
+      - (cd ecpay && docker run --rm -d --name ecpay-service.default.svc.cluster.local -e SecretKeyString=${STRIPE_SECRET_KEY} -e MysqlUser=mocktenusr -e MysqlPassword=mocktenpassword -e DbHost="mysql-service.default.svc.cluster.local:3306" -e MysqlDB=mocktendb -e RANKING_SERVICE_URL="http://ranking-service.default.svc.cluster.local:8080" --network mockten_nw mockten-ecpay)
+      - (cd ranking && docker run --rm -d --name ranking-service.default.svc.cluster.local -e REDIS_HOST="redis-service.default.svc.cluster.local:6379" -e MYSQL_DSN="mocktenusr:mocktenpassword@tcp(mysql-service.default.svc.cluster.local:3306)/mocktendb?parseTime=true" --network mockten_nw mockten-ranking)
       - (docker run --rm --name nginx --network mockten_nw -v $(pwd)/dev_nginx.conf:/etc/nginx/nginx.conf:ro -p 80:80 -dit nginx)
       - (cd ecfront2 && npm run dev -- --host 0.0.0.0 --port 5173)
   destroy: 
@@ -38,3 +39,4 @@ tasks:
       - (cd sync && docker build -t mockten-sync .)
       - (cd geocoding && docker build -t mockten-geocoding .)
       - (cd ecpay && docker build -t mockten-ecpay .)
+      - (cd ranking && docker build -t mockten-ranking .)

@@ -210,6 +210,39 @@ const FavoritesListNew: React.FC = () => {
     }
   };
 
+  const handleBuy = (item: FavoriteItem) => {
+    if (item.availableStocks === 0 || item.selectedQuantity === 0) return;
+    
+    const selectedShip = item.shippingOptions.find(opt => opt.label === item.selectedShippingLabel) || item.shippingOptions[0];
+    
+    const purchaseItem = {
+      id: item.id,
+      productId: item.id,
+      name: item.name,
+      description: item.description,
+      price: item.price,
+      quantity: item.selectedQuantity,
+      shipping_fee: selectedShip.fee,
+      shipping_type: selectedShip.label,
+      shipping_days: selectedShip.days,
+      stocks: item.stocks,
+      image: item.image,
+    };
+
+    const itemSubtotal = item.price * item.selectedQuantity;
+    const fee = selectedShip.fee;
+
+    navigate('/cart/checkout', { 
+      state: { 
+        shippingFee: fee, 
+        subtotal: itemSubtotal,
+        maxDays: selectedShip.days,
+        items: [purchaseItem],
+        isFromCart: false
+      } 
+    });
+  };
+
   const renderStars = (rating: number) => {
     const stars = [];
     const fullStars = Math.floor(rating);
@@ -358,6 +391,17 @@ const FavoritesListNew: React.FC = () => {
                     >
                       {item.description}
                     </Typography>
+                    <Typography
+                      sx={{
+                        fontFamily: 'Noto Sans',
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        color: 'black',
+                        marginTop: '8px',
+                      }}
+                    >
+                      ${item.price}
+                    </Typography>
                   </Box>
 
                   {/* Add to Cart Section */}
@@ -407,24 +451,38 @@ const FavoritesListNew: React.FC = () => {
                       ))}
                     </Select>
 
-                    <Button
-                      variant="contained"
-                      fullWidth
-                      onClick={() => handleAddToCart(item)}
-                      disabled={item.availableStocks === 0}
-                      sx={{
-                        backgroundColor: '#5856D6',
-                        color: 'white',
-                        fontFamily: 'Noto Sans',
-                        fontWeight: 'bold',
-                        textTransform: 'none',
-                        '&:hover': {
-                          backgroundColor: '#4a47a3',
-                        },
-                      }}
-                    >
-                      Add to Cart
-                    </Button>
+                      <Button
+                        variant="contained"
+                        fullWidth
+                        sx={{
+                          backgroundColor: '#5C59E8',
+                          '&:hover': { backgroundColor: '#4A47D1' },
+                          textTransform: 'none',
+                          fontFamily: 'Noto Sans',
+                          fontWeight: 'bold',
+                          marginBottom: '8px'
+                        }}
+                        disabled={item.availableStocks === 0}
+                        onClick={() => handleAddToCart(item)}
+                      >
+                        Add to Cart
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        fullWidth
+                        sx={{
+                          borderColor: '#5C59E8',
+                          color: '#5C59E8',
+                          '&:hover': { borderColor: '#4A47D1', backgroundColor: 'rgba(92, 89, 232, 0.04)' },
+                          textTransform: 'none',
+                          fontFamily: 'Noto Sans',
+                          fontWeight: 'bold',
+                        }}
+                        disabled={item.availableStocks === 0}
+                        onClick={() => handleBuy(item)}
+                      >
+                        Buy Now
+                      </Button>
                   </Box>
                 </Box>
               ))}

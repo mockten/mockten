@@ -310,3 +310,15 @@ services:
           - PUT
           - DELETE
           - OPTIONS
+
+  - name: ranking-service
+    url: http://ranking-service.default.svc.cluster.local:8080
+    routes:
+      - name: ranking-service-route
+        paths:
+          - /api/ranking
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - OPTIONS

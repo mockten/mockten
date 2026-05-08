@@ -2,157 +2,171 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
-	"io"
 	"log"
-	"net"
 	"net/http"
 	"os"
-	"path/filepath"
+	"strconv"
 	"time"
 
-	pb "github.com/mockten/mockten_interfaces/ranking"
-
-	"github.com/gomodule/redigo/redis"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/rung/go-safecast"
-	"google.golang.org/grpc"
-)
-
-const (
-	LogFile = "/var/log/apl/apl.log"
-	Port    = "127.0.0.1:50053"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 var (
-	grpcRecvRankingReqs = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "rcv_req_grpc_ranking",
-			Help: "How many gRPC requests rcv from ecfront.",
-		},
-		[]string{"code", "method"},
-	)
-)
-var (
-	grpcSndRankingResps = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "snd_resp_grpc_ranking",
-			Help: "How many gRPC requests snd to ecfront.",
-		},
-		[]string{"code", "method"},
-	)
+	ctx = context.Background()
+	rdb *redis.Client
+	db  *sql.DB
 )
 
-func grpcRecvRankingReqcount() {
-	grpcRecvRankingReqs.WithLabelValues("200", "GET").Add(1)
-}
-func grpcSndRankingRespcount() {
-	grpcSndRankingResps.WithLabelValues("200", "GET").Add(1)
-}
-
-type server struct{}
-
-func exportMetrics() {
-	http.Handle("/metrics", promhttp.Handler())
-	err := http.ListenAndServe(":9100", nil)
-	if err != nil {
-		log.Fatalf("metrics goroutine fail:%v", err)
-	}
+type RankingItem struct {
+	ProductID   string  `json:"product_id"`
+	Score       int     `json:"score"`
+	ProductName string  `json:"product_name"`
+	Image       string  `json:"image"`
+	Summary     string  `json:"summary"`
+	Price       float64 `json:"price"`
+	Rating      float64 `json:"rating"`
 }
 
-func init() {
-	LoggingSettings(LogFile)
-	prometheus.MustRegister(grpcRecvRankingReqs)
-	prometheus.MustRegister(grpcSndRankingResps)
+type RankingResponse struct {
+	RankingMonth string        `json:"ranking_month"`
+	Category     int           `json:"category"`
+	Ranking      []RankingItem `json:"ranking"`
 }
 
-//LoggingSettings Initialization
-func LoggingSettings(logFile string) {
-	logfile, _ := os.OpenFile(filepath.Clean(logFile), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
-	multiLogFile := io.MultiWriter(os.Stdout, logfile)
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	log.SetOutput(multiLogFile)
-}
-
-func get_date() (today_date string) {
-	t := time.Now()
-	year := t.Year()
-	month := int(t.Month())
-	day := t.Day()
-	today := fmt.Sprintf("%02d%02d%02d", year, month, day)
-	return today
-
-}
-
-func (s *server) RankItem(ctx context.Context, in *pb.GetRankItem) (*pb.RankResponse, error) {
-	grpcRecvRankingReqcount()
-	log.Printf("Received: Category:%v,Page:%v)", in.Category, in.Page)
-	// prepare empty return value
-	items := make([]*pb.RankingResult, 0)
-	// get parameter
-	page := in.Page
-	category := in.Category
-	//prepare redis command
-	RedisHost := fmt.Sprintf("%v:%v", os.Getenv("REDIS_HOST"), 6379)
-	today := get_date()
-	filter := fmt.Sprintf("%v_%v", today, category)
-	//connect to redis
-	conn, err := redis.Dial("tcp", RedisHost)
-	if err != nil {
-		log.Printf("could not connect to redis server : %v", err)
-	}
-	defer conn.Close()
-	//Get TotalNum(Ranking) on YYYYMMDD
-	productTotalList, err := redis.Strings(conn.Do("ZREVRANGE", filter, 0, 99))
-	if err != nil {
-		log.Printf("could not execute redis operator : %v", err)
-	}
-	TotalLength := int32(len(productTotalList))
-	//Get productlist(Ranking) on YYYYMMDD
-	productList, err := redis.Strings(conn.Do("ZREVRANGE", filter, 10*page-10, 10*page-1))
-	if err != nil {
-		log.Printf("could not execute redis operator : %v", err)
-	}
-	//Get each productinfo
-	for _, product_id := range productList {
-		responseResult := &pb.RankingResult{}
-		responseResult.ProductId = product_id
-		responseResult.Category = category
-		url, err := redis.String(conn.Do("HGET", product_id, "url"))
-		if err != nil {
-			log.Printf("could not execute redis operator : %v", err)
-		}
-		responseResult.ImageUrl = url
-		price_raw, err := redis.String(conn.Do("HGET", product_id, "price"))
-		if err != nil {
-			log.Printf("could not execute redis operator : %v", err)
-		}
-		price, _ := safecast.Atoi32(price_raw)
-		responseResult.Price = price
-		name, err := redis.String(conn.Do("HGET", product_id, "name"))
-		if err != nil {
-			log.Printf("could not execute redis operator : %v", err)
-		}
-		responseResult.ProductName = name
-		items = append(items, responseResult)
-	}
-	grpcSndRankingRespcount()
-	return &pb.RankResponse{Response: items, TotalNum: TotalLength}, nil
+type UpdateRankingRequest struct {
+	ProductID  string `json:"product_id"`
+	CategoryID int    `json:"category_id"`
+	Quantity   int    `json:"quantity"`
 }
 
 func main() {
-	// exec node-export service
-	go exportMetrics()
-	// Apl setting
-	lis, err := net.Listen("tcp", Port)
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+	var err error
+
+	// Redis setup
+	redisHost := os.Getenv("REDIS_HOST")
+	if redisHost == "" {
+		redisHost = "localhost:6379"
 	}
-	s := grpc.NewServer()
-	pb.RegisterRankItemsServer(s, &server{})
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+	if redisPassword == "" {
+		redisPassword = "mocktenpass"
+	}
+	rdb = redis.NewClient(&redis.Options{
+		Addr:     redisHost,
+		Password: redisPassword,
+	})
+
+	// MySQL setup
+	dsn := os.Getenv("MYSQL_DSN")
+	if dsn == "" {
+		// Mock default for development
+		dsn = "mocktenusr:mocktenpassword@tcp(mysql-service.default.svc.cluster.local:3306)/mocktendb?parseTime=true"
+	}
+	db, err = sql.Open("mysql", dsn)
+	if err != nil {
+		log.Fatalf("failed to connect to MySQL: %v", err)
+	}
+	defer db.Close()
+
+	r := gin.Default()
+
+	// CORS config
+	config := cors.DefaultConfig()
+	config.AllowAllOrigins = true
+	config.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
+	r.Use(cors.New(config))
+
+	r.GET("/api/ranking", handleGetRanking)
+	r.POST("/api/ranking/update", handleUpdateRanking)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
 
+	log.Printf("Starting Ranking service on :%s", port)
+	if err := r.Run(":" + port); err != nil {
+		log.Fatalf("failed to run server: %v", err)
+	}
+}
+
+func handleGetRanking(c *gin.Context) {
+	categoryStr := c.DefaultQuery("category", "all")
+	month := time.Now().Format("2006-01")
+
+	var zsetKey string
+	var categoryID int
+	if categoryStr == "all" {
+		zsetKey = fmt.Sprintf("ranking:%s:all", month)
+		categoryID = 99
+	} else {
+		zsetKey = fmt.Sprintf("ranking:%s:%s", month, categoryStr)
+		id, _ := strconv.Atoi(categoryStr)
+		categoryID = id
+	}
+
+	// Get top 10 products from Redis
+	res, err := rdb.ZRevRangeWithScores(ctx, zsetKey, 0, 9).Result()
+	if err != nil {
+		log.Printf("failed to fetch ranking from redis: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch ranking"})
+		return
+	}
+
+	rankingItems := []RankingItem{}
+	for _, z := range res {
+		productID := z.Member.(string)
+		score := int(z.Score)
+
+		// Fetch metadata from MySQL
+		var name, summary string
+		var price float64
+		var rating float64
+		err := db.QueryRow("SELECT product_name, summary, price, avg_review FROM Product WHERE product_id = ?", productID).Scan(&name, &summary, &price, &rating)
+		if err != nil {
+			log.Printf("failed to fetch product info for %s: %v", productID, err)
+			continue
+		}
+
+		// Image URL from storage API
+		image := fmt.Sprintf("/api/storage/%s.png", productID) 
+
+		rankingItems = append(rankingItems, RankingItem{
+			ProductID:   productID,
+			Score:       score,
+			ProductName: name,
+			Image:       image,
+			Summary:     summary,
+			Price:       price,
+			Rating:      rating,
+		})
+	}
+
+	c.JSON(http.StatusOK, RankingResponse{
+		RankingMonth: month, // requested field name
+		Category:     categoryID,
+		Ranking:      rankingItems,
+	})
+}
+
+func handleUpdateRanking(c *gin.Context) {
+	var req UpdateRankingRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	month := time.Now().Format("2006-01")
+	zsetKey := fmt.Sprintf("ranking:%s:%d", month, req.CategoryID)
+	allKey := fmt.Sprintf("ranking:%s:all", month)
+
+	rdb.ZIncrBy(ctx, zsetKey, float64(req.Quantity), req.ProductID)
+	rdb.ZIncrBy(ctx, allKey, float64(req.Quantity), req.ProductID)
+
+	c.JSON(http.StatusOK, gin.H{"status": "success"})
 }

@@ -1,16 +1,9 @@
-FROM golang:1.20.1 as builder
+FROM golang:1.25 as builder
 
-RUN apt-get update &&\
-    apt-get -y install --no-install-recommends sysv-rc-conf &&\
-    apt-get -y install --no-install-recommends unzip &&\
-    curl -OL https://github.com/google/protobuf/releases/download/v3.11.2/protoc-3.11.2-linux-x86_64.zip &&\
-    unzip protoc-3.11.2-linux-x86_64.zip -d protoc3
-WORKDIR /go/src
-RUN mkdir ranking
 WORKDIR /go/src/ranking
-RUN ls /go/src
 COPY . .
-RUN go build .
+RUN go mod tidy
+RUN go build -o ranking .
 
 FROM alpine:3
 RUN apk add --no-cache ca-certificates &&\
