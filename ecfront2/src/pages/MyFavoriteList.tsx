@@ -10,6 +10,10 @@ import {
   CardContent,
   Grid,
   IconButton,
+  Select,
+  MenuItem,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import {
   Star,
@@ -29,8 +33,13 @@ interface FavoriteItem {
   description: string;
   price: number;
   quantity: number;
+  stocks: number;
+  availableStocks: number;
+  selectedQuantity: number;
   image: string;
   rating: number;
+  shippingOptions: { fee: number, label: string, days: number }[];
+  selectedShippingLabel: string;
 }
 
 interface RecommendedProduct {
@@ -42,22 +51,82 @@ interface RecommendedProduct {
   image: string;
 }
 
+interface ShippingInfo {
+  sea_standard_fee?: number;
+  sea_express_fee?: number;
+  sea_standard_days?: number;
+  sea_express_days?: number;
+  air_standard_fee?: number;
+  air_express_fee?: number;
+  air_standard_days?: number;
+  air_express_days?: number;
+  standard_fee?: number;
+  express_fee?: number;
+  standard_days?: number;
+  express_days?: number;
+}
+
 const FavoritesListNew: React.FC = () => {
   const navigate = useNavigate();
   const [favoriteItems, setFavoriteItems] = useState<FavoriteItem[]>([]);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
 
   const fetchFavorites = async () => {
     try {
       const res = await apiClient.get('/api/fav');
       if (res.data && Array.isArray(res.data)) {
-        const mappedItems: FavoriteItem[] = res.data.map((item: any) => ({
-          id: item.productId,
-          name: item.productName,
-          description: item.summary || 'No description',
-          price: item.price,
-          quantity: 1, // Favorite item usually doesn't have quantity
-          image: `/api/storage/${item.productId}.png`,
-          rating: item.avgReview || 0,
+        // Fetch cart items to check current cart quantity
+        let cartMap = new Map();
+        try {
+          const cartRes = await apiClient.get('/api/cart/list');
+          const cartItems = cartRes.data.items || [];
+          for (const c of cartItems) {
+            const pid = c.product?.product_id || c.product_id || c.productId || c.id;
+            // c.id could be "PID:ShippingType", so we try c.product.product_id first
+            cartMap.set(String(pid), (cartMap.get(String(pid)) || 0) + c.quantity);
+          }
+        } catch (e) { console.error("Failed to fetch cart", e); }
+
+        const mappedItems: FavoriteItem[] = await Promise.all(res.data.map(async (item: any) => {
+          let shippingOptions: { fee: number, label: string, days: number }[] = [];
+          try {
+            const shipRes = await apiClient.get<ShippingInfo>('/api/shipping', { params: { product_id: item.productId }});
+            const data = shipRes.data;
+            if (typeof data.sea_standard_fee === 'number') shippingOptions.push({ fee: data.sea_standard_fee, label: 'Sea Standard', days: data.sea_standard_days || 0 });
+            if (typeof data.sea_express_fee === 'number') shippingOptions.push({ fee: data.sea_express_fee, label: 'Sea Express', days: data.sea_express_days || 0 });
+            if (typeof data.air_standard_fee === 'number') shippingOptions.push({ fee: data.air_standard_fee, label: 'Air Standard', days: data.air_standard_days || 0 });
+            if (typeof data.air_express_fee === 'number') shippingOptions.push({ fee: data.air_express_fee, label: 'Air Express', days: data.air_express_days || 0 });
+            if (typeof data.standard_fee === 'number') shippingOptions.push({ fee: data.standard_fee, label: 'Standard Delivery', days: data.standard_days || 0 });
+            if (typeof data.express_fee === 'number') shippingOptions.push({ fee: data.express_fee, label: 'Express Delivery', days: data.express_days || 0 });
+          } catch(e) {}
+          
+          if (shippingOptions.length === 0) {
+            shippingOptions.push({ fee: 0, label: 'Standard Delivery', days: 3 });
+          }
+          let cheapest = shippingOptions[0];
+          for(const opt of shippingOptions) {
+            if(opt.fee < cheapest.fee) cheapest = opt;
+          }
+
+          const cartQty = cartMap.get(String(item.productId)) || 0;
+          const availableStocks = Math.max(0, (item.stocks || 0) - cartQty);
+
+          return {
+            id: item.productId,
+            name: item.productName,
+            description: item.summary || 'No description',
+            price: item.price,
+            quantity: 1, // Favorite item usually doesn't have quantity
+            stocks: item.stocks || 0,
+            availableStocks,
+            selectedQuantity: availableStocks > 0 ? 1 : 0,
+            image: `/api/storage/${item.productId}.png`,
+            rating: item.avgReview || 0,
+            shippingOptions,
+            selectedShippingLabel: cheapest.label,
+          };
         }));
         setFavoriteItems(mappedItems);
       } else {
@@ -90,6 +159,55 @@ const FavoritesListNew: React.FC = () => {
       }
     }
     setFavoriteItems([]);
+  };
+
+  const handleQuantityChange = (itemId: string | number, newQuantity: number) => {
+    setFavoriteItems(prevItems => prevItems.map(item => 
+      item.id === itemId ? { ...item, selectedQuantity: newQuantity } : item
+    ));
+  };
+
+  const handleShippingChange = (itemId: string | number, newLabel: string) => {
+    setFavoriteItems(prevItems => prevItems.map(item => 
+      item.id === itemId ? { ...item, selectedShippingLabel: newLabel } : item
+    ));
+  };
+
+  const handleAddToCart = async (item: FavoriteItem) => {
+    if (item.availableStocks === 0 || item.selectedQuantity === 0) return;
+    try {
+      const selectedShip = item.shippingOptions.find(opt => opt.label === item.selectedShippingLabel) || item.shippingOptions[0];
+
+      await apiClient.post("/api/cart/items", {
+        product_id: item.id,
+        quantity: item.selectedQuantity,
+        shipping_fee: selectedShip.fee,
+        shipping_type: selectedShip.label,
+        shipping_days: selectedShip.days,
+      });
+
+      // Update available stock locally
+      setFavoriteItems(prev => prev.map(f => {
+        if (f.id === item.id) {
+          const newAvail = Math.max(0, f.availableStocks - item.selectedQuantity);
+          return {
+            ...f,
+            availableStocks: newAvail,
+            selectedQuantity: newAvail > 0 ? 1 : 0
+          };
+        }
+        return f;
+      }));
+
+      setSnackbarMessage('Added to cart');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    } catch (err: any) {
+      console.error(err);
+      setSnackbarMessage('Failed to add to cart');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
   };
 
   const renderStars = (rating: number) => {
@@ -240,6 +358,73 @@ const FavoritesListNew: React.FC = () => {
                     >
                       {item.description}
                     </Typography>
+                  </Box>
+
+                  {/* Add to Cart Section */}
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', marginTop: '16px', width: '240px', flexShrink: 0 }}>
+                    <Select
+                      value={item.selectedQuantity}
+                      onChange={(e) => handleQuantityChange(item.id, Number(e.target.value))}
+                      disabled={item.availableStocks === 0}
+                      size="small"
+                      sx={{
+                        backgroundColor: 'white',
+                        border: '1px solid #cccccc',
+                        borderRadius: '4px',
+                        width: '100%',
+                      }}
+                    >
+                      {item.availableStocks === 0 ? (
+                        <MenuItem value={0}>Out of stock</MenuItem>
+                      ) : (
+                        Array.from({ length: Math.min(10, item.availableStocks) }, (_, i) => (
+                          <MenuItem key={i + 1} value={i + 1}>
+                            {i + 1}
+                          </MenuItem>
+                        ))
+                      )}
+                    </Select>
+                    
+                    {/* Shipping Options */}
+                    <Select
+                      value={item.selectedShippingLabel}
+                      onChange={(e) => handleShippingChange(item.id, e.target.value)}
+                      disabled={item.availableStocks === 0 || item.shippingOptions.length === 0}
+                      size="small"
+                      sx={{
+                        backgroundColor: 'white',
+                        border: '1px solid #cccccc',
+                        borderRadius: '4px',
+                        width: '100%',
+                        fontFamily: 'Noto Sans',
+                        fontSize: '14px',
+                      }}
+                    >
+                      {item.shippingOptions.map((opt, idx) => (
+                        <MenuItem key={idx} value={opt.label}>
+                          {opt.label} (${opt.fee})
+                        </MenuItem>
+                      ))}
+                    </Select>
+
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      onClick={() => handleAddToCart(item)}
+                      disabled={item.availableStocks === 0}
+                      sx={{
+                        backgroundColor: '#5856D6',
+                        color: 'white',
+                        fontFamily: 'Noto Sans',
+                        fontWeight: 'bold',
+                        textTransform: 'none',
+                        '&:hover': {
+                          backgroundColor: '#4a47a3',
+                        },
+                      }}
+                    >
+                      Add to Cart
+                    </Button>
                   </Box>
                 </Box>
               ))}
@@ -398,6 +583,22 @@ const FavoritesListNew: React.FC = () => {
         </Box>
         */}
       </Container>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbarOpen(false)}
+          severity={snackbarSeverity}
+          sx={{ width: '100%' }}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
 
       {/* Footer */}
       <Footer />

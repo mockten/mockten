@@ -48,6 +48,12 @@ interface CartItemBackend {
   added_at: string;
 }
 
+interface ShippingOption {
+  fee: number;
+  days: number;
+  label: string;
+}
+
 interface CartItem {
   id: string; // This is now the line item ID (e.g. "prodID:shipping")
   productId: string; // Original product ID for images/links
@@ -61,6 +67,7 @@ interface CartItem {
   shipping_type: string;
   shipping_days: number;
   stocks: number;
+  shippingOptions?: ShippingOption[];
 }
 
 interface RecommendedProduct {
@@ -93,19 +100,38 @@ const CartListNew: React.FC = () => {
       }
 
       if (items && Array.isArray(items)) {
-        const mappedItems: CartItem[] = items.map((item: any) => ({
-          id: item.id || item.product.product_id, // Use new ID if available, fallback for old items
-          productId: item.product.product_id,
-          name: item.product.product_name,
-          description: item.product.summary,
-          price: item.product.price,
-          quantity: item.quantity,
-          image: `/api/storage/${item.product.product_id}.png`,
-          rating: 0, // Default rating
-          shipping_fee: item.shipping_fee || 0,
-          shipping_type: item.shipping_type || 'Standard',
-          shipping_days: item.shipping_days || 3,
-          stocks: item.product.stocks || 0,
+        const mappedItems: CartItem[] = await Promise.all(items.map(async (item: any) => {
+          let shippingOptions: ShippingOption[] = [];
+          try {
+            const shipRes = await apiClient.get('/api/shipping', { params: { product_id: item.product.product_id } });
+            const data = shipRes.data;
+            if (typeof data.sea_standard_fee === 'number') shippingOptions.push({ fee: data.sea_standard_fee, label: 'Sea Standard', days: data.sea_standard_days || 0 });
+            if (typeof data.sea_express_fee === 'number') shippingOptions.push({ fee: data.sea_express_fee, label: 'Sea Express', days: data.sea_express_days || 0 });
+            if (typeof data.air_standard_fee === 'number') shippingOptions.push({ fee: data.air_standard_fee, label: 'Air Standard', days: data.air_standard_days || 0 });
+            if (typeof data.air_express_fee === 'number') shippingOptions.push({ fee: data.air_express_fee, label: 'Air Express', days: data.air_express_days || 0 });
+            if (typeof data.standard_fee === 'number') shippingOptions.push({ fee: data.standard_fee, label: 'Standard Delivery', days: data.standard_days || 0 });
+            if (typeof data.express_fee === 'number') shippingOptions.push({ fee: data.express_fee, label: 'Express Delivery', days: data.express_days || 0 });
+          } catch(e) {}
+          
+          if (shippingOptions.length === 0) {
+            shippingOptions.push({ fee: item.shipping_fee || 0, label: item.shipping_type || 'Standard Delivery', days: item.shipping_days || 3 });
+          }
+
+          return {
+            id: item.id || item.product.product_id, // Use new ID if available, fallback for old items
+            productId: item.product.product_id,
+            name: item.product.product_name,
+            description: item.product.summary,
+            price: item.product.price,
+            quantity: item.quantity,
+            image: `/api/storage/${item.product.product_id}.png`,
+            rating: 0, // Default rating
+            shipping_fee: item.shipping_fee || 0,
+            shipping_type: item.shipping_type || 'Standard',
+            shipping_days: item.shipping_days || 3,
+            stocks: item.product.stocks || 0,
+            shippingOptions,
+          };
         }));
         setCartItems(mappedItems);
       }
@@ -137,6 +163,27 @@ const CartListNew: React.FC = () => {
       );
     } catch (error) {
       console.error('Failed to update quantity', error);
+    }
+  };
+
+  const handleShippingChange = async (itemId: string, newShippingLabel: string) => {
+    const item = cartItems.find(i => i.id === itemId);
+    if (!item) return;
+    const newOption = item.shippingOptions?.find(o => o.label === newShippingLabel);
+    if (!newOption || newOption.label === item.shipping_type) return;
+
+    try {
+      await apiClient.delete(`/api/cart/items/${itemId}`);
+      await apiClient.post(`/api/cart/items`, {
+        product_id: item.productId,
+        quantity: item.quantity,
+        shipping_fee: newOption.fee,
+        shipping_type: newOption.label,
+        shipping_days: newOption.days,
+      });
+      window.location.reload();
+    } catch (e) {
+      console.error('Failed to update shipping', e);
     }
   };
 
@@ -379,10 +426,10 @@ const CartListNew: React.FC = () => {
                             }
                           }}
                         >
-                          {item.stocks === 0 ? (
-                            <MenuItem value={item.quantity}>0 (Out of stock)</MenuItem>
+                          {item.stocks === 0 && item.quantity === 0 ? (
+                            <MenuItem value={0}>0 (Out of stock)</MenuItem>
                           ) : (
-                            [0, ...Array.from({ length: Math.min(10, item.stocks) }, (_, i) => i + 1)].map((num) => (
+                            [0, ...Array.from({ length: Math.max(item.quantity, Math.min(10, item.stocks)) }, (_, i) => i + 1)].map((num) => (
                               <MenuItem key={num} value={num}>
                                 {num === 0 ? '0 (Remove)' : num}
                               </MenuItem>
@@ -391,16 +438,38 @@ const CartListNew: React.FC = () => {
                         </Select>
                       </FormControl>
                     </Box>
-                    <Typography
-                      sx={{
-                        fontFamily: 'Noto Sans',
-                        fontSize: '14px',
-                        color: '#666666',
-                        marginTop: '4px',
-                      }}
-                    >
-                      Shipping: {item.shipping_type} (${item.shipping_fee.toFixed(2)})
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                      <Typography
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontSize: '14px',
+                          color: '#666666',
+                        }}
+                      >
+                        Shipping:
+                      </Typography>
+                      <FormControl variant="standard" sx={{ minWidth: 120 }}>
+                        <Select
+                          value={item.shipping_type}
+                          onChange={(e) => handleShippingChange(item.id, e.target.value)}
+                          disableUnderline
+                          sx={{
+                            fontFamily: 'Noto Sans',
+                            fontSize: '14px',
+                            color: '#666666',
+                            '& .MuiSelect-select': {
+                              paddingY: '0px',
+                            }
+                          }}
+                        >
+                          {item.shippingOptions?.map(opt => (
+                            <MenuItem key={opt.label} value={opt.label}>
+                              {opt.label} (${opt.fee})
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Box>
                   </Box>
                 </Box>
               ))}
