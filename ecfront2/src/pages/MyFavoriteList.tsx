@@ -6,9 +6,6 @@ import {
   Container,
   Typography,
   Button,
-  Card,
-  CardContent,
-  Grid,
   IconButton,
   Select,
   MenuItem,
@@ -42,14 +39,6 @@ interface FavoriteItem {
   selectedShippingLabel: string;
 }
 
-interface RecommendedProduct {
-  id: string | number;
-  name: string;
-  description: string;
-  price: number;
-  rating: number;
-  image: string;
-}
 
 interface ShippingInfo {
   sea_standard_fee?: number;
@@ -243,26 +232,6 @@ const FavoritesListNew: React.FC = () => {
     });
   };
 
-  const renderStars = (rating: number) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(<Star key={i} sx={{ color: '#ffc107', fontSize: '16px' }} />);
-    }
-
-    if (hasHalfStar) {
-      stars.push(<StarHalf key="half" sx={{ color: '#ffc107', fontSize: '16px' }} />);
-    }
-
-    const emptyStars = 5 - Math.ceil(rating);
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push(<StarBorder key={`empty-${i}`} sx={{ color: '#ffc107', fontSize: '16px' }} />);
-    }
-
-    return stars;
-  };
 
   return (
     <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
