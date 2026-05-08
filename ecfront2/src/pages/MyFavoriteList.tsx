@@ -13,9 +13,6 @@ import {
   Alert,
 } from '@mui/material';
 import {
-  Star,
-  StarHalf,
-  StarBorder,
   Close,
 } from '@mui/icons-material';
 import Appbar from '../components/Appbar';
