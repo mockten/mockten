@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import apiClient from '../module/apiClient';
 import {
   Box,
   Container,
@@ -23,7 +24,7 @@ import Footer from '../components/Footer';
 import photoSvg from "../assets/photo.svg";
 
 interface FavoriteItem {
-  id: number;
+  id: string | number;
   name: string;
   description: string;
   price: number;
@@ -33,7 +34,7 @@ interface FavoriteItem {
 }
 
 interface RecommendedProduct {
-  id: number;
+  id: string | number;
   name: string;
   description: string;
   price: number;
@@ -45,91 +46,49 @@ const FavoritesListNew: React.FC = () => {
   const navigate = useNavigate();
   const [favoriteItems, setFavoriteItems] = useState<FavoriteItem[]>([]);
 
-  // Mock data - replace with actual API calls
-  const mockFavoriteItems: FavoriteItem[] = [
-    {
-      id: 1,
-      name: 'Sample',
-      description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
-      price: 4550,
-      quantity: 1,
-      image: photoSvg,
-      rating: 4.5,
-    },
-    {
-      id: 2,
-      name: 'Sample',
-      description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
-      price: 4550,
-      quantity: 1,
-      image: photoSvg,
-      rating: 4.5,
-    },
-    {
-      id: 3,
-      name: 'Sample',
-      description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
-      price: 4550,
-      quantity: 1,
-      image: photoSvg,
-      rating: 4.5,
-    },
-    {
-      id: 4,
-      name: 'Sample',
-      description: 'Sample text. Sample text. Sample text. Sample text. Sample text.',
-      price: 4550,
-      quantity: 1,
-      image: photoSvg,
-      rating: 4.5,
-    },
-  ];
-
-  const mockRecommendedProducts: RecommendedProduct[] = [
-    {
-      id: 1,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      price: 2999,
-      rating: 4.5,
-      image: photoSvg,
-    },
-    {
-      id: 2,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      price: 3999,
-      rating: 4.5,
-      image: photoSvg,
-    },
-    {
-      id: 3,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      price: 4999,
-      rating: 4.5,
-      image: photoSvg,
-    },
-    {
-      id: 4,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      price: 5999,
-      rating: 4.5,
-      image: photoSvg,
-    },
-  ];
-
-  useEffect(() => {
-    // Mock API call for favorite items
-    setFavoriteItems(mockFavoriteItems);
-  }, []);
-
-  const handleRemoveItem = (itemId: number) => {
-    setFavoriteItems(prevItems => prevItems.filter(item => item.id !== itemId));
+  const fetchFavorites = async () => {
+    try {
+      const res = await apiClient.get('/api/fav');
+      if (res.data && Array.isArray(res.data)) {
+        const mappedItems: FavoriteItem[] = res.data.map((item: any) => ({
+          id: item.productId,
+          name: item.productName,
+          description: item.summary || 'No description',
+          price: item.price,
+          quantity: 1, // Favorite item usually doesn't have quantity
+          image: `/api/storage/${item.productId}.png`,
+          rating: item.avgReview || 0,
+        }));
+        setFavoriteItems(mappedItems);
+      } else {
+        setFavoriteItems([]);
+      }
+    } catch (e) {
+      console.error('Failed to fetch favorites', e);
+    }
   };
 
-  const handleRemoveAll = () => {
+  useEffect(() => {
+    fetchFavorites();
+  }, []);
+
+  const handleRemoveItem = async (itemId: string | number) => {
+    try {
+      await apiClient.delete(`/api/fav/${itemId}`);
+      setFavoriteItems(prevItems => prevItems.filter(item => item.id !== itemId));
+    } catch (e) {
+      console.error('Failed to remove favorite item', e);
+    }
+  };
+
+  const handleRemoveAll = async () => {
+    for (const item of favoriteItems) {
+      try {
+        await apiClient.delete(`/api/fav/${item.id}`);
+      } catch (e) {
+        console.error('Failed to remove favorite item', e);
+      }
+    }
     setFavoriteItems([]);
   };
 
@@ -243,19 +202,29 @@ const FavoritesListNew: React.FC = () => {
                       marginTop: '12px',
                     }}
                   >
-                    <img src={item.image} alt={item.name} style={{ width: '64px', height: '64px' }} />
+                    <img 
+                      src={item.image} 
+                      alt={item.name} 
+                      style={{ width: '64px', height: '64px', objectFit: 'contain' }} 
+                      onError={(e) => { e.currentTarget.src = photoSvg; }}
+                    />
                   </Box>
 
                   {/* Product Details */}
                   <Box sx={{ flex: 1, marginTop: '16px' }}>
                     <Typography
                       variant="h6"
+                      onClick={() => navigate(`/item/${item.id}`)}
                       sx={{
                         fontFamily: 'Noto Sans',
                         fontWeight: 'bold',
                         fontSize: '20px',
                         color: 'black',
                         marginBottom: '8px',
+                        cursor: 'pointer',
+                        '&:hover': {
+                          textDecoration: 'underline',
+                        },
                       }}
                     >
                       {item.name}
@@ -270,15 +239,6 @@ const FavoritesListNew: React.FC = () => {
                       }}
                     >
                       {item.description}
-                    </Typography>
-                    <Typography
-                      sx={{
-                        fontFamily: 'Noto Sans',
-                        fontSize: '16px',
-                        color: '#666666',
-                      }}
-                    >
-                      Quantity: {item.quantity}
                     </Typography>
                   </Box>
                 </Box>
@@ -343,7 +303,7 @@ const FavoritesListNew: React.FC = () => {
               </Typography>
               <Button
                 variant="contained"
-                onClick={() => navigate('/dashboard-new')}
+                onClick={() => navigate('/')}
                 sx={{
                   backgroundColor: '#5856D6',
                   color: 'white',
@@ -364,7 +324,7 @@ const FavoritesListNew: React.FC = () => {
           )}
         </Box>
 
-        {/* Recommended Products */}
+        {/* Recommended Products 
         <Box sx={{ marginTop: '64px' }}>
           <Typography
             sx={{
@@ -436,6 +396,7 @@ const FavoritesListNew: React.FC = () => {
             ))}
           </Grid>
         </Box>
+        */}
       </Container>
 
       {/* Footer */}

@@ -22,10 +22,13 @@ import {
   StarHalf,
   StarBorder,
   Sort,
+  Favorite,
+  FavoriteBorder,
 } from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 import photoSvg from "../assets/photo.svg";
+import apiClient from '../module/apiClient';
 
 interface Product {
   product_id: string;
@@ -92,6 +95,8 @@ const SearchResultNew: React.FC = () => {
   const [sortedDatasetKey, setSortedDatasetKey] = useState<string>('');
   const [sortedDataset, setSortedDataset] = useState<Product[]>([]);
   const [sortedDatasetTotal, setSortedDatasetTotal] = useState<number>(0);
+
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
   const requestSeqRef = useRef(0);
 
@@ -362,6 +367,22 @@ const SearchResultNew: React.FC = () => {
     fetchProducts(query, page, filters, s);
   }, [location.search, filters]);
 
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      try {
+        const res = await apiClient.get('/api/fav');
+        if (res.data && Array.isArray(res.data)) {
+          const favIds = new Set<string>();
+          res.data.forEach((item: any) => favIds.add(item.productId));
+          setFavorites(favIds);
+        }
+      } catch (e) {
+        console.error('Failed to fetch favorites', e);
+      }
+    };
+    fetchFavorites();
+  }, []);
+
   const handleProductClick = (productId: string) => {
     navigate(`/item/${productId}`);
   };
@@ -400,6 +421,30 @@ const SearchResultNew: React.FC = () => {
       rating: prev.rating === rating ? 0 : rating,
     }));
     navigateWithPageReset();
+  };
+
+  const handleToggleFavorite = async (e: React.MouseEvent, productId: string) => {
+    e.stopPropagation();
+    const isFav = favorites.has(productId);
+    try {
+      if (isFav) {
+        await apiClient.delete(`/api/fav/${productId}`);
+        setFavorites(prev => {
+          const next = new Set(prev);
+          next.delete(productId);
+          return next;
+        });
+      } else {
+        await apiClient.post(`/api/fav/${productId}`);
+        setFavorites(prev => {
+          const next = new Set(prev);
+          next.add(productId);
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('Failed to toggle favorite', err);
+    }
   };
 
   const renderStars = (rating: number) => {
@@ -787,11 +832,23 @@ const SearchResultNew: React.FC = () => {
                     <img
                       src={`/api/storage/${product.product_id}.png`}
                       alt="Product"
-                      style={{ width: '64px', height: '64px', filter: product.stocks === 0 ? 'grayscale(100%)' : 'none' }}
+                      style={{ width: '64px', height: '64px', filter: product.stocks === 0 ? 'grayscale(100%)' : 'none', objectFit: 'contain' }}
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = photoSvg;
                       }}
                     />
+                    {product.stocks !== 0 && (
+                      <IconButton
+                        sx={{ position: 'absolute', top: 8, right: 8 }}
+                        onClick={(e) => handleToggleFavorite(e, product.product_id)}
+                      >
+                        {favorites.has(product.product_id) ? (
+                          <Favorite sx={{ color: 'red' }} />
+                        ) : (
+                          <FavoriteBorder />
+                        )}
+                      </IconButton>
+                    )}
                     {product.stocks === 0 && (
                       <Box
                         sx={{
