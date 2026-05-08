@@ -29,7 +29,8 @@ const MyCartConfirm: React.FC = () => {
     selectedTime = '', 
     cartItems = [], 
     orderSummary = { subtotal: 0, shipping: 0, total: 0 },
-    selectedCardId = ''
+    selectedCardId = '',
+    isFromCart = false
   } = location.state || {};
 
   const cancelPolicy = `Returns and Exchanges for Initial Defects We do not accept returns except in cases where there is a defect on our part. In the unlikely event of a defective product, please contact us by e-mail within 7 days of receipt of the product. If the initial defect is confirmed, we will contact you back with return shipping instructions. We will bear the shipping costs.`;
@@ -51,7 +52,9 @@ const MyCartConfirm: React.FC = () => {
       if (res.status === 200) {
         console.log('Payment successful:', res.data);
         try {
-          await apiClient.delete('/api/cart');
+          if (isFromCart) {
+            await apiClient.delete('/api/cart');
+          }
         } catch (e) {
           console.error('Failed to clear cart after payment', e);
         }

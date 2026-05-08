@@ -47,7 +47,7 @@ export interface GeoAddress {
 const MyCartCheckout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { shippingFee = 1820, subtotal = 18200, maxDays = 3, items = [] } = location.state || {};
+  const { shippingFee = 1820, subtotal = 18200, maxDays = 3, items = [], isFromCart = false } = location.state || {};
 
   const getAvailableDates = (startOffset: number) => {
     const dates = [];
@@ -250,7 +250,8 @@ const MyCartCheckout: React.FC = () => {
         selectedTime,
         cartItems: items,
         orderSummary,
-        selectedCardId
+        selectedCardId,
+        isFromCart
       }
     });
   };
