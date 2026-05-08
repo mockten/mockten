@@ -29,7 +29,10 @@ import {
 
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
 
 export interface GeoAddress {
   geo_id: string;
@@ -84,6 +87,7 @@ const MyCartCheckout: React.FC = () => {
 
   // New address form state
   const [isAddingNewAddress, setIsAddingNewAddress] = useState(false);
+  const [isAddingNewCard, setIsAddingNewCard] = useState(false);
   const [newAddressForm, setNewAddressForm] = useState({
     country_code: 'jp',
     postal_code: '',
@@ -308,8 +312,7 @@ const MyCartCheckout: React.FC = () => {
   };
 
   const handleAddNewCard = () => {
-    // TODO: Open new card form
-    console.log('Add new card clicked');
+    setIsAddingNewCard(true);
   };
 
   const SectionTitle: React.FC<{ title: string }> = ({ title }) => (
@@ -863,8 +866,162 @@ const MyCartCheckout: React.FC = () => {
         </DialogActions>
       </Dialog>
 
+      {/* New Card Dialog */}
+      <Dialog open={isAddingNewCard} onClose={() => setIsAddingNewCard(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold' }}>
+          Add New Credit Card
+        </DialogTitle>
+        <DialogContent dividers>
+          <Elements stripe={stripePromise}>
+            <CheckoutCardForm 
+              onSuccess={async (newMethodId) => {
+                setIsAddingNewCard(false);
+                // Refresh payment methods
+                try {
+                  const res = await apiClient.get('/api/payment-method');
+                  if (res.data && res.data.length > 0) {
+                    setSavedCards(res.data);
+                    // Match by Stripe ID if possible, otherwise just pick the newest one
+                    const matchingCard = res.data.find((m: any) => m.stripe_payment_method_id === newMethodId || m.id === newMethodId);
+                    setSelectedCardId(matchingCard ? matchingCard.id : res.data[res.data.length - 1].id);
+                  }
+                } catch(e) {}
+              }}
+              onCancel={() => setIsAddingNewCard(false)}
+            />
+          </Elements>
+        </DialogContent>
+      </Dialog>
+
       {/* Footer */}
       <Footer />
+    </Box>
+  );
+};
+
+const textFieldSx = {
+  '& .MuiOutlinedInput-root': {
+    borderRadius: '4px',
+    height: '50px',
+    '& fieldset': {
+      borderColor: '#dddddd',
+    },
+    '&:hover fieldset': {
+      borderColor: '#dddddd',
+    },
+    '&.Mui-focused fieldset': {
+      borderColor: '#5856D6',
+    },
+  },
+  '& .MuiInputBase-input': {
+    color: '#aaaaaa',
+    fontFamily: 'Noto Sans',
+    fontSize: '16px',
+    padding: '8px 16px',
+    '&::placeholder': {
+      color: '#aaaaaa',
+      opacity: 1,
+    },
+  },
+};
+
+const CheckoutCardForm: React.FC<{ onSuccess: (id: string) => void, onCancel: () => void }> = ({ onSuccess, onCancel }) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [cardHolderName, setCardHolderName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setIsSubmitting(true);
+    setErrorMsg('');
+
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) {
+      setIsSubmitting(false);
+      return;
+    }
+
+    const { error, paymentMethod } = await stripe.createPaymentMethod({
+      type: 'card',
+      card: cardElement,
+      billing_details: { name: cardHolderName },
+    });
+
+    if (error) {
+      setErrorMsg(error.message || 'Error configuring card.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const result = await apiClient.post('/api/payment-method', {
+        payment_method_id: paymentMethod.id,
+      });
+      if (result.status === 200) {
+        onSuccess(paymentMethod.id);
+      }
+    } catch (apiError) {
+      console.error(apiError);
+      setErrorMsg('Failed to save to server.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+      {errorMsg && (
+        <Typography color="error" sx={{ mb: 2, fontFamily: 'Noto Sans', fontSize: '14px' }}>{errorMsg}</Typography>
+      )}
+      <Box sx={{ marginBottom: '24px' }}>
+        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
+          Card Holder Name
+        </Typography>
+        <TextField
+          fullWidth
+          variant="outlined"
+          placeholder="ex: TARO YAMADA"
+          value={cardHolderName}
+          onChange={(e) => setCardHolderName(e.target.value)}
+          sx={textFieldSx}
+          required
+        />
+      </Box>
+
+      <Box sx={{ marginBottom: '32px' }}>
+        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black', mb: '8px' }}>
+          Card Details
+        </Typography>
+        <Box sx={{
+          padding: '16px',
+          border: '1px solid #ddd',
+          borderRadius: '4px',
+          backgroundColor: '#fafafa'
+        }}>
+          <CardElement options={{
+            style: {
+              base: {
+                fontSize: '16px',
+                color: '#424770',
+                '::placeholder': { color: '#aab7c4' },
+              },
+              invalid: { color: '#9e2146' },
+            },
+          }} />
+        </Box>
+      </Box>
+
+      <DialogActions sx={{ padding: '0' }}>
+        <Button onClick={onCancel} variant="outlined" sx={{ textTransform: 'none', color: 'black', borderColor: '#ccc' }}>
+          Cancel
+        </Button>
+        <Button type="submit" variant="contained" disabled={!stripe || isSubmitting} sx={{ textTransform: 'none', backgroundColor: 'black' }}>
+          {isSubmitting ? 'Saving...' : 'Save Card'}
+        </Button>
+      </DialogActions>
     </Box>
   );
 };
