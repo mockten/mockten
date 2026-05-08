@@ -347,6 +347,17 @@ const SearchResultNew: React.FC = () => {
 
     setSearchQuery(query);
 
+    // Initial load from location state (e.g. from Dashboard Category click)
+    const initialCategory = (location.state as any)?.category;
+    if (initialCategory && filters.category.length === 0) {
+      setFilters(prev => ({
+        ...prev,
+        category: [initialCategory]
+      }));
+      // Clear state so it doesn't re-apply on subsequent search changes
+      navigate(location.search, { replace: true, state: {} });
+    }
+
     if (s !== sortOrder) {
       setSortOrder(s);
     }
@@ -355,15 +366,7 @@ const SearchResultNew: React.FC = () => {
       setCurrentPage(page);
     }
 
-    if (!query) {
-      setProducts([]);
-      setTotalResults(0);
-      setSortedDatasetKey('');
-      setSortedDataset([]);
-      setSortedDatasetTotal(0);
-      return;
-    }
-
+    // Fetch even if query is empty (backend will handle empty as all-results)
     fetchProducts(query, page, filters, s);
   }, [location.search, filters]);
 
@@ -706,28 +709,28 @@ const SearchResultNew: React.FC = () => {
 
         <Box sx={{ flexGrow: 1, padding: '24px' }}>
           <Box sx={{ marginBottom: '16px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '20px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Category
-            </Typography>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ mb: 2 }}>
               <Typography
+                variant="h5"
                 sx={{
                   fontFamily: 'Noto Sans',
-                  fontSize: '14px',
-                  color: '#666666',
+                  fontWeight: 'bold',
+                  fontSize: '20px',
+                  color: 'black',
+                  mb: 1
                 }}
               >
-                Showing results for "{searchQuery}"
+                Category
               </Typography>
+              {searchQuery && (
+                <Typography variant="body2" color="text.secondary">
+                  Showing results for "{searchQuery}"
+                </Typography>
+              )}
+            </Box>
 
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black' }}>
                   {sortLabel}
                 </Typography>

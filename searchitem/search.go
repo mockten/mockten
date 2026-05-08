@@ -65,10 +65,12 @@ func searchHandler(c *gin.Context) {
 	maxPriceStr := c.Query("max_price")
 	minRatingStr := c.Query("min_rating")
 
-	if query == "" || pageStr == "" {
-		logger.Error("Search Query parameter is missing.")
-		c.JSON(http.StatusNoContent, gin.H{"message": "There is no content"})
-		return
+	if query == "" {
+		query = "*"
+	}
+
+	if pageStr == "" {
+		pageStr = "1"
 	}
 
 	logger.Debug(
@@ -248,14 +250,15 @@ func ConvertToResponse(detail *ProductDetail) ProductDetailResponse {
 }
 
 type Category struct {
-	CategoryID   string `json:"category_id"`
-	CategoryName string `json:"category_name"`
+	CategoryID    string `json:"category_id"`
+	CategoryName  string `json:"category_name"`
+	CategoryImage string `json:"category_image"`
 }
 
 func getCategoryListHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rows, err := db.Query(`
-			SELECT category_id, category_name
+			SELECT category_id, category_name, category_image
 			FROM Category
 			ORDER BY category_id
 		`)
@@ -268,7 +271,7 @@ func getCategoryListHandler(db *sql.DB) gin.HandlerFunc {
 		var categories []Category
 		for rows.Next() {
 			var cat Category
-			if err := rows.Scan(&cat.CategoryID, &cat.CategoryName); err != nil {
+			if err := rows.Scan(&cat.CategoryID, &cat.CategoryName, &cat.CategoryImage); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan category"})
 				return
 			}

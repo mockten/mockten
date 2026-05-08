@@ -28,7 +28,7 @@ tasks:
   setup:
     cmds:
       - (cd redis && docker build -t mockten-redis .)
-      - (cd mysql && docker build -t mockten-mysql .)
+      - (cd mysql && docker build --platform linux/amd64 -t mockten-mysql .)
       - (cd uam && docker build --platform linux/amd64 -t uam .)
       - (cd apigw && docker build -t apigw .)
       - (cd minIO && docker build -t minio . )
