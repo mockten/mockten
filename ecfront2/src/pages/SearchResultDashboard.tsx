@@ -844,6 +844,7 @@ const SearchResultNew: React.FC = () => {
                       <IconButton
                         sx={{ position: 'absolute', top: 8, right: 8 }}
                         onClick={(e) => handleToggleFavorite(e, product.product_id)}
+                        aria-label="Toggle Favorite"
                       >
                         {favorites.has(product.product_id) ? (
                           <Favorite sx={{ color: 'red' }} />
