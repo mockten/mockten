@@ -1,6 +1,6 @@
 module github.com/mockten/mockten/ranking
 
-go 1.19
+go 1.25
 
 require (
 	github.com/gomodule/redigo v1.8.9
