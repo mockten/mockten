@@ -100,6 +100,18 @@ type CreateReviewResponse struct {
 	ReviewCount int       `json:"reviewCount"`
 }
 
+type FavoriteItemResponse struct {
+	ProductID         string           `json:"productId"`
+	ProductName       string           `json:"productName"`
+	SellerName        string           `json:"sellerName"`
+	Price             int              `json:"price"`
+	Summary           string           `json:"summary"`
+	ProductCondition  string           `json:"productCondition"`
+	Stocks            int              `json:"stocks"`
+	AvgReview         float64          `json:"avgReview"`
+	ReviewCount       int              `json:"reviewCount"`
+}
+
 func waitForMySQL(db *sql.DB, logger *zap.Logger) {
 	maxAttempts := 20
 	for i := 1; i <= maxAttempts; i++ {
@@ -683,6 +695,171 @@ func postItemReviewHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
+func getFavoriteListHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, err := getUserIDFromAccessToken(c)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		var productIDsJSON string
+		err = db.QueryRow(`SELECT product_ids FROM Wishlist WHERE user_id = ? LIMIT 1`, userID).Scan(&productIDsJSON)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(http.StatusOK, []FavoriteItemResponse{})
+				return
+			}
+			logger.Error("DB query failed (Wishlist)", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		var productIDs []string
+		if err := json.Unmarshal([]byte(productIDsJSON), &productIDs); err != nil {
+			logger.Error("JSON unmarshal failed", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		if len(productIDs) == 0 {
+			c.JSON(http.StatusOK, []FavoriteItemResponse{})
+			return
+		}
+
+		query := `
+SELECT
+  p.product_id,
+  p.product_name,
+  COALESCE(s.seller_name, ue.USERNAME) AS seller_name,
+  p.price,
+  p.product_condition,
+  COALESCE(t.stocks, 0) AS stocks,
+  p.summary,
+  p.avg_review,
+  p.review_count
+FROM Product p
+LEFT JOIN Stock t ON p.product_id = t.product_id
+LEFT JOIN Seller s ON p.seller_id = s.seller_id
+LEFT JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
+WHERE p.product_id IN (?` + strings.Repeat(",?", len(productIDs)-1) + `)
+`
+		args := make([]interface{}, len(productIDs))
+		for i, id := range productIDs {
+			args[i] = id
+		}
+
+		rows, err := db.Query(query, args...)
+		if err != nil {
+			logger.Error("DB query failed (Fav products)", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+		defer rows.Close()
+
+		var results []FavoriteItemResponse
+		for rows.Next() {
+			var resp FavoriteItemResponse
+			var avgReview sql.NullFloat64
+			var reviewCount sql.NullInt64
+
+			err := rows.Scan(
+				&resp.ProductID,
+				&resp.ProductName,
+				&resp.SellerName,
+				&resp.Price,
+				&resp.ProductCondition,
+				&resp.Stocks,
+				&resp.Summary,
+				&avgReview,
+				&reviewCount,
+			)
+			if err != nil {
+				continue
+			}
+			if avgReview.Valid {
+				resp.AvgReview = avgReview.Float64
+			}
+			if reviewCount.Valid {
+				resp.ReviewCount = int(reviewCount.Int64)
+			}
+			results = append(results, resp)
+		}
+
+		c.JSON(http.StatusOK, results)
+	}
+}
+
+func addFavoriteItemHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, err := getUserIDFromAccessToken(c)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		productID := c.Param("productId")
+		if productID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing productId"})
+			return
+		}
+
+		var exists int
+		err = db.QueryRow(`SELECT 1 FROM Product WHERE product_id = ? LIMIT 1`, productID).Scan(&exists)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+			return
+		}
+
+		upsertQuery := `
+INSERT INTO Wishlist (user_id, product_ids, updated)
+VALUES (?, JSON_ARRAY(?), NOW())
+ON DUPLICATE KEY UPDATE 
+  product_ids = IF(JSON_CONTAINS(product_ids, JSON_QUOTE(?)), product_ids, JSON_ARRAY_APPEND(product_ids, '$', ?)),
+  updated = NOW()
+`
+		_, err = db.Exec(upsertQuery, userID, productID, productID, productID)
+		if err != nil {
+			logger.Error("DB upsert failed (Wishlist add)", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"status": "success"})
+	}
+}
+
+func removeFavoriteItemHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, err := getUserIDFromAccessToken(c)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		productID := c.Param("productId")
+		if productID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing productId"})
+			return
+		}
+
+		updateQuery := `
+UPDATE Wishlist
+SET product_ids = JSON_REMOVE(product_ids, JSON_UNQUOTE(JSON_SEARCH(product_ids, 'one', ?))),
+    updated = NOW()
+WHERE user_id = ? AND JSON_CONTAINS(product_ids, JSON_QUOTE(?))
+`
+		_, err = db.Exec(updateQuery, productID, userID, productID)
+		if err != nil {
+			logger.Error("DB update failed (Wishlist remove)", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"status": "success"})
+	}
+}
+
 func main() {
 	var err error
 
@@ -738,6 +915,10 @@ func main() {
 	router.GET("/v1/item/detail/:productId", getItemDetailHandler(db))
 	router.GET("/v1/item/reviews/:productId", getItemReviewsHandler(db))
 	router.POST("/v1/item/review", postItemReviewHandler(db))
+
+	router.GET("/v1/fav", getFavoriteListHandler(db))
+	router.POST("/v1/fav/:productId", addFavoriteItemHandler(db))
+	router.DELETE("/v1/fav/:productId", removeFavoriteItemHandler(db))
 
 	_ = router.Run(port)
 }

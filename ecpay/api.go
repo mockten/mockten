@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,9 @@ import (
 	"github.com/stripe/stripe-go/v74/customer"
 	"github.com/stripe/stripe-go/v74/paymentintent"
 	"github.com/stripe/stripe-go/v74/paymentmethod"
+)
+
+var (
 )
 
 type PaymentMethodRequest struct {
@@ -356,6 +360,30 @@ func handleCreatePayment(c *gin.Context) {
 			_, err := db.Exec("UPDATE Stock SET stocks = GREATEST(0, stocks - ?) WHERE product_id = ?", item.Quantity, item.ProductID)
 			if err != nil {
 				log.Printf("failed to decrement stock for product %s: %v", item.ProductID, err)
+			}
+
+			// Update ranking by calling Ranking service
+			var categoryID int
+			err = db.QueryRow("SELECT category_id FROM Product WHERE product_id = ?", item.ProductID).Scan(&categoryID)
+			if err == nil {
+				updateReq := map[string]interface{}{
+					"product_id":  item.ProductID,
+					"category_id": categoryID,
+					"quantity":    item.Quantity,
+				}
+				jsonBody, _ := json.Marshal(updateReq)
+				rankingURL := os.Getenv("RANKING_SERVICE_URL")
+				if rankingURL == "" {
+					rankingURL = "http://ranking-service:8080" // Default internal URL
+				}
+				resp, err := http.Post(rankingURL+"/api/ranking/update", "application/json", bytes.NewBuffer(jsonBody))
+				if err != nil {
+					log.Printf("failed to call ranking service: %v", err)
+				} else {
+					resp.Body.Close()
+				}
+			} else {
+				log.Printf("failed to get category for ranking: %v", err)
 			}
 		}
 	}
