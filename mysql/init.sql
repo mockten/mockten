@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS Seller (
 CREATE TABLE IF NOT EXISTS Category (
   category_id VARCHAR(3) PRIMARY KEY,
   category_name VARCHAR(255),
+  category_image VARCHAR(255),
   last_update DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
@@ -165,27 +166,28 @@ CREATE TABLE IF NOT EXISTS Review (
   CONSTRAINT chk_review_rating CHECK (rating BETWEEN 1 AND 5)
 );
 
-INSERT INTO Category (category_id, category_name)
+INSERT INTO Category (category_id, category_name, category_image)
 VALUES
-('01', 'Books'),
-('02', 'Music'),
-('03', 'Food&Drink'),
-('04', 'Game'),
-('05', 'Home'),
-('06', 'Fashion'),
-('07', 'Electronics'),
-('08', 'Hobby'),
-('09', 'Toy'),
-('10', 'Kids'),
-('11', 'Baby'),
-('12', 'Sports&Outdoor'),
-('13', 'Beauty'),
-('14', 'Car'),
-('15', 'Gifts'),
-('16', 'Health'),
-('99', 'Other')
+('01', 'Books', '3cd51e99-b274-4d73-85d9-ccd2f5f1b1b7'),
+('02', 'Music', '198a650e-efe0-4d3e-9a4f-632d13e743d0'),
+('03', 'Food&Drink', 'acdb45aa-2d17-4916-be78-e6165450cf03'),
+('04', 'Game', 'bdd52128-0874-442d-af14-7b8112a5cb09'),
+('05', 'Home', 'd6da2ce7-fe11-4223-93a6-804a084c57c2'),
+('06', 'Fashion', '3f8c9dfa-e9a0-401f-842d-0d90cb697385'),
+('07', 'Electronics', '96438bb7-6cec-4772-afa5-68f10586389c'),
+('08', 'Hobby', 'c727354e-3f0c-49de-b018-0f7cb2b2fcb7'),
+('09', 'Toy', '46eefe09-f18b-4239-8a38-407bf8830325'),
+('10', 'Kids', '60116905-91eb-440f-a04b-782f7f513b9b'),
+('11', 'Baby', '90f6b079-ad46-4204-9b42-4d4b26e34250'),
+('12', 'Sports&Outdoor', '07f100e6-36e9-4dc5-9dcd-654a7cd9680c'),
+('13', 'Beauty', 'b0c3c993-7b4f-461e-bc29-b1236c819071'),
+('14', 'Car', 'bd02271e-2b5d-4a78-99f3-e10ff412326d'),
+('15', 'Gifts', '542c67dd-e97d-4b82-958b-c8142d2a9bd2'),
+('16', 'Health', 'f69d2a5b-0257-4ebf-ad95-0a8333159697'),
+('99', 'Other', 'c38b797c-199e-4b4f-b034-9c7daa420521')
 ON DUPLICATE KEY UPDATE
-  category_name = VALUES(category_name);
+  category_name = VALUES(category_name),
+  category_image = VALUES(category_image);
 
 INSERT INTO Product (product_id, product_name, seller_id, price, category_id, summary, product_condition, geo_id, avg_review, review_count)
 VALUES

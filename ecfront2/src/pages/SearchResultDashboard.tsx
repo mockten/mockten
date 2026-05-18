@@ -22,10 +22,13 @@ import {
   StarHalf,
   StarBorder,
   Sort,
+  Favorite,
+  FavoriteBorder,
 } from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 import photoSvg from "../assets/photo.svg";
+import apiClient from '../module/apiClient';
 
 interface Product {
   product_id: string;
@@ -92,6 +95,8 @@ const SearchResultNew: React.FC = () => {
   const [sortedDatasetKey, setSortedDatasetKey] = useState<string>('');
   const [sortedDataset, setSortedDataset] = useState<Product[]>([]);
   const [sortedDatasetTotal, setSortedDatasetTotal] = useState<number>(0);
+
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
   const requestSeqRef = useRef(0);
 
@@ -342,6 +347,17 @@ const SearchResultNew: React.FC = () => {
 
     setSearchQuery(query);
 
+    // Initial load from location state (e.g. from Dashboard Category click)
+    const initialCategory = (location.state as any)?.category;
+    if (initialCategory && filters.category.length === 0) {
+      setFilters(prev => ({
+        ...prev,
+        category: [initialCategory]
+      }));
+      // Clear state so it doesn't re-apply on subsequent search changes
+      navigate(location.search, { replace: true, state: {} });
+    }
+
     if (s !== sortOrder) {
       setSortOrder(s);
     }
@@ -350,17 +366,25 @@ const SearchResultNew: React.FC = () => {
       setCurrentPage(page);
     }
 
-    if (!query) {
-      setProducts([]);
-      setTotalResults(0);
-      setSortedDatasetKey('');
-      setSortedDataset([]);
-      setSortedDatasetTotal(0);
-      return;
-    }
-
+    // Fetch even if query is empty (backend will handle empty as all-results)
     fetchProducts(query, page, filters, s);
   }, [location.search, filters]);
+
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      try {
+        const res = await apiClient.get('/api/fav');
+        if (res.data && Array.isArray(res.data)) {
+          const favIds = new Set<string>();
+          res.data.forEach((item: any) => favIds.add(item.productId));
+          setFavorites(favIds);
+        }
+      } catch (e) {
+        console.error('Failed to fetch favorites', e);
+      }
+    };
+    fetchFavorites();
+  }, []);
 
   const handleProductClick = (productId: string) => {
     navigate(`/item/${productId}`);
@@ -400,6 +424,30 @@ const SearchResultNew: React.FC = () => {
       rating: prev.rating === rating ? 0 : rating,
     }));
     navigateWithPageReset();
+  };
+
+  const handleToggleFavorite = async (e: React.MouseEvent, productId: string) => {
+    e.stopPropagation();
+    const isFav = favorites.has(productId);
+    try {
+      if (isFav) {
+        await apiClient.delete(`/api/fav/${productId}`);
+        setFavorites(prev => {
+          const next = new Set(prev);
+          next.delete(productId);
+          return next;
+        });
+      } else {
+        await apiClient.post(`/api/fav/${productId}`);
+        setFavorites(prev => {
+          const next = new Set(prev);
+          next.add(productId);
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('Failed to toggle favorite', err);
+    }
   };
 
   const renderStars = (rating: number) => {
@@ -661,28 +709,28 @@ const SearchResultNew: React.FC = () => {
 
         <Box sx={{ flexGrow: 1, padding: '24px' }}>
           <Box sx={{ marginBottom: '16px' }}>
-            <Typography
-              sx={{
-                fontFamily: 'Noto Sans',
-                fontSize: '20px',
-                color: 'black',
-                marginBottom: '8px',
-              }}
-            >
-              Category
-            </Typography>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ mb: 2 }}>
               <Typography
+                variant="h5"
                 sx={{
                   fontFamily: 'Noto Sans',
-                  fontSize: '14px',
-                  color: '#666666',
+                  fontWeight: 'bold',
+                  fontSize: '20px',
+                  color: 'black',
+                  mb: 1
                 }}
               >
-                Showing results for "{searchQuery}"
+                Category
               </Typography>
+              {searchQuery && (
+                <Typography variant="body2" color="text.secondary">
+                  Showing results for "{searchQuery}"
+                </Typography>
+              )}
+            </Box>
 
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black' }}>
                   {sortLabel}
                 </Typography>
@@ -787,11 +835,24 @@ const SearchResultNew: React.FC = () => {
                     <img
                       src={`/api/storage/${product.product_id}.png`}
                       alt="Product"
-                      style={{ width: '64px', height: '64px', filter: product.stocks === 0 ? 'grayscale(100%)' : 'none' }}
+                      style={{ width: '64px', height: '64px', filter: product.stocks === 0 ? 'grayscale(100%)' : 'none', objectFit: 'contain' }}
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = photoSvg;
                       }}
                     />
+                    {product.stocks !== 0 && (
+                      <IconButton
+                        sx={{ position: 'absolute', top: 8, right: 8 }}
+                        onClick={(e) => handleToggleFavorite(e, product.product_id)}
+                        aria-label="Toggle Favorite"
+                      >
+                        {favorites.has(product.product_id) ? (
+                          <Favorite sx={{ color: 'red' }} />
+                        ) : (
+                          <FavoriteBorder />
+                        )}
+                      </IconButton>
+                    )}
                     {product.stocks === 0 && (
                       <Box
                         sx={{

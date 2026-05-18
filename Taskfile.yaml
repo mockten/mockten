@@ -5,7 +5,7 @@ tasks:
       - (docker network inspect mockten_nw > /dev/null 2>&1 || docker network create mockten_nw)
       - (cd mysql && docker run --rm -d --name mysql-service.default.svc.cluster.local -e MYSQL_ROOT_PASSWORD=rootpassword -e MYSQL_DATABASE=mocktendb -e MYSQL_USER=mocktenusr -e MYSQL_PASSWORD=mocktenpassword --network mockten_nw -p 3306:3306 mockten-mysql)
       - (cd redis && docker run --rm -d --name redis-service.default.svc.cluster.local --network mockten_nw -p 6379:6379 mockten-redis)
-      - (cd uam && docker run --rm --platform linux/amd64 --name uam-service.default.svc.cluster.local --network mockten_nw -e KC_HOSTNAME=localhost -dit uam)
+      - (cd uam && docker run --rm --platform linux/amd64 --name uam-service.default.svc.cluster.local --network mockten_nw -e KC_HOSTNAME=localhost -e DEV_MODE=true -dit uam)
       - (cd minIO && docker run --rm --name minio-service.default.svc.cluster.local --network mockten_nw -p 9000:9000 -p 9001:9001 -dit minio)
       - (cd apigw && docker run --rm --name apigw --network mockten_nw -p 8082:8082 -p 8001:8001 -p 8002:8002 -dit apigw)
       - (cd meilisearch && docker run --rm --name meilisearch-service.default.svc.cluster.local --network mockten_nw -p 7700:7700 -dit meilisearch)
@@ -14,9 +14,11 @@ tasks:
       - (cd cart && docker run --rm --name cart-service.default.svc.cluster.local --network mockten_nw -p 50053:50053 -dit cart)
       - (cd sync && docker run --rm --name mockten-sync --network mockten_nw -dit mockten-sync)
       - (cd geocoding && docker run --rm -d -v "$PWD/config.json:/app/config.json:ro" --name geocoding-service.default.svc.cluster.local --network mockten_nw mockten-geocoding)
-      - (cd ecpay && docker run --rm -d --name ecpay-service.default.svc.cluster.local -e SecretKeyString=${STRIPE_SECRET_KEY} -e MysqlUser=mocktenusr -e MysqlPassword=mocktenpassword -e DbHost="mysql-service.default.svc.cluster.local:3306" -e MysqlDB=mocktendb --network mockten_nw mockten-ecpay)
+      - (cd ecpay && docker run --rm -d --name ecpay-service.default.svc.cluster.local -e SecretKeyString=${STRIPE_SECRET_KEY} -e MysqlUser=mocktenusr -e MysqlPassword=mocktenpassword -e DbHost="mysql-service.default.svc.cluster.local:3306" -e MysqlDB=mocktendb -e RANKING_SERVICE_URL="http://ranking-service.default.svc.cluster.local:8080" --network mockten_nw mockten-ecpay)
+      - (cd ranking && docker run --rm -d --name ranking-service.default.svc.cluster.local -e REDIS_HOST="redis-service.default.svc.cluster.local:6379" -e MYSQL_DSN="mocktenusr:mocktenpassword@tcp(mysql-service.default.svc.cluster.local:3306)/mocktendb?parseTime=true" --network mockten_nw mockten-ranking)
       - (docker run --rm --name nginx --network mockten_nw -v $(pwd)/dev_nginx.conf:/etc/nginx/nginx.conf:ro -p 80:80 -dit nginx)
-      - (cd ecfront2 && npm run dev -- --host 0.0.0.0 --port 5173)
+      - (for i in {1..30}; do docker exec -i mysql-service.default.svc.cluster.local mysql -umocktenusr -pmocktenpassword mocktendb < mysql/test_insert.sql 2>/dev/null && break || sleep 1; done)
+      - (cd ecfront2 && TEST_MODE=true npm run dev -- --host 0.0.0.0 --port 5173)
   destroy: 
     cmds:
       - docker stop mockten-sync
@@ -24,10 +26,19 @@ tasks:
       - docker stop nginx
       - docker stop apigw
       - docker network rm mockten_nw
+  ci:
+    desc: Run CI workflows locally using act
+    cmds:
+      - act pull_request -W .github/workflows/ci.yml
+      - docker builder prune -a -f
+  e2e:
+    desc: Run Playwright E2E test suite locally
+    cmds:
+      - (cd ecfront2 && npx playwright test)
   setup:
     cmds:
       - (cd redis && docker build -t mockten-redis .)
-      - (cd mysql && docker build -t mockten-mysql .)
+      - (cd mysql && docker build --platform linux/amd64 -t mockten-mysql .)
       - (cd uam && docker build --platform linux/amd64 -t uam .)
       - (cd apigw && docker build -t apigw .)
       - (cd minIO && docker build -t minio . )
@@ -38,3 +49,4 @@ tasks:
       - (cd sync && docker build -t mockten-sync .)
       - (cd geocoding && docker build -t mockten-geocoding .)
       - (cd ecpay && docker build -t mockten-ecpay .)
+      - (cd ranking && docker build -t mockten-ranking .)

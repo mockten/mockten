@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -15,6 +18,9 @@ import (
 	"github.com/stripe/stripe-go/v74/customer"
 	"github.com/stripe/stripe-go/v74/paymentintent"
 	"github.com/stripe/stripe-go/v74/paymentmethod"
+)
+
+var (
 )
 
 type PaymentMethodRequest struct {
@@ -37,11 +43,45 @@ type UserContext struct {
 	Email  string
 }
 
-// mock function to extract user details from Authorization Header token or mock it
-func getMockUser() UserContext {
+// Extract user details from Authorization Header token or fallback to mock
+func getUser(c *gin.Context) UserContext {
+	authHeader := c.GetHeader("Authorization")
+	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		token := authHeader[7:]
+		parts := strings.Split(token, ".")
+		if len(parts) == 3 {
+			// Base64 decode payload (parts[1])
+			payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+			if err == nil {
+				var claims struct {
+					Email             string `json:"email"`
+					PreferredUsername string `json:"preferred_username"`
+					Sub               string `json:"sub"`
+				}
+				if json.Unmarshal(payload, &claims) == nil {
+					email := claims.Email
+					if email == "" {
+						email = claims.PreferredUsername + "@example.com"
+					}
+					userID := claims.PreferredUsername
+					if userID == "" {
+						userID = claims.Sub
+					}
+					if userID != "" {
+						return UserContext{
+							UserID: userID,
+							Email:  email,
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Fallback mock if no valid auth header
 	return UserContext{
-		UserID: "howlfreedom@gmail.com",
-		Email:  "howlfreedom@gmail.com",
+		UserID: "testuser@example.com",
+		Email:  "testuser@example.com",
 	}
 }
 
@@ -79,7 +119,7 @@ func handleAddPaymentMethod(c *gin.Context) {
 		return
 	}
 
-	user := getMockUser()
+	user := getUser(c)
 
 	mySqlHost := fmt.Sprintf(MySQLHost, os.Getenv("MysqlUser"), os.Getenv("MysqlPassword"), os.Getenv("DbHost"), os.Getenv("MysqlDB"))
 	db, err := sql.Open("mysql", mySqlHost)
@@ -150,7 +190,7 @@ func handleAddPaymentMethod(c *gin.Context) {
 }
 
 func handleGetPaymentMethods(c *gin.Context) {
-	user := getMockUser()
+	user := getUser(c)
 
 	mySqlHost := fmt.Sprintf(MySQLHost, os.Getenv("MysqlUser"), os.Getenv("MysqlPassword"), os.Getenv("DbHost"), os.Getenv("MysqlDB"))
 	db, err := sql.Open("mysql", mySqlHost)
@@ -204,7 +244,7 @@ func handleSetDefaultPaymentMethod(c *gin.Context) {
 		return
 	}
 
-	user := getMockUser()
+	user := getUser(c)
 
 	mySqlHost := fmt.Sprintf(MySQLHost, os.Getenv("MysqlUser"), os.Getenv("MysqlPassword"), os.Getenv("DbHost"), os.Getenv("MysqlDB"))
 	db, err := sql.Open("mysql", mySqlHost)
@@ -248,7 +288,7 @@ func handleDeletePaymentMethod(c *gin.Context) {
 		return
 	}
 
-	user := getMockUser()
+	user := getUser(c)
 
 	mySqlHost := fmt.Sprintf(MySQLHost, os.Getenv("MysqlUser"), os.Getenv("MysqlPassword"), os.Getenv("DbHost"), os.Getenv("MysqlDB"))
 	db, err := sql.Open("mysql", mySqlHost)
@@ -282,7 +322,7 @@ func handleCreatePayment(c *gin.Context) {
 		return
 	}
 
-	user := getMockUser()
+	user := getUser(c)
 
 	mySqlHost := fmt.Sprintf(MySQLHost, os.Getenv("MysqlUser"), os.Getenv("MysqlPassword"), os.Getenv("DbHost"), os.Getenv("MysqlDB"))
 	db, err := sql.Open("mysql", mySqlHost)
@@ -356,6 +396,30 @@ func handleCreatePayment(c *gin.Context) {
 			_, err := db.Exec("UPDATE Stock SET stocks = GREATEST(0, stocks - ?) WHERE product_id = ?", item.Quantity, item.ProductID)
 			if err != nil {
 				log.Printf("failed to decrement stock for product %s: %v", item.ProductID, err)
+			}
+
+			// Update ranking by calling Ranking service
+			var categoryID int
+			err = db.QueryRow("SELECT category_id FROM Product WHERE product_id = ?", item.ProductID).Scan(&categoryID)
+			if err == nil {
+				updateReq := map[string]interface{}{
+					"product_id":  item.ProductID,
+					"category_id": categoryID,
+					"quantity":    item.Quantity,
+				}
+				jsonBody, _ := json.Marshal(updateReq)
+				rankingURL := os.Getenv("RANKING_SERVICE_URL")
+				if rankingURL == "" {
+					rankingURL = "http://ranking-service:8080" // Default internal URL
+				}
+				resp, err := http.Post(rankingURL+"/api/ranking/update", "application/json", bytes.NewBuffer(jsonBody))
+				if err != nil {
+					log.Printf("failed to call ranking service: %v", err)
+				} else {
+					resp.Body.Close()
+				}
+			} else {
+				log.Printf("failed to get category for ranking: %v", err)
 			}
 		}
 	}

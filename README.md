@@ -13,6 +13,11 @@ go1.21.4
 node: '20.9.0'
 ```
 
+- act version
+```
+act version 0.2.88
+```
+
 # Building Dev Infrastructure
 Before proceeding, ensure you have the following tool installed on your system:
 

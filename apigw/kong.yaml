@@ -180,6 +180,40 @@ services:
         strip_path: true
         methods:
           - POST
+  - name: favorite-service
+    url: http://product-service.default.svc.cluster.local:50052
+    routes:
+      - name: get-favorites
+        paths: [ /api/fav ]
+        methods: [ GET ]
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1/fav
+      - name: add-favorite
+        paths:
+          - ~/api/fav/([^/]+)$
+        methods:
+          - POST
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: "/v1/fav/$(uri_captures[1])"
+      - name: remove-favorite
+        paths:
+          - ~/api/fav/([^/]+)$
+        methods:
+          - DELETE
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: "/v1/fav/$(uri_captures[1])"
   - name: cart-service
     url: http://cart-service.default.svc.cluster.local:50053
     routes:
@@ -275,4 +309,16 @@ services:
           - POST
           - PUT
           - DELETE
+          - OPTIONS
+
+  - name: ranking-service
+    url: http://ranking-service.default.svc.cluster.local:8080
+    routes:
+      - name: ranking-service-route
+        paths:
+          - /api/ranking
+        strip_path: false
+        methods:
+          - GET
+          - POST
           - OPTIONS

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import apiClient from '../module/apiClient';
 import {
   Box,
   Typography,
@@ -12,17 +13,26 @@ import {
 import {
   PhotoOutlined,
   KeyboardArrowRight,
+  Star,
+  StarHalf,
+  StarBorder,
+  Favorite,
+  FavoriteBorder,
 } from '@mui/icons-material';
+import { IconButton } from '@mui/material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 import photoSvg from "../assets/photo.svg";
 
 
 interface Product {
-  id: number;
+  id: string;
   title: string;
   description: string;
   image: string;
+  score?: number;
+  price?: number;
+  rating?: number;
 }
 
 interface Category {
@@ -34,30 +44,117 @@ interface Category {
 const DashboardNew: React.FC = () => {
   const navigate = useNavigate();
 
-  // Mock data - replace with actual API calls
-  const categories: Category[] = [
-    { id: 'toy', name: 'Toy', image: PhotoOutlined.toString() },
-    { id: 'game', name: 'Game', image: PhotoOutlined.toString() },
-    { id: 'music', name: 'Music', image: PhotoOutlined.toString() },
-    { id: 'fashion', name: 'FASHION', image: PhotoOutlined.toString() },
-    { id: 'home', name: 'HOME', image: PhotoOutlined.toString() },
-    { id: 'electronics', name: 'ELECT', image: PhotoOutlined.toString() },
-  ];
+  const [categories, setCategories] = useState<Category[]>([]);
 
-  const products: Product[] = [
-    { id: 1, title: 'Sample', description: 'This is where you enter a description of the product.', image: photoSvg },
-    { id: 2, title: 'Sample', description: 'This is where you enter a description of the product.', image: photoSvg },
-    { id: 3, title: 'Sample', description: 'This is where you enter a description of the product.', image: photoSvg },
-    { id: 4, title: 'Sample', description: 'This is where you enter a description of the product.', image: photoSvg },
-    { id: 5, title: 'Sample', description: 'This is where you enter a description of the product.', image: photoSvg },
-    { id: 6, title: 'Sample', description: 'This is where you enter a description of the product.', image: photoSvg },
-  ];
+  const [rankingProducts, setRankingProducts] = useState<Product[]>([]);
 
-  const handleCategoryClick = (categoryId: string) => {
-    navigate(`/category/${categoryId}`);
+  useEffect(() => {
+    const fetchRanking = async () => {
+      try {
+        const res = await apiClient.get('/api/ranking');
+        if (res.data && res.data.ranking) {
+          const formatted = res.data.ranking.slice(0, 10).map((item: any) => ({
+            id: item.product_id,
+            title: item.product_name,
+            description: item.summary,
+            image: item.image,
+            score: item.score,
+            price: item.price,
+            rating: item.rating,
+          }));
+          setRankingProducts(formatted);
+        }
+      } catch (err) {
+        console.error('Failed to fetch ranking:', err);
+      }
+    };
+    fetchRanking();
+  }, []);
+
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      try {
+        const res = await apiClient.get('/api/fav');
+        if (res.data && Array.isArray(res.data)) {
+          const favSet = new Set<string>(res.data.map((f: any) => String(f.productId)));
+          setFavorites(favSet);
+        }
+      } catch (e) {
+        console.error('Failed to fetch favorites', e);
+      }
+    };
+    fetchFavorites();
+    
+    const fetchCategories = async () => {
+      try {
+        const res = await apiClient.get('/api/categories');
+        if (res.data && Array.isArray(res.data)) {
+          const formatted = res.data.map((c: any) => ({
+            id: c.category_id,
+            name: c.category_name,
+            image: `/api/storage/${c.category_image}.png`,
+          }));
+          setCategories(formatted);
+        }
+      } catch (e) {
+        console.error('Failed to fetch categories', e);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  const handleToggleFavorite = async (e: React.MouseEvent, productId: string) => {
+    e.stopPropagation();
+    const isFav = favorites.has(productId);
+    try {
+      if (isFav) {
+        await apiClient.delete(`/api/fav/${productId}`);
+        setFavorites(prev => {
+          const next = new Set(prev);
+          next.delete(productId);
+          return next;
+        });
+      } else {
+        await apiClient.post(`/api/fav/${productId}`);
+        setFavorites(prev => {
+          const next = new Set(prev);
+          next.add(productId);
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('Failed to toggle favorite', err);
+    }
   };
 
-  const handleProductClick = (productId: number) => {
+  const renderStars = (rating: number) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 !== 0;
+
+    for (let i = 0; i < fullStars; i++) {
+      stars.push(<Star key={i} sx={{ color: '#ffc107', fontSize: '16px' }} />);
+    }
+
+    if (hasHalfStar) {
+      stars.push(<StarHalf key="half" sx={{ color: '#ffc107', fontSize: '16px' }} />);
+    }
+
+    const emptyStars = 5 - Math.ceil(rating);
+    for (let i = 0; i < emptyStars; i++) {
+      stars.push(<StarBorder key={`empty-${i}`} sx={{ color: '#ffc107', fontSize: '16px' }} />);
+    }
+
+    return stars;
+  };
+
+  const handleCategoryClick = (categoryName: string) => {
+    navigate(`/search`, { state: { category: categoryName } });
+  };
+
+  const handleProductClick = (productId: string) => {
     navigate(`/item/${productId}`);
   };
 
@@ -133,7 +230,7 @@ const DashboardNew: React.FC = () => {
             {Array.from({ length: 7 }, (_, index) => (
               <Box
                 key={index}
-                onClick={() => handleProductClick(index)}
+                onClick={() => handleProductClick(index.toString())}
                 sx={{
                   width: '120px',
                   height: '120px',
@@ -172,7 +269,7 @@ const DashboardNew: React.FC = () => {
             {Array.from({ length: 7 }, (_, index) => (
               <Box
                 key={index}
-                onClick={() => handleProductClick(index)}
+                onClick={() => handleProductClick(index.toString())}
                 sx={{
                   width: '120px',
                   height: '120px',
@@ -207,52 +304,77 @@ const DashboardNew: React.FC = () => {
             Browse by Category
           </Typography>
           
-          <Box sx={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-            {Array.from({ length: 7 }, (_, index) => (
+          <Box sx={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '16px' }}>
+            {categories.map((category) => (
               <Box
-                key={index}
-                onClick={() => handleProductClick(index)}
+                key={category.id}
+                onClick={() => handleCategoryClick(category.name)}
                 sx={{
+                  minWidth: '120px',
                   width: '120px',
                   height: '120px',
                   backgroundColor: '#f5f5f5',
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderRadius: '8px',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    boxShadow: 2,
+                  },
                 }}
               >
-                <PhotoOutlined />
+                <img 
+                  src={category.image} 
+                  alt={category.name} 
+                  style={{ width: '48px', height: '48px', objectFit: 'contain', marginBottom: '8px' }}
+                  onError={(e) => { e.currentTarget.src = photoSvg; }}
+                />
+                <Typography
+                  sx={{
+                    fontFamily: 'Noto Sans',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    color: 'black',
+                    textAlign: 'center',
+                    textTransform: 'uppercase'
+                  }}
+                >
+                  {category.name}
+                </Typography>
               </Box>
             ))}
           </Box>
 
           {/* Category Buttons */}
-          <Grid container spacing={3}>
+          <Grid container spacing={2}>
             {categories.map((category) => (
               <Grid item xs={12} sm={6} md={4} key={category.id}>
                 <Button
                   fullWidth
-                  onClick={() => handleCategoryClick(category.id)}
+                  onClick={() => handleCategoryClick(category.name)}
                   sx={{
-                    display: 'flex',
-                    alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '16px 0',
-                    borderBottom: '1px solid #dddddd',
+                    borderBottom: '1px solid #EEEEEE',
                     borderRadius: 0,
-                    textTransform: 'uppercase',
+                    textTransform: 'none',
+                    color: 'black',
                     '&:hover': {
                       backgroundColor: 'transparent',
-                    },
+                      '& .MuiTypography-root': {
+                        textDecoration: 'underline',
+                      }
+                    }
                   }}
                 >
                   <Typography
                     sx={{
                       fontFamily: 'Noto Sans',
+                      fontWeight: 'bold',
                       fontSize: '16px',
-                      color: 'black',
-                      textAlign: 'left',
+                      textTransform: 'uppercase'
                     }}
                   >
                     {category.name}
@@ -282,68 +404,129 @@ const DashboardNew: React.FC = () => {
             Ranking
           </Typography>
           
-          <Grid container spacing={2}>
-            {products.map((product, index) => (
-              <Grid item xs={12} sm={6} md={4} lg={2} key={product.id}>
-                <Card
-                  sx={{
-                    cursor: 'pointer',
-                    '&:hover': {
-                      boxShadow: 3,
-                    },
-                  }}
-                  onClick={() => handleProductClick(product.id)}
-                >
-                  <Box
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              gap: '16px', 
+              overflowX: 'auto', 
+              paddingBottom: '16px',
+              '::-webkit-scrollbar': { height: '8px' },
+              '::-webkit-scrollbar-thumb': { backgroundColor: '#EEEEEE', borderRadius: '4px' }
+            }}
+          >
+            {rankingProducts.length > 0 ? rankingProducts.map((product, index) => {
+              const rank = index + 1;
+              const isTop3 = rank <= 3;
+              const rankColor = rank === 1 ? '#FFD700' : rank === 2 ? '#C0C0C0' : rank === 3 ? '#CD7F32' : '#666666';
+
+              return (
+                <Box key={product.id} sx={{ minWidth: '180px', width: '180px' }}>
+                  <Card
                     sx={{
-                      height: '100px',
-                      backgroundColor: '#f5f5f5',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      height: '100%',
+                      position: 'relative',
+                      '&:hover': {
+                        boxShadow: 3,
+                        transform: 'translateY(-4px)',
+                        transition: 'transform 0.2s'
+                      },
                     }}
+                    onClick={() => handleProductClick(product.id)}
                   >
-                    <img src={product.image} alt="Product" style={{ width: '64px', height: '64px' }} />
-                  </Box>
-                  <CardContent sx={{ padding: '8px' }}>
-                    <Typography
-                      variant="body2"
+                    {/* Rank Badge */}
+                    <Box
                       sx={{
-                        fontFamily: 'Noto Sans',
-                        fontSize: '14px',
-                        color: 'black',
-                        marginBottom: '2px',
-                      }}
-                    >
-                      # {index + 1}
-                    </Typography>
-                    <Typography
-                      variant="h6"
-                      sx={{
-                        fontFamily: 'Noto Sans',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        zIndex: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '4px 8px',
+                        backgroundColor: isTop3 ? rankColor : 'rgba(255,255,255,0.9)',
+                        color: isTop3 ? 'white' : 'black',
+                        borderRadius: '0 0 8px 0',
                         fontWeight: 'bold',
-                        fontSize: '16px',
-                        color: 'black',
-                        marginBottom: '8px',
+                        boxShadow: 1
                       }}
                     >
-                      {product.title}
-                    </Typography>
-                    <Typography
-                      variant="body2"
+                      {isTop3 && <Star sx={{ fontSize: '16px', marginRight: '4px' }} />}
+                      {rank}
+                    </Box>
+
+                    <Box
                       sx={{
-                        fontFamily: 'Noto Sans',
-                        fontSize: '14px',
-                        color: '#666666',
+                        height: '120px',
+                        backgroundColor: '#f5f5f5',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative',
                       }}
                     >
-                      {product.description}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
+                      <img 
+                        src={product.image} 
+                        alt="Product" 
+                        style={{ width: '80px', height: '80px', objectFit: 'contain' }} 
+                        onError={(e) => { e.currentTarget.src = photoSvg; }}
+                      />
+                      <IconButton
+                        sx={{ position: 'absolute', top: 4, right: 4 }}
+                        onClick={(e) => handleToggleFavorite(e, product.id)}
+                      >
+                        {favorites.has(product.id) ? (
+                          <Favorite sx={{ color: 'red', fontSize: '20px' }} />
+                        ) : (
+                          <FavoriteBorder sx={{ fontSize: '20px' }} />
+                        )}
+                      </IconButton>
+                    </Box>
+                    <CardContent sx={{ padding: '8px' }}>
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontWeight: 'bold',
+                          fontSize: '14px',
+                          color: 'black',
+                          marginBottom: '4px',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          height: '40px'
+                        }}
+                      >
+                        {product.title}
+                      </Typography>
+                      
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '8px' }}>
+                        {renderStars(product.rating ?? 0)}
+                      </Box>
+
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontSize: '14px',
+                          color: '#666666',
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        ${product.price}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Box>
+              );
+            }) : (
+              <Box sx={{ width: '100%', textAlign: 'center', padding: '40px' }}>
+                <Typography color="textSecondary">No ranking data available yet.</Typography>
+              </Box>
+            )}
+          </Box>
         </Box>
       </Container>
 

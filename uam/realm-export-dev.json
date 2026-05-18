@@ -53,7 +53,7 @@
       "webOrigins": [
         "http://localhost"
       ],
-      "directAccessGrantsEnabled": false,
+      "directAccessGrantsEnabled": true,
       "defaultClientScopes": [
         "web-origins",
         "role_list",

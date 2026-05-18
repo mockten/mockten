@@ -26,6 +26,7 @@ import {
   DialogActions,
   CircularProgress,
   Pagination,
+  IconButton,
 } from '@mui/material';
 import {
   Star,
@@ -36,6 +37,8 @@ import {
   Apartment,
   DirectionsBoat,
   Flight,
+  Favorite,
+  FavoriteBorder,
 } from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
@@ -265,6 +268,9 @@ const ItemDetailNew: React.FC = () => {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
 
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
+
   const reviewsPageSize = 20;
 
   const productIdForImages = useMemo(() => {
@@ -326,6 +332,23 @@ const ItemDetailNew: React.FC = () => {
     };
 
     fetchShipping();
+  }, [id]);
+
+  useEffect(() => {
+    const checkFavorite = async () => {
+      try {
+        const res = await apiClient.get('/api/fav');
+        if (res.data && Array.isArray(res.data)) {
+          const found = res.data.some((item: any) => item.productId === id);
+          setIsFavorite(found);
+        }
+      } catch (e) {
+        console.error('Failed to check favorite', e);
+      }
+    };
+    if (id) {
+      checkFavorite();
+    }
   }, [id]);
 
   useEffect(() => {
@@ -479,6 +502,31 @@ const ItemDetailNew: React.FC = () => {
       setSnackbarMessage('Add to cart failed');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
+    }
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!product?.product_id || favoriteLoading) return;
+    setFavoriteLoading(true);
+    try {
+      if (isFavorite) {
+        await apiClient.delete(`/api/fav/${product.product_id}`);
+        setIsFavorite(false);
+        setSnackbarMessage('Removed from favorites');
+      } else {
+        await apiClient.post(`/api/fav/${product.product_id}`);
+        setIsFavorite(true);
+        setSnackbarMessage('Added to favorites');
+      }
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    } catch (err: any) {
+      console.error(err);
+      setSnackbarMessage('Failed to update favorite');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setFavoriteLoading(false);
     }
   };
 
@@ -741,18 +789,22 @@ const ItemDetailNew: React.FC = () => {
                 {product.category}
               </Typography>
 
-              <Typography
-                variant="h4"
-                sx={{
-                  fontFamily: 'Noto Sans',
-                  fontWeight: 'bold',
-                  fontSize: '24px',
-                  color: 'black',
-                  marginBottom: '16px',
-                }}
-              >
-                {product.name}
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontFamily: 'Noto Sans',
+                    fontWeight: 'bold',
+                    fontSize: '24px',
+                    color: 'black',
+                  }}
+                >
+                  {product.name}
+                </Typography>
+                <IconButton onClick={handleToggleFavorite} disabled={favoriteLoading} size="large" aria-label="Toggle Favorite">
+                  {isFavorite ? <Favorite sx={{ color: 'red', fontSize: '32px' }} /> : <FavoriteBorder sx={{ fontSize: '32px' }} />}
+                </IconButton>
+              </Box>
 
               <Box sx={{ marginBottom: '16px' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
