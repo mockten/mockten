@@ -24,10 +24,11 @@ func (r *MySQLProductRepo) GetByIDs(ctx context.Context, productIDs []string) ([
 
 	query, args, err := sqlx.In(`
 		SELECT
-		  product_id, product_name, seller_id, price, category_id, summary,
-		  product_condition, geo_id, regist_day, last_update
-		FROM Product
-		WHERE product_id IN (?)
+		  p.product_id, p.product_name, p.seller_id, p.price, p.category_id, p.summary,
+		  p.product_condition, p.geo_id, p.regist_day, p.last_update, COALESCE(s.stocks, 0) as stocks
+		FROM Product p
+		LEFT JOIN Stock s ON p.product_id = s.product_id
+		WHERE p.product_id IN (?)
 	`, productIDs)
 	if err != nil {
 		zap.L().Debug("sqlx.In",

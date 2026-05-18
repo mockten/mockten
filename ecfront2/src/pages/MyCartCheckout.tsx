@@ -76,7 +76,6 @@ const MyCartCheckout: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState('credit-card');
   const [savedCards, setSavedCards] = useState<any[]>([]);
   const [selectedCardId, setSelectedCardId] = useState('');
-  const [securityCode, setSecurityCode] = useState('');
 
   const [addresses, setAddresses] = useState<GeoAddress[]>([]);
   const [shippingAddress, setShippingAddress] = useState<GeoAddress | null>(null);
@@ -595,34 +594,6 @@ const MyCartCheckout: React.FC = () => {
                   )}
                 </Select>
               </FormControl>
-              <Box sx={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '32px' }}>
-                <Typography
-                  sx={{
-                    fontFamily: 'Noto Sans',
-                    fontSize: '16px',
-                    color: 'black',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  Security Code
-                </Typography>
-                <TextField
-                  type="password"
-                  value={securityCode}
-                  onChange={(e) => setSecurityCode(e.target.value)}
-                  placeholder=""
-                  sx={{
-                    width: '175px',
-                    '& .MuiOutlinedInput-root': {
-                      height: '50px',
-                      borderRadius: '4px',
-                      '& fieldset': {
-                        borderColor: '#dddddd',
-                      },
-                    },
-                  }}
-                />
-              </Box>
             </Box>
 
             {/* Action Buttons */}

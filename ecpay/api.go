@@ -21,9 +21,15 @@ type PaymentMethodRequest struct {
 	PaymentMethodID string `json:"payment_method_id"`
 }
 
+type CartItemReq struct {
+	ProductID string `json:"product_id"`
+	Quantity  int    `json:"quantity"`
+}
+
 type CheckoutRequest struct {
-	PaymentMethodID string `json:"payment_method_id"`
-	Amount          int64  `json:"amount"` // typically calculated by backend but for mockup here
+	PaymentMethodID string        `json:"payment_method_id"`
+	Amount          int64         `json:"amount"` // typically calculated by backend but for mockup here
+	Items           []CartItemReq `json:"items"`
 }
 
 type UserContext struct {
@@ -343,6 +349,15 @@ func handleCreatePayment(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record payment: " + err.Error()})
 		return
+	}
+
+	if statusStr == "captured" || statusStr == "authorized" {
+		for _, item := range req.Items {
+			_, err := db.Exec("UPDATE Stock SET stocks = GREATEST(0, stocks - ?) WHERE product_id = ?", item.Quantity, item.ProductID)
+			if err != nil {
+				log.Printf("failed to decrement stock for product %s: %v", item.ProductID, err)
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "success", "payment_intent_id": pi.ID, "payment_id": paymentID})

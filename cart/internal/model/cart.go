@@ -30,6 +30,7 @@ type Product struct {
 	GeoID            string    `db:"geo_id"`
 	RegistDay        time.Time `db:"regist_day"`
 	LastUpdate       time.Time `db:"last_update"`
+	Stocks           int       `db:"stocks"`
 }
 
 // For API response (image URL is built in the frontend)
@@ -44,6 +45,7 @@ type ProductDTO struct {
 	GeoID            string    `json:"geo_id"`
 	RegistDay        time.Time `json:"regist_day"`
 	LastUpdate       time.Time `json:"last_update"`
+	Stocks           int       `json:"stocks"`
 }
 
 type CartViewItem struct {
