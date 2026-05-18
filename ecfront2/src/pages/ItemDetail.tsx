@@ -801,7 +801,7 @@ const ItemDetailNew: React.FC = () => {
                 >
                   {product.name}
                 </Typography>
-                <IconButton onClick={handleToggleFavorite} disabled={favoriteLoading} size="large">
+                <IconButton onClick={handleToggleFavorite} disabled={favoriteLoading} size="large" aria-label="Toggle Favorite">
                   {isFavorite ? <Favorite sx={{ color: 'red', fontSize: '32px' }} /> : <FavoriteBorder sx={{ fontSize: '32px' }} />}
                 </IconButton>
               </Box>
