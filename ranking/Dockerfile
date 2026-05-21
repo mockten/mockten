@@ -14,6 +14,6 @@ RUN adduser sys-user --disabled-password &&\
     chown sys-user:sys-user /ranking &&\
     chown sys-user:sys-user /var/log/apl
 HEALTHCHECK --interval=5m --timeout=30s \
-CMD curl -f http://localhost:9100/metrics || exit 1
+    CMD curl -f http://localhost:9100/metrics || exit 1
 USER sys-user
 ENTRYPOINT ["./ranking"]
