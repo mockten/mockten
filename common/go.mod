@@ -1,6 +1,6 @@
 module github.com/mockten/mockten/common
 
-go 1.25
+go 1.23.2
 
 require (
 	github.com/MicahParks/keyfunc v1.9.0

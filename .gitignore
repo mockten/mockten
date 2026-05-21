@@ -18,6 +18,14 @@ ecfront2/node_modules/*
 /ecfront2/node_modules/.vite
 /ecfront2/node_modules/.vite
 uam/config.json
+uam/config.json
 profile/test.sh
 con_db.sh
-.DS_Store
+uam/config.json
+ecpay/test.text
+.secrets
+.clinerules
+ecfront2/debug_payment_page.png
+ecfront2/playwright-report/
+ecfront2/test-results/
+test-results/

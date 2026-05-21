@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import apiClient from '../module/apiClient';
 import {
   Box,
   Container,
@@ -8,6 +9,12 @@ import {
   Card,
   CardContent,
   LinearProgress,
+  Select,
+  MenuItem,
+  Pagination,
+  FormControl,
+  InputLabel,
+  Stack,
 } from '@mui/material';
 import {
   Inventory,
@@ -44,41 +51,42 @@ interface RecommendedProduct {
 const OrderHistoryNew: React.FC = () => {
   const navigate = useNavigate();
 
-  // Mock data - replace with actual API calls
-  const mockOrders: Order[] = [
-    {
-      id: 1,
-      name: 'Sample Name',
-      purchaseDate: 'July 12',
-      status: 'Order Confirming',
-      quantity: 1,
-      image: photoSvg,
-    },
-    {
-      id: 2,
-      name: 'Sample Name',
-      purchaseDate: 'Jun 23',
-      status: 'Shipping',
-      quantity: 1,
-      image: photoSvg,
-    },
-    {
-      id: 3,
-      name: 'Sample Name',
-      purchaseDate: 'Jun 15',
-      status: 'Delivered',
-      quantity: 1,
-      image: photoSvg,
-    },
-    {
-      id: 4,
-      name: 'Sample',
-      purchaseDate: 'May 30',
-      status: 'Delivered',
-      quantity: 1,
-      image: photoSvg,
-    },
-  ];
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const userinfoRes = await apiClient.get('/api/uam/userinfo');
+        const userId = userinfoRes.data.email || userinfoRes.data.preferred_username;
+        if (!userId) {
+          setLoading(false);
+          return;
+        }
+
+        const res = await apiClient.get(`/api/shipment?userId=${userId}`);
+        const data = res.data || [];
+        
+        const mappedOrders: Order[] = data.map((item: any) => ({
+          id: item.transaction_id,
+          name: item.product_name || 'Unknown Product',
+          purchaseDate: item.purchase_date,
+          status: item.status === 'booked' ? 'Order Confirming' : 
+                  (item.status === 'picked_up' || item.status === 'in_transit') ? 'Shipping' : 'Delivered',
+          quantity: 1,
+          image: `/api/storage/${item.product_id}.png`,
+        }));
+        setOrders(mappedOrders);
+      } catch (err) {
+        console.error('Failed to fetch orders', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOrders();
+  }, []);
 
   const mockRecommendedProducts: RecommendedProduct[] = [
     {
@@ -142,15 +150,18 @@ const OrderHistoryNew: React.FC = () => {
   const getStatusProgress = (status: Order['status']) => {
     switch (status) {
       case 'Order Confirming':
-        return { step1: true, step2: false, step3: false, progress: 33 };
+        return { step1: true, step2: false, step3: false, progress: 15 };
       case 'Shipping':
-        return { step1: true, step2: true, step3: false, progress: 66 };
+        return { step1: true, step2: true, step3: false, progress: 55 };
       case 'Delivered':
         return { step1: true, step2: true, step3: true, progress: 100 };
       default:
         return { step1: false, step2: false, step3: false, progress: 0 };
     }
   };
+
+  const totalPages = Math.ceil(orders.length / rowsPerPage);
+  const paginatedOrders = orders.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
   return (
     <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
@@ -193,17 +204,22 @@ const OrderHistoryNew: React.FC = () => {
         </Box>
 
         {/* Order Items */}
-        <Box sx={{ marginBottom: '64px' }}>
-          {mockOrders.map((order) => {
-            const progress = getStatusProgress(order.status);
-            return (
+        <Box sx={{ marginBottom: '32px' }}>
+          {loading ? (
+            <Typography>Loading...</Typography>
+          ) : orders.length === 0 ? (
+            <Typography>There are no purchase history records.</Typography>
+          ) : (
+            paginatedOrders.map((order) => {
+              const progress = getStatusProgress(order.status);
+              return (
               <Box
                 key={order.id}
                 sx={{
                   display: 'flex',
                   alignItems: 'flex-start',
                   gap: '32px',
-                  marginBottom: '48px',
+                  marginBottom: '24px',
                   padding: '16px',
                   border: '1px solid #f0f0f0',
                   borderRadius: '8px',
@@ -222,7 +238,7 @@ const OrderHistoryNew: React.FC = () => {
                     flexShrink: 0,
                   }}
                 >
-                  <img src={order.image} alt={order.name} style={{ width: '64px', height: '64px' }} />
+                  <img src={order.image} alt={order.name} style={{ width: '64px', height: '64px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.src = photoSvg; }} />
                 </Box>
 
                 {/* Order Details */}
@@ -308,8 +324,49 @@ const OrderHistoryNew: React.FC = () => {
                 </Box>
               </Box>
             );
-          })}
+          }))}
         </Box>
+
+        {/* Pagination */}
+        {!loading && orders.length > 0 && (
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            sx={{ marginBottom: '48px', flexWrap: 'wrap', gap: 2 }}
+          >
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel sx={{ fontFamily: 'Noto Sans' }}>Per page</InputLabel>
+              <Select
+                value={rowsPerPage}
+                label="Per page"
+                onChange={(e) => {
+                  setRowsPerPage(Number(e.target.value));
+                  setPage(1);
+                }}
+                sx={{ fontFamily: 'Noto Sans' }}
+              >
+                <MenuItem value={5}>5</MenuItem>
+                <MenuItem value={10}>10</MenuItem>
+                <MenuItem value={25}>25</MenuItem>
+              </Select>
+            </FormControl>
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={(_e, v) => setPage(v)}
+              color="primary"
+              shape="rounded"
+              sx={{
+                '& .MuiPaginationItem-root': { fontFamily: 'Noto Sans' },
+                '& .Mui-selected': { backgroundColor: '#5856D6 !important', color: 'white' },
+              }}
+            />
+            <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: '#666' }}>
+              {(page - 1) * rowsPerPage + 1}–{Math.min(page * rowsPerPage, orders.length)} of {orders.length}
+            </Typography>
+          </Stack>
+        )}
 
         {/* Recommended Products */}
         <Box sx={{ marginTop: '64px' }}>

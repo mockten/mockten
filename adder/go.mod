@@ -1,6 +1,6 @@
 module github.com/mockten/mockten/adder
 
-go 1.25
+go 1.21.4
 
 require (
 	cloud.google.com/go/storage v1.40.0

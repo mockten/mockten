@@ -322,3 +322,15 @@ services:
           - GET
           - POST
           - OPTIONS
+
+  - name: shipment-service
+    url: http://shipment-service.default.svc.cluster.local:8080/v1/shipment
+    routes:
+      - name: shipment-service-route
+        paths:
+          - /api/shipment
+        strip_path: true
+        methods:
+          - GET
+          - POST
+          - OPTIONS

@@ -1,4 +1,4 @@
-FROM golang:1.25 as builder
+FROM golang:1.20.1 as builder
 
 RUN apt-get update &&\
     apt-get -y install sysv-rc-conf
@@ -20,6 +20,6 @@ RUN adduser sys-user --disabled-password &&\
     chown sys-user:sys-user /config.ini &&\
     chown sys-user:sys-user /var/log/apl
 HEALTHCHECK --interval=5m --timeout=30s \
-    CMD curl -f http://localhost:9100/metrics || exit 1
+CMD curl -f http://localhost:9100/metrics || exit 1
 USER sys-user
 ENTRYPOINT ["./notification"]
