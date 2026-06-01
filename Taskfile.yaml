@@ -23,11 +23,11 @@ tasks:
       - (cd ecfront2 && TEST_MODE=true npm run dev -- --host 0.0.0.0 --port 5173)
   destroy: 
     cmds:
-      - docker stop mockten-sync
-      - docker ps --no-trunc | awk '$NF ~ /-service\.default\.svc\.cluster\.local$/ { print $NF }' | xargs -r docker stop
-      - docker stop nginx
-      - docker stop apigw
-      - docker network rm mockten_nw
+      - docker stop mockten-sync || true
+      - docker ps --no-trunc | awk '$NF ~ /-service\.default\.svc\.cluster\.local$/ { print $NF }' | xargs -r docker stop || true
+      - docker stop nginx || true
+      - docker stop apigw || true
+      - docker network rm mockten_nw || true
   ci:
     desc: Run CI workflows locally using act
     cmds:

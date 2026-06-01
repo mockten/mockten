@@ -327,6 +327,20 @@ const MyCartConfirm: React.FC = () => {
                        Shipping：{item.shipping_type}
                      </Typography>
                     )}
+                    {item.saleFlag && item.discountRate && item.discountRate > 0 ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'red', textDecoration: 'line-through' }}>
+                          ${item.price.toLocaleString()}
+                        </Typography>
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
+                          ${Math.round(item.price * (1 - item.discountRate)).toLocaleString()}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', marginTop: '4px' }}>
+                        Price : ${item.price ? item.price.toLocaleString() : '0'}
+                      </Typography>
+                    )}
                   </Box>
                 </Box>
               )) : (

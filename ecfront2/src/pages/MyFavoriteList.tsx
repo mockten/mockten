@@ -34,6 +34,8 @@ interface FavoriteItem {
   rating: number;
   shippingOptions: { fee: number, label: string, days: number }[];
   selectedShippingLabel: string;
+  discountRate?: number;
+  saleFlag?: boolean;
 }
 
 
@@ -112,6 +114,8 @@ const FavoritesListNew: React.FC = () => {
             rating: item.avgReview || 0,
             shippingOptions,
             selectedShippingLabel: cheapest.label,
+            discountRate: item.discountRate || 0,
+            saleFlag: item.saleFlag || false,
           };
         }));
         setFavoriteItems(mappedItems);
@@ -201,12 +205,18 @@ const FavoritesListNew: React.FC = () => {
     
     const selectedShip = item.shippingOptions.find(opt => opt.label === item.selectedShippingLabel) || item.shippingOptions[0];
     
+    const discountedPrice = item.saleFlag && item.discountRate && item.discountRate > 0
+      ? Math.round(item.price * (1 - item.discountRate))
+      : item.price;
+
     const purchaseItem = {
       id: item.id,
       productId: item.id,
       name: item.name,
       description: item.description,
       price: item.price,
+      saleFlag: item.saleFlag,
+      discountRate: item.discountRate,
       quantity: item.selectedQuantity,
       shipping_fee: selectedShip.fee,
       shipping_type: selectedShip.label,
@@ -215,7 +225,7 @@ const FavoritesListNew: React.FC = () => {
       image: item.image,
     };
 
-    const itemSubtotal = item.price * item.selectedQuantity;
+    const itemSubtotal = discountedPrice * item.selectedQuantity;
     const fee = selectedShip.fee;
 
     navigate('/cart/checkout', { 
@@ -357,17 +367,28 @@ const FavoritesListNew: React.FC = () => {
                     >
                       {item.description}
                     </Typography>
-                    <Typography
-                      sx={{
-                        fontFamily: 'Noto Sans',
-                        fontSize: '18px',
-                        fontWeight: 'bold',
-                        color: 'black',
-                        marginTop: '8px',
-                      }}
-                    >
-                      ${item.price}
-                    </Typography>
+                    {item.saleFlag && item.discountRate && item.discountRate > 0 ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'red', textDecoration: 'line-through' }}>
+                          ${item.price.toLocaleString()}
+                        </Typography>
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '18px', color: 'black' }}>
+                          ${Math.round(item.price * (1 - item.discountRate)).toLocaleString()}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontSize: '18px',
+                          fontWeight: 'bold',
+                          color: 'black',
+                          marginTop: '8px',
+                        }}
+                      >
+                        ${item.price.toLocaleString()}
+                      </Typography>
+                    )}
                   </Box>
 
                   {/* Add to Cart Section */}

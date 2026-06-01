@@ -113,6 +113,9 @@ type FavoriteItemResponse struct {
 	Stocks            int              `json:"stocks"`
 	AvgReview         float64          `json:"avgReview"`
 	ReviewCount       int              `json:"reviewCount"`
+	SaleFlag          bool             `json:"saleFlag"`
+	SaleID            string           `json:"saleId"`
+	DiscountRate      float64          `json:"discountRate"`
 }
 
 func waitForMySQL(db *sql.DB, logger *zap.Logger) {
@@ -747,11 +750,15 @@ SELECT
   COALESCE(t.stocks, 0) AS stocks,
   p.summary,
   p.avg_review,
-  p.review_count
+  p.review_count,
+  p.sale_flag,
+  COALESCE(p.sale_id, '') AS sale_id,
+  COALESCE(ts.discount_rate, 0.0) AS discount_rate
 FROM Product p
 LEFT JOIN Stock t ON p.product_id = t.product_id
 LEFT JOIN Seller s ON p.seller_id = s.seller_id
 LEFT JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
+LEFT JOIN TimeSale ts ON p.sale_id = ts.id
 WHERE p.product_id IN (?` + strings.Repeat(",?", len(productIDs)-1) + `)
 `
 		args := make([]interface{}, len(productIDs))
@@ -783,6 +790,9 @@ WHERE p.product_id IN (?` + strings.Repeat(",?", len(productIDs)-1) + `)
 				&resp.Summary,
 				&avgReview,
 				&reviewCount,
+				&resp.SaleFlag,
+				&resp.SaleID,
+				&resp.DiscountRate,
 			)
 			if err != nil {
 				continue

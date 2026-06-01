@@ -675,6 +675,20 @@ const MyCartCheckout: React.FC = () => {
                       <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', fontWeight: 'bold' }}>{item.name}</Typography>
                       <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '12px', color: '#666' }}>Quantity: {item.quantity}</Typography>
                       <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '12px', color: '#666' }}>Shipping: {item.shipping_type}</Typography>
+                      {item.saleFlag && item.discountRate && item.discountRate > 0 ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                          <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '12px', color: 'red', textDecoration: 'line-through' }}>
+                            ${item.price.toLocaleString()}
+                          </Typography>
+                          <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '12px', color: 'black' }}>
+                            ${Math.round(item.price * (1 - item.discountRate)).toLocaleString()}
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '12px', color: 'black', marginTop: '2px' }}>
+                          ${item.price.toLocaleString()}
+                        </Typography>
+                      )}
                     </Box>
                   </Box>
                 ))}

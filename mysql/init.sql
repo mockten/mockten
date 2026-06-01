@@ -10,7 +10,8 @@ INSERT INTO TimeSale (id, name, start_date, end_date, discount_rate)
 VALUES
 ('f1234567-abcd-1234-abcd-1234567890ab', 'Mockten Super Sale', '2026-06-01 00:00:00', '2026-06-30 23:59:59', 0.10),
 ('f2345678-abcd-1234-abcd-1234567890ab', "Father's day Sale", '2026-06-14 00:00:00', '2026-06-28 23:59:59', 0.30),
-('f3456789-abcd-1234-abcd-1234567890ab', 'June Deals', '2026-06-01 00:00:00', '2026-06-30 23:59:59', 0.20)
+('f3456789-abcd-1234-abcd-1234567890ab', 'June Deals', '2026-06-01 00:00:00', '2026-06-30 23:59:59', 0.20),
+('f456789a-abcd-1234-abcd-1234567890ab', 'July Hot Deals', '2026-06-01 00:00:00', '2026-07-31 23:59:59', 0.15)
 ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   start_date = VALUES(start_date),
@@ -226,9 +227,9 @@ VALUES
 ('fb28d68b-fd2d-4db9-9d6b-dbb13f63f24f','Parmesan Cheese','cooking@example.com',16,'03','Finely grated parmesan cheese for pasta.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 1, 'f2345678-abcd-1234-abcd-1234567890ab'),
 ('c8ba2aec-ec56-46dd-a62b-067087b22628','Soy Sauce Bottle','cooking@example.com',9,'03','Traditional soy sauce to enhance flavor.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 1, 'f3456789-abcd-1234-abcd-1234567890ab'),
 ('a0a27644-61f1-47cd-88ea-e4e886f6bb1b','Bottle Can Coffee','drink@example.com',6,'03','Refreshing canned coffee for a quick boost.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
-('a8c4e635-8502-4d7b-b3e4-c730d7d34fa4','Sparkling Water','drink@example.com',15,'03','Refreshing sparkling water in a classic bottle.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
-('e63d496d-5a93-4e31-a623-5c55a3b2f941','Grape Juice','drink@example.com',18,'03','Rich grape juice for relaxing moments.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
-('f203372b-e650-4e98-b67b-269ceaa1d01a','Zero Cola','drink@example.com',7,'03','Sugar-free cola with crisp taste.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('a8c4e635-8502-4d7b-b3e4-c730d7d34fa4','Sparkling Water','drink@example.com',15,'03','Refreshing sparkling water in a classic bottle.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 1, 'f456789a-abcd-1234-abcd-1234567890ab'),
+('e63d496d-5a93-4e31-a623-5c55a3b2f941','Grape Juice','drink@example.com',18,'03','Rich grape juice for relaxing moments.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 1, 'f456789a-abcd-1234-abcd-1234567890ab'),
+('f203372b-e650-4e98-b67b-269ceaa1d01a','Zero Cola','drink@example.com',7,'03','Sugar-free cola with crisp taste.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 1, 'f456789a-abcd-1234-abcd-1234567890ab'),
 ('5bd23c48-72b2-4b80-badc-cd56b314d073','Cup Soup','drink@example.com',5,'03','Simple and warm instant cup soup.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
 ('0ef627dd-d8d1-44b3-a340-0c56bebda12d','Energy Drink Can','drink@example.com',8,'03','Energy drink for an instant refreshment.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
 ('404586d7-d357-4659-90fb-91e6aedc2f13','Milk','drink@example.com',9,'03','Fresh milk conveniently packed with cap.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
