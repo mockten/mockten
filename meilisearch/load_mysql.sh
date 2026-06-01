@@ -34,13 +34,17 @@ SELECT
   p.product_condition,
   t.stocks,
   p.avg_review,
-  p.review_count
+  p.review_count,
+  p.sale_flag,
+  COALESCE(p.sale_id, '') AS sale_id,
+  COALESCE(ts.discount_rate, 0.0) AS discount_rate
 FROM Product p
 JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
 JOIN USER_GROUP_MEMBERSHIP ugm ON ue.ID = ugm.USER_ID
 JOIN KEYCLOAK_GROUP kg ON ugm.GROUP_ID = kg.ID
 JOIN Category c ON p.category_id = c.category_id
 JOIN Stock t ON p.product_id = t.product_id
+LEFT JOIN TimeSale ts ON p.sale_id = ts.id
 WHERE kg.NAME = 'Seller'
 " > /tmp/products.tsv
 
@@ -49,7 +53,7 @@ current_line=0
 
 {
   echo "["
-  while IFS=$'\t' read -r id name seller price category condition stocks avg_review review_count
+  while IFS=$'\t' read -r id name seller price category condition stocks avg_review review_count sale_flag sale_id discount_rate
   do
     current_line=$((current_line + 1))
     id_clean=$(echo "$id" | tr -d '\000-\037' | sed 's/"/\\"/g')
@@ -57,22 +61,25 @@ current_line=0
     seller_clean=$(echo "$seller" | tr -d '\000-\037' | sed 's/"/\\"/g')
     category_clean=$(echo "$category" | tr -d '\000-\037' | sed 's/"/\\"/g')
     condition_clean=$(echo "$condition" | tr -d '\000-\037' | sed 's/"/\\"/g')
+    sale_id_clean=$(echo "$sale_id" | tr -d '\000-\037' | sed 's/"/\\"/g')
 
     price_num=${price:-0}
     stocks_num=${stocks:-0}
     avg_review_num=${avg_review:-0}
     review_count_num=${review_count:-0}
+    sale_flag_bool=$( [ "$sale_flag" = "1" ] && echo "true" || echo "false" )
+    discount_rate_num=${discount_rate:-0.0}
 
     if [ "$current_line" -eq "$total_lines" ]; then
-      echo "  {\"product_id\":\"$id_clean\",\"product_name\":\"$name_clean\",\"seller_name\":\"$seller_clean\",\"price\":$price_num,\"category_name\":\"$category_clean\",\"condition\":\"$condition_clean\",\"stocks\":$stocks_num,\"avg_review\":$avg_review_num,\"review_count\":$review_count_num}"
+      echo "  {\"product_id\":\"$id_clean\",\"product_name\":\"$name_clean\",\"seller_name\":\"$seller_clean\",\"price\":$price_num,\"category_name\":\"$category_clean\",\"condition\":\"$condition_clean\",\"stocks\":$stocks_num,\"avg_review\":$avg_review_num,\"review_count\":$review_count_num,\"sale_flag\":$sale_flag_bool,\"sale_id\":\"$sale_id_clean\",\"discount_rate\":$discount_rate_num}"
     else
-      echo "  {\"product_id\":\"$id_clean\",\"product_name\":\"$name_clean\",\"seller_name\":\"$seller_clean\",\"price\":$price_num,\"category_name\":\"$category_clean\",\"condition\":\"$condition_clean\",\"stocks\":$stocks_num,\"avg_review\":$avg_review_num,\"review_count\":$review_count_num},"
+      echo "  {\"product_id\":\"$id_clean\",\"product_name\":\"$name_clean\",\"seller_name\":\"$seller_clean\",\"price\":$price_num,\"category_name\":\"$category_clean\",\"condition\":\"$condition_clean\",\"stocks\":$stocks_num,\"avg_review\":$avg_review_num,\"review_count\":$review_count_num,\"sale_flag\":$sale_flag_bool,\"sale_id\":\"$sale_id_clean\",\"discount_rate\":$discount_rate_num},"
     fi
   done < /tmp/products.tsv
   echo "]"
 } > /tmp/products.json
 
-curl -sf -X POST "$MEILI_URL/indexes/products/documents" \
+curl -sf -X POST "$MEILI_URL/indexes/products/documents?primaryKey=product_id" \
   -H 'Content-Type: application/json' \
   --data-binary @/tmp/products.json > /dev/null
 
@@ -93,5 +100,7 @@ curl -sf -X PUT "$MEILI_URL/indexes/products/settings/filterable-attributes" \
     "stocks",
     "price",
     "avg_review",
-    "review_count"
+    "review_count",
+    "sale_flag",
+    "sale_id"
   ]' > /dev/null

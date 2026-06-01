@@ -1,3 +1,22 @@
+CREATE TABLE IF NOT EXISTS TimeSale (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  start_date DATETIME NOT NULL,
+  end_date DATETIME NOT NULL,
+  discount_rate DECIMAL(3,2) NOT NULL
+);
+
+INSERT INTO TimeSale (id, name, start_date, end_date, discount_rate)
+VALUES
+('f1234567-abcd-1234-abcd-1234567890ab', 'Mockten Super Sale', '2026-06-01 00:00:00', '2026-06-30 23:59:59', 0.10),
+('f2345678-abcd-1234-abcd-1234567890ab', "Father's day Sale", '2026-06-14 00:00:00', '2026-06-28 23:59:59', 0.30),
+('f3456789-abcd-1234-abcd-1234567890ab', 'June Deals', '2026-06-01 00:00:00', '2026-06-30 23:59:59', 0.20)
+ON DUPLICATE KEY UPDATE
+  name = VALUES(name),
+  start_date = VALUES(start_date),
+  end_date = VALUES(end_date),
+  discount_rate = VALUES(discount_rate);
+
 CREATE TABLE IF NOT EXISTS Seller (
   seller_id VARCHAR(64) PRIMARY KEY,
   seller_name VARCHAR(255),
@@ -24,6 +43,8 @@ CREATE TABLE IF NOT EXISTS Product (
   review_count INT NOT NULL DEFAULT 0,
   regist_day DATETIME DEFAULT CURRENT_TIMESTAMP,
   last_update DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  sale_flag TINYINT(1) NOT NULL DEFAULT 0,
+  sale_id VARCHAR(36) NULL,
   KEY idx_product_category (category_id),
   KEY idx_product_geo (geo_id),
   KEY idx_product_last_update (last_update)
@@ -190,54 +211,54 @@ ON DUPLICATE KEY UPDATE
   category_name = VALUES(category_name),
   category_image = VALUES(category_image);
 
-INSERT INTO Product (product_id, product_name, seller_id, price, category_id, summary, product_condition, geo_id, avg_review, review_count)
+INSERT INTO Product (product_id, product_name, seller_id, price, category_id, summary, product_condition, geo_id, avg_review, review_count, sale_flag, sale_id)
 VALUES
-('b150d47f-f4fb-40a2-a336-ac8e897af607', 'Bone conduction earphones', 'headphonecompany@example.com', 500, '07', 'Experience clear sound without blocking your ears.', 'new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('580414f1-e962-4f6c-a461-d88d168e7cb1', 'Lemongrass', 'greengrocer@example.com', 6, '03', 'Fresh and aromatic lemongrass perfect for cooking or tea.', 'new', 'e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('91e438c6-f073-4c57-95b3-0f98ccdedf34', 'Playing cards', 'toycompany@example.com', 5, '09', 'Standard deck of playing cards for endless fun.', 'used','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('fe88e32f-678f-403a-bed2-331a4ff406c2', 'Protain bar', 'healthcompany@example.com', 20, '16', 'Delicious protein bars to power your workout.', 'new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('d82f659a-a1ff-47f5-afb8-c93c02702fa4', 'Snowboard', 'sportscompany@example.com', 100, '12', 'Designed for extreme winter sports with durability and sound clarity.', 'used','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('ad8e41bd-a9ff-4d18-9aed-3bcb8fa3bfc4','Strawberry Chocolate','sweets@example.com',10,'03','Sweet strawberry chocolate snack.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('7b1c5c71-6e88-4b72-9ad0-1e2d6b9b6111','Balsamic Vinegar','cooking@example.com',12,'03','Rich balsamic vinegar ideal for cooking and salads.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('e91b19b6-cb8e-4abd-ae3c-72fb0ea58491','Honey (Hachimitsu)','cooking@example.com',14,'03','Pure natural honey perfect for tea or desserts.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('1da5ef1b-2c41-4c3a-b8d2-e74048e0f92a','Ketchup Bottle','cooking@example.com',8,'03','Classic tomato ketchup for everyday meals.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('0b2cbf64-f73e-4c69-9f89-647db1e19fb4','Nabe Soup Base','cooking@example.com',11,'03','Warm soup base perfect for hot pot dishes.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('fb28d68b-fd2d-4db9-9d6b-dbb13f63f24f','Parmesan Cheese','cooking@example.com',16,'03','Finely grated parmesan cheese for pasta.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('c8ba2aec-ec56-46dd-a62b-067087b22628','Soy Sauce Bottle','cooking@example.com',9,'03','Traditional soy sauce to enhance flavor.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('a0a27644-61f1-47cd-88ea-e4e886f6bb1b','Bottle Can Coffee','drink@example.com',6,'03','Refreshing canned coffee for a quick boost.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('a8c4e635-8502-4d7b-b3e4-c730d7d34fa4','Sparkling Water','drink@example.com',15,'03','Refreshing sparkling water in a classic bottle.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('e63d496d-5a93-4e31-a623-5c55a3b2f941','Grape Juice','drink@example.com',18,'03','Rich grape juice for relaxing moments.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('f203372b-e650-4e98-b67b-269ceaa1d01a','Zero Cola','drink@example.com',7,'03','Sugar-free cola with crisp taste.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('5bd23c48-72b2-4b80-badc-cd56b314d073','Cup Soup','drink@example.com',5,'03','Simple and warm instant cup soup.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('0ef627dd-d8d1-44b3-a340-0c56bebda12d','Energy Drink Can','drink@example.com',8,'03','Energy drink for an instant refreshment.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('404586d7-d357-4659-90fb-91e6aedc2f13','Milk','drink@example.com',9,'03','Fresh milk conveniently packed with cap.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('9a487e3c-8d90-4e8c-8e9c-49f1e801b4af','Yasai Vegetable Juice','drink@example.com',6,'03','Healthy vegetable juice full of nutrients.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('a8cfbaa9-3b6d-4474-9558-28b8983d9332','Salad Chicken','food@example.com',12,'03','Tender salad chicken ready to eat.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('8d13b89f-029d-4621-8ac3-22065d7d25df','Miso Cup Ramen','food@example.com',7,'03','Rich miso-flavored instant ramen.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('f2d5e4f1-e459-4623-b665-995dcde9f5fa','Low-Sodium Cup Ramen','food@example.com',7,'03','Light cup ramen with reduced salt.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('9d37823d-0ad5-4b44-b70f-83aab7b8e2a1','Yakisoba Cup','food@example.com',6,'03','Savory instant yakisoba noodles.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('fc5fb21c-ffe1-46dc-a5cb-bc56071f6203','Freeze-Dried Meal','food@example.com',15,'03','Lightweight freeze-dried food for convenience.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('5c0ed03e-3706-4e1e-b6d8-7cc6b6df3c0f','Strawberry Sandwich','food@example.com',12,'03','Sweet strawberry cream fruit sandwich.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('73d062cf-6d55-434e-b825-c83dfaa5eaf4','Nattou Pack','food@example.com',5,'03','Traditional Japanese fermented soybeans.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('b72c04cf-5571-4a77-bec1-4c4e56d0d965','Yakiniku Meat Set','food@example.com',18,'03','Freshly prepared yakiniku BBQ set.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('d40144ee-e2a3-4740-8090-ccdc92ed8f2f','Oatmeal','food@example.com',10,'03','Healthy oatmeal perfect for breakfast.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('e79e4bbb-3f65-4bdf-9dda-6ce0656c9f8a','Kashipan Sweet Bread Set','food@example.com',6,'03','Soft sweet breads for snacks.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('ff2bf87c-ae70-4cc1-8bb5-fa923c4ba8a7','Laksa','food@example.com',12,'03','Spicy and rich laksa-flavored noodles.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('4e2a7db7-4762-4d55-b5e0-fb9b6053320e','Frozen Shrimp','food@example.com',14,'03','Fresh frozen shrimp for cooking.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('fa55d8e3-291e-4f06-a690-2b0b4f7d8e5b','Retort Curry','food@example.com',9,'03','Ready-to-eat rich curry meal.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('65fd3bbd-2743-4e72-9e63-4d5a3eca6f86','Watermelon (Round)','fruit@example.com',13,'03','Fresh round watermelon.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('8b7460c3-dc13-4a66-915f-2f64d716c607','Watermelon (Square)','fruit@example.com',16,'03','Unique square-shaped watermelon.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('aaf4d6ea-61a0-4afb-a386-34a6a91e6e6a','Strawberry Jam','jam@example.com',8,'03','Sweet strawberry jam for bread.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('c5ec7a88-b4eb-4f47-a832-3fa4c5ca5aa0','Marmalade','jam@example.com',8,'03','Bitter-sweet orange marmalade.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('b91a5d68-6acb-48e7-8e5d-3d85b7e76af2','Blueberry Jam','jam@example.com',9,'03','Rich blueberry jam full of flavor.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('50cbbe87-385e-4a60-b0d5-99b6ac0a969d','Apple Jam','jam@example.com',7,'03','Classic apple jam with mild sweetness.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('9a1ed557-4ea2-4523-959c-712fc3b9b748','PET Bottle Water','water@example.com',5,'03','Refreshing clean bottled water.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('e8f085de-89dd-4574-9dfd-f7c1352f9a25','Vegetables Mix','vegetable@example.com',7,'03','Fresh assorted vegetables.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('4b9f1c23-8e9a-4c26-a347-995046dfbb5d','Cut Vegetables','vegetable@example.com',6,'03','Pre-cut vegetables for easy cooking.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('24f0dd61-4663-4a0b-8cd0-d3c762ddc090','Frozen Vegetables','vegetable@example.com',8,'03','Frozen mixed vegetables.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('12b8cb8c-6ef9-4bb4-a022-2fd8f8d2b878','Donut','sweets@example.com',6,'03','Sweet and fluffy donut snack.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0),
-('bfd759cf-a8eb-47b1-a23d-dcba3f17366a','Chocolate','sweets@example.com',11,'03','Cute chocolate perfect for Valentine’s Day.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0),
-('c8a1b74b-d2c4-4d5d-a845-176b5457ec36','Space Food','space@example.com',20,'03','Lightweight space-ready food pack.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0)
+('b150d47f-f4fb-40a2-a336-ac8e897af607', 'Bone conduction earphones', 'headphonecompany@example.com', 500, '07', 'Experience clear sound without blocking your ears.', 'new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 1, 'f1234567-abcd-1234-abcd-1234567890ab'),
+('580414f1-e962-4f6c-a461-d88d168e7cb1', 'Lemongrass', 'greengrocer@example.com', 6, '03', 'Fresh and aromatic lemongrass perfect for cooking or tea.', 'new', 'e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 1, 'f2345678-abcd-1234-abcd-1234567890ab'),
+('91e438c6-f073-4c57-95b3-0f98ccdedf34', 'Playing cards', 'toycompany@example.com', 5, '09', 'Standard deck of playing cards for endless fun.', 'used','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 1, 'f3456789-abcd-1234-abcd-1234567890ab'),
+('fe88e32f-678f-403a-bed2-331a4ff406c2', 'Protain bar', 'healthcompany@example.com', 20, '16', 'Delicious protein bars to power your workout.', 'new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 1, 'f1234567-abcd-1234-abcd-1234567890ab'),
+('d82f659a-a1ff-47f5-afb8-c93c02702fa4', 'Snowboard', 'sportscompany@example.com', 100, '12', 'Designed for extreme winter sports with durability and sound clarity.', 'used','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 1, 'f2345678-abcd-1234-abcd-1234567890ab'),
+('ad8e41bd-a9ff-4d18-9aed-3bcb8fa3bfc4','Strawberry Chocolate','sweets@example.com',10,'03','Sweet strawberry chocolate snack.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 1, 'f3456789-abcd-1234-abcd-1234567890ab'),
+('7b1c5c71-6e88-4b72-9ad0-1e2d6b9b6111','Balsamic Vinegar','cooking@example.com',12,'03','Rich balsamic vinegar ideal for cooking and salads.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 1, 'f1234567-abcd-1234-abcd-1234567890ab'),
+('e91b19b6-cb8e-4abd-ae3c-72fb0ea58491','Honey (Hachimitsu)','cooking@example.com',14,'03','Pure natural honey perfect for tea or desserts.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 1, 'f2345678-abcd-1234-abcd-1234567890ab'),
+('1da5ef1b-2c41-4c3a-b8d2-e74048e0f92a','Ketchup Bottle','cooking@example.com',8,'03','Classic tomato ketchup for everyday meals.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 1, 'f3456789-abcd-1234-abcd-1234567890ab'),
+('0b2cbf64-f73e-4c69-9f89-647db1e19fb4','Nabe Soup Base','cooking@example.com',11,'03','Warm soup base perfect for hot pot dishes.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 1, 'f1234567-abcd-1234-abcd-1234567890ab'),
+('fb28d68b-fd2d-4db9-9d6b-dbb13f63f24f','Parmesan Cheese','cooking@example.com',16,'03','Finely grated parmesan cheese for pasta.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 1, 'f2345678-abcd-1234-abcd-1234567890ab'),
+('c8ba2aec-ec56-46dd-a62b-067087b22628','Soy Sauce Bottle','cooking@example.com',9,'03','Traditional soy sauce to enhance flavor.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 1, 'f3456789-abcd-1234-abcd-1234567890ab'),
+('a0a27644-61f1-47cd-88ea-e4e886f6bb1b','Bottle Can Coffee','drink@example.com',6,'03','Refreshing canned coffee for a quick boost.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('a8c4e635-8502-4d7b-b3e4-c730d7d34fa4','Sparkling Water','drink@example.com',15,'03','Refreshing sparkling water in a classic bottle.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('e63d496d-5a93-4e31-a623-5c55a3b2f941','Grape Juice','drink@example.com',18,'03','Rich grape juice for relaxing moments.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('f203372b-e650-4e98-b67b-269ceaa1d01a','Zero Cola','drink@example.com',7,'03','Sugar-free cola with crisp taste.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('5bd23c48-72b2-4b80-badc-cd56b314d073','Cup Soup','drink@example.com',5,'03','Simple and warm instant cup soup.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('0ef627dd-d8d1-44b3-a340-0c56bebda12d','Energy Drink Can','drink@example.com',8,'03','Energy drink for an instant refreshment.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('404586d7-d357-4659-90fb-91e6aedc2f13','Milk','drink@example.com',9,'03','Fresh milk conveniently packed with cap.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('9a487e3c-8d90-4e8c-8e9c-49f1e801b4af','Yasai Vegetable Juice','drink@example.com',6,'03','Healthy vegetable juice full of nutrients.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('a8cfbaa9-3b6d-4474-9558-28b8983d9332','Salad Chicken','food@example.com',12,'03','Tender salad chicken ready to eat.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('8d13b89f-029d-4621-8ac3-22065d7d25df','Miso Cup Ramen','food@example.com',7,'03','Rich miso-flavored instant ramen.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('f2d5e4f1-e459-4623-b665-995dcde9f5fa','Low-Sodium Cup Ramen','food@example.com',7,'03','Light cup ramen with reduced salt.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('9d37823d-0ad5-4b44-b70f-83aab7b8e2a1','Yakisoba Cup','food@example.com',6,'03','Savory instant yakisoba noodles.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('fc5fb21c-ffe1-46dc-a5cb-bc56071f6203','Freeze-Dried Meal','food@example.com',15,'03','Lightweight freeze-dried food for convenience.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('5c0ed03e-3706-4e1e-b6d8-7cc6b6df3c0f','Strawberry Sandwich','food@example.com',12,'03','Sweet strawberry cream fruit sandwich.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('73d062cf-6d55-434e-b825-c83dfaa5eaf4','Nattou Pack','food@example.com',5,'03','Traditional Japanese fermented soybeans.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('b72c04cf-5571-4a77-bec1-4c4e56d0d965','Yakiniku Meat Set','food@example.com',18,'03','Freshly prepared yakiniku BBQ set.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('d40144ee-e2a3-4740-8090-ccdc92ed8f2f','Oatmeal','food@example.com',10,'03','Healthy oatmeal perfect for breakfast.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('e79e4bbb-3f65-4bdf-9dda-6ce0656c9f8a','Kashipan Sweet Bread Set','food@example.com',6,'03','Soft sweet breads for snacks.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('ff2bf87c-ae70-4cc1-8bb5-fa923c4ba8a7','Laksa','food@example.com',12,'03','Spicy and rich laksa-flavored noodles.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('4e2a7db7-4762-4d55-b5e0-fb9b6053320e','Frozen Shrimp','food@example.com',14,'03','Fresh frozen shrimp for cooking.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('fa55d8e3-291e-4f06-a690-2b0b4f7d8e5b','Retort Curry','food@example.com',9,'03','Ready-to-eat rich curry meal.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('65fd3bbd-2743-4e72-9e63-4d5a3eca6f86','Watermelon (Round)','fruit@example.com',13,'03','Fresh round watermelon.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('8b7460c3-dc13-4a66-915f-2f64d716c607','Watermelon (Square)','fruit@example.com',16,'03','Unique square-shaped watermelon.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('aaf4d6ea-61a0-4afb-a386-34a6a91e6e6a','Strawberry Jam','jam@example.com',8,'03','Sweet strawberry jam for bread.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('c5ec7a88-b4eb-4f47-a832-3fa4c5ca5aa0','Marmalade','jam@example.com',8,'03','Bitter-sweet orange marmalade.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('b91a5d68-6acb-48e7-8e5d-3d85b7e76af2','Blueberry Jam','jam@example.com',9,'03','Rich blueberry jam full of flavor.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('50cbbe87-385e-4a60-b0d5-99b6ac0a969d','Apple Jam','jam@example.com',7,'03','Classic apple jam with mild sweetness.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('9a1ed557-4ea2-4523-959c-712fc3b9b748','PET Bottle Water','water@example.com',5,'03','Refreshing clean bottled water.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('e8f085de-89dd-4574-9dfd-f7c1352f9a25','Vegetables Mix','vegetable@example.com',7,'03','Fresh assorted vegetables.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('4b9f1c23-8e9a-4c26-a347-995046dfbb5d','Cut Vegetables','vegetable@example.com',6,'03','Pre-cut vegetables for easy cooking.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('24f0dd61-4663-4a0b-8cd0-d3c762ddc090','Frozen Vegetables','vegetable@example.com',8,'03','Frozen mixed vegetables.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('12b8cb8c-6ef9-4bb4-a022-2fd8f8d2b878','Donut','sweets@example.com',6,'03','Sweet and fluffy donut snack.','new','40e1eeca-7db5-4df3-8ab0-8addd3ec9103', 0.0, 0, 0, NULL),
+('bfd759cf-a8eb-47b1-a23d-dcba3f17366a','Chocolate','sweets@example.com',11,'03','Cute chocolate perfect for Valentine’s Day.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL),
+('c8a1b74b-d2c4-4d5d-a845-176b5457ec36','Space Food','space@example.com',20,'03','Lightweight space-ready food pack.','new','e99da54a-71ea-420a-85d1-9dc55146c2fb', 0.0, 0, 0, NULL)
 ON DUPLICATE KEY UPDATE
   product_name       = VALUES(product_name),
   seller_id          = VALUES(seller_id),
@@ -247,7 +268,9 @@ ON DUPLICATE KEY UPDATE
   product_condition  = VALUES(product_condition),
   geo_id             = VALUES(geo_id),
   avg_review         = VALUES(avg_review),
-  review_count       = VALUES(review_count);
+  review_count       = VALUES(review_count),
+  sale_flag          = VALUES(sale_flag),
+  sale_id            = VALUES(sale_id);
 
 INSERT INTO Stock (product_id, stocks)
 VALUES
