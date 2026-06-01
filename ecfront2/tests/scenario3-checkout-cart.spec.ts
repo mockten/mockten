@@ -4,7 +4,8 @@ test.describe('Scenario 3: Checkout Cart', () => {
   test('should login, go to cart, and checkout', async ({ page }) => {
     // 1. Login via backdoor
     await page.goto('/api/test/auth-backdoor');
-    
+    await page.waitForTimeout(1000);
+
     // 2. Go to cart list
     await page.goto('/cart/list');
     

@@ -52,6 +52,36 @@ const MyCartConfirm: React.FC = () => {
       if (res.status === 200) {
         console.log('Payment successful:', res.data);
         try {
+          // Build scheduled_start from delivery date + time slot start
+          const parseScheduledStart = (dateStr: string, timeStr: string): string => {
+            try {
+              const startHHMM = timeStr.split('〜')[0].trim(); // "10:00"
+              const d = new Date(`${dateStr} ${startHHMM}`);
+              if (isNaN(d.getTime())) return '';
+              const pad = (n: number) => String(n).padStart(2, '0');
+              return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+            } catch {
+              return '';
+            }
+          };
+          const scheduledStart = parseScheduledStart(selectedDate, selectedTime);
+
+          // Create shipment records for each item
+          for (const item of cartItems) {
+            const shipPayload: any = {
+              product_id: item.productId || item.id,
+              geo_id: shippingAddress.geo_id || '40e1eeca-7db5-4df3-8ab0-8addd3ec9103',
+            };
+            if (scheduledStart) {
+              shipPayload.scheduled_start = scheduledStart;
+            }
+            await apiClient.post('/api/shipment', shipPayload);
+          }
+        } catch (e) {
+          console.error('Failed to create shipment records', e);
+        }
+
+        try {
           if (isFromCart) {
             await apiClient.delete('/api/cart');
           }

@@ -1,6 +1,6 @@
 module github.com/mockten/mockten/ranking
 
-go 1.25
+go 1.23
 
 require (
 	github.com/gin-contrib/cors v1.6.0

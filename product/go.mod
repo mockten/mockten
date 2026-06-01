@@ -1,6 +1,6 @@
 module product
 
-go 1.25
+go 1.23.0
 
 toolchain go1.24.11
 

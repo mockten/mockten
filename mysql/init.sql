@@ -107,6 +107,7 @@ CREATE TABLE IF NOT EXISTS `Transaction` (
   geo_id         VARCHAR(36) NOT NULL,
   status         ENUM('quoted','booked','picked_up','in_transit','delayed','delivered','canceled','failed') NOT NULL DEFAULT 'quoted',
   leg_type       ENUM('road','air','sea') NOT NULL DEFAULT 'road',
+  scheduled_start DATETIME NULL,
   created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at     DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_tx_geo     (geo_id),

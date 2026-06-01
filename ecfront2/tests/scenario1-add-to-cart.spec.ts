@@ -16,12 +16,17 @@ test.describe('Scenario 1: Add Lemongrass to Cart', () => {
   test('should login, add payment, and add Lemongrass to cart', async ({ page }) => {
     // 1. Login via backdoor
     await page.goto('/api/test/auth-backdoor');
-    
+    await page.waitForTimeout(1000);
+
     // 2. Add MasterCard payment
     await page.goto('/user/payment');
     
-    // Click 'Add new card' if it exists (e.g. if a card was already added)
+    // Wait for either the form or the button to appear
+    const formField = page.getByPlaceholder('ex: TARO YAMADA');
     const addNewCardBtn = page.getByRole('button', { name: 'Add new card' });
+    await expect(addNewCardBtn.or(formField)).toBeVisible({ timeout: 15000 });
+    
+    // Click 'Add new card' if it exists (e.g. if a card was already added)
     if (await addNewCardBtn.isVisible()) {
       await addNewCardBtn.click();
     }
