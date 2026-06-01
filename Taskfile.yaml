@@ -16,6 +16,7 @@ tasks:
       - (cd geocoding && docker run --rm -d -v "$PWD/config.json:/app/config.json:ro" --name geocoding-service.default.svc.cluster.local --network mockten_nw mockten-geocoding)
       - (cd ecpay && docker run --rm -d --name ecpay-service.default.svc.cluster.local -e SecretKeyString=${STRIPE_SECRET_KEY} -e MysqlUser=mocktenusr -e MysqlPassword=mocktenpassword -e DbHost="mysql-service.default.svc.cluster.local:3306" -e MysqlDB=mocktendb -e RANKING_SERVICE_URL="http://ranking-service.default.svc.cluster.local:8080" --network mockten_nw mockten-ecpay)
       - (cd ranking && docker run --rm -d --name ranking-service.default.svc.cluster.local -e REDIS_HOST="redis-service.default.svc.cluster.local:6379" -e MYSQL_DSN="mocktenusr:mocktenpassword@tcp(mysql-service.default.svc.cluster.local:3306)/mocktendb?parseTime=true" --network mockten_nw mockten-ranking)
+      - (cd sale && docker run --rm -d --name sale-service.default.svc.cluster.local -e MYSQL_DSN="mocktenusr:mocktenpassword@tcp(mysql-service.default.svc.cluster.local:3306)/mocktendb?parseTime=true" -e MEILI_SVC="meilisearch-service.default.svc.cluster.local" --network mockten_nw mockten-sale)
       - (cd shipment && docker run --rm -d --name shipment-service.default.svc.cluster.local -e TEST_MODE=true -e TICK_INTERVAL_SECONDS=200 -e MYSQL_DSN="mocktenusr:mocktenpassword@tcp(mysql-service.default.svc.cluster.local:3306)/mocktendb?parseTime=true" --network mockten_nw mockten-shipment)
       - (docker run --rm --name nginx --network mockten_nw -v $(pwd)/dev_nginx.conf:/etc/nginx/nginx.conf:ro -p 80:80 -dit nginx)
       - (for i in {1..30}; do docker exec -i mysql-service.default.svc.cluster.local mysql -umocktenusr -pmocktenpassword mocktendb < mysql/test_insert.sql 2>/dev/null && break || sleep 1; done)
@@ -51,4 +52,5 @@ tasks:
       - (cd geocoding && docker build -t mockten-geocoding .)
       - (cd ecpay && docker build -t mockten-ecpay .)
       - (cd ranking && docker build -t mockten-ranking .)
+      - (cd sale && docker build -t mockten-sale .)
       - (cd shipment && docker build -t mockten-shipment .)
