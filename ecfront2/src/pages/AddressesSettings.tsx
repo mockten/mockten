@@ -251,13 +251,26 @@ const AddressesSettings: React.FC = () => {
   };
 
   return (
-    <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
-      {/* App Bar */}
+    <Box
+      sx={{
+        width: '100vw',
+        minHeight: '100vh',
+        backgroundColor: 'white',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >      {/* App Bar */}
       <Appbar />
 
       {/* Main Content */}
-      <Container maxWidth="lg" sx={{ padding: '24px 16px' }}>
-        {/* Page Title */}
+      <Container
+        maxWidth="lg"
+        sx={{
+          padding: '24px 16px',
+          flex: 1,
+          pb: 8,
+        }}
+      >        {/* Page Title */}
         <Box
           sx={{
             borderLeft: '5px solid black',
