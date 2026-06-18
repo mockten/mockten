@@ -70,6 +70,7 @@ interface Product {
   vendorDescription: string;
   reviews: Review[];
   stocks: number;
+  discount_rate?: number;
 }
 
 interface ApiReview {
@@ -110,6 +111,9 @@ interface ApiItemDetailResponse {
   vendorUserName?: string;
   vendorDescription?: string;
   reviews?: ApiReview[];
+  discountRate?: number;
+  saleFlag?: boolean;
+  saleId?: string;
 }
 
 interface ApiItemReviewsResponse {
@@ -238,6 +242,7 @@ const mapApiToProduct = (api: ApiItemDetailResponse, fallbackId: string): Produc
     vendorDescription: vendorDesc,
     reviews,
     stocks: api.stocks || 0,
+    discount_rate: api.discountRate || 0,
   };
 };
 
@@ -807,12 +812,23 @@ const ItemDetailNew: React.FC = () => {
               </Box>
 
               <Box sx={{ marginBottom: '16px' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black' }}>$</Typography>
-                  <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '22px', color: 'black' }}>
-                    {product.price.toLocaleString()}
-                  </Typography>
-                </Box>
+                {product.discount_rate && product.discount_rate > 0 ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'red', textDecoration: 'line-through' }}>
+                      ${product.price.toLocaleString()}
+                    </Typography>
+                    <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '22px', color: 'black' }}>
+                      ${Math.round(product.price * (1 - product.discount_rate)).toLocaleString()}
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black' }}>$</Typography>
+                    <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '22px', color: 'black' }}>
+                      {product.price.toLocaleString()}
+                    </Typography>
+                  </Box>
+                )}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {renderStars(product.rating)}
                 </Box>

@@ -40,6 +40,8 @@ interface ProductBackend {
   regist_day: string;
   last_update: string;
   stocks: number;
+  sale_flag?: boolean;
+  discount_rate?: number;
 }
 
 interface CartItemBackend {
@@ -68,6 +70,8 @@ interface CartItem {
   shipping_days: number;
   stocks: number;
   shippingOptions?: ShippingOption[];
+  saleFlag?: boolean;
+  discountRate?: number;
 }
 
 interface RecommendedProduct {
@@ -131,6 +135,8 @@ const CartListNew: React.FC = () => {
             shipping_days: item.shipping_days || 3,
             stocks: item.product.stocks || 0,
             shippingOptions,
+            saleFlag: item.product.sale_flag || false,
+            discountRate: item.product.discount_rate || 0,
           };
         }));
         setCartItems(mappedItems);
@@ -255,7 +261,12 @@ const CartListNew: React.FC = () => {
   };
 
   const calculateSubtotal = () => {
-    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+    return cartItems.reduce((total, item) => {
+      const activePrice = item.saleFlag && item.discountRate && item.discountRate > 0
+        ? Math.round(item.price * (1 - item.discountRate))
+        : item.price;
+      return total + (activePrice * item.quantity);
+    }, 0);
   };
 
   // Removed getShippingFee (localStorage based)
@@ -399,6 +410,29 @@ const CartListNew: React.FC = () => {
                     >
                       {item.description}
                     </Typography>
+
+                    {item.saleFlag && item.discountRate && item.discountRate > 0 ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'red', textDecoration: 'line-through' }}>
+                          ${item.price.toLocaleString()}
+                        </Typography>
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '18px', color: 'black' }}>
+                          ${Math.round(item.price * (1 - item.discountRate)).toLocaleString()}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontSize: '18px',
+                          fontWeight: 'bold',
+                          color: 'black',
+                          marginBottom: '8px',
+                        }}
+                      >
+                        ${item.price.toLocaleString()}
+                      </Typography>
+                    )}
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                       <Typography

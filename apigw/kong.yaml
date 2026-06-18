@@ -334,3 +334,15 @@ services:
           - GET
           - POST
           - OPTIONS
+
+  - name: sale-service
+    url: http://sale-service.default.svc.cluster.local:8080
+    routes:
+      - name: sale-service-route
+        paths:
+          - /api/sale
+        strip_path: false
+        methods:
+          - GET
+          - OPTIONS
+

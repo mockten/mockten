@@ -72,6 +72,9 @@ type ItemDetailResponse struct {
 	VendorUserName    string           `json:"vendorUserName"`
 	VendorDescription string           `json:"vendorDescription"`
 	Reviews           []ReviewResponse `json:"reviews,omitempty"`
+	SaleFlag          bool             `json:"saleFlag"`
+	SaleID            string           `json:"saleId"`
+	DiscountRate      float64          `json:"discountRate"`
 }
 
 type ItemReviewsResponse struct {
@@ -110,6 +113,9 @@ type FavoriteItemResponse struct {
 	Stocks            int              `json:"stocks"`
 	AvgReview         float64          `json:"avgReview"`
 	ReviewCount       int              `json:"reviewCount"`
+	SaleFlag          bool             `json:"saleFlag"`
+	SaleID            string           `json:"saleId"`
+	DiscountRate      float64          `json:"discountRate"`
 }
 
 func waitForMySQL(db *sql.DB, logger *zap.Logger) {
@@ -363,7 +369,10 @@ SELECT
   p.avg_review,
   p.review_count,
   ue.USERNAME AS vendor_username,
-  COALESCE(ua.VALUE, '') AS vendor_description
+  COALESCE(ua.VALUE, '') AS vendor_description,
+  p.sale_flag,
+  COALESCE(p.sale_id, '') AS sale_id,
+  COALESCE(ts.discount_rate, 0.0) AS discount_rate
 FROM Product p
 JOIN Category c ON p.category_id = c.category_id
 LEFT JOIN Stock t ON p.product_id = t.product_id
@@ -371,6 +380,7 @@ LEFT JOIN Seller s ON p.seller_id = s.seller_id
 LEFT JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
 LEFT JOIN USER_ATTRIBUTE ua ON ue.ID = ua.USER_ID AND ua.NAME = 'description'
 LEFT JOIN Geo g ON p.geo_id = g.user_id
+LEFT JOIN TimeSale ts ON p.sale_id = ts.id
 WHERE p.product_id = ?
 LIMIT 1
 `
@@ -421,6 +431,9 @@ LIMIT 1
 			&reviewCount,
 			&vendorUserName,
 			&vendorDescription,
+			&resp.SaleFlag,
+			&resp.SaleID,
+			&resp.DiscountRate,
 		)
 
 		if err != nil {
@@ -737,11 +750,15 @@ SELECT
   COALESCE(t.stocks, 0) AS stocks,
   p.summary,
   p.avg_review,
-  p.review_count
+  p.review_count,
+  p.sale_flag,
+  COALESCE(p.sale_id, '') AS sale_id,
+  COALESCE(ts.discount_rate, 0.0) AS discount_rate
 FROM Product p
 LEFT JOIN Stock t ON p.product_id = t.product_id
 LEFT JOIN Seller s ON p.seller_id = s.seller_id
 LEFT JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
+LEFT JOIN TimeSale ts ON p.sale_id = ts.id
 WHERE p.product_id IN (?` + strings.Repeat(",?", len(productIDs)-1) + `)
 `
 		args := make([]interface{}, len(productIDs))
@@ -773,6 +790,9 @@ WHERE p.product_id IN (?` + strings.Repeat(",?", len(productIDs)-1) + `)
 				&resp.Summary,
 				&avgReview,
 				&reviewCount,
+				&resp.SaleFlag,
+				&resp.SaleID,
+				&resp.DiscountRate,
 			)
 			if err != nil {
 				continue

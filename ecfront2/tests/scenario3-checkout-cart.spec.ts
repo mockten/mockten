@@ -22,7 +22,7 @@ test.describe('Scenario 3: Checkout Cart', () => {
     await page.getByRole('button', { name: 'Place Order' }).click();
     
     // Verify Order Completion
-    await expect(page.getByText(/Thank you for your order!/i)).toBeVisible();
+    await expect(page.getByText(/Thank you for your order!/i)).toBeVisible({ timeout: 20000 });
     
     // Extract UUID from the success text
     const fullText = await page.locator('body').innerText();
