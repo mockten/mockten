@@ -341,11 +341,25 @@ const CreditCardSettings: React.FC = () => {
   );
 
   return (
-    <Box sx={{ width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
+    <Box
+      sx={{
+        width: '100vw',
+        minHeight: '100vh',
+        backgroundColor: 'white',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       <Appbar />
 
-      <Container maxWidth="lg" sx={{ padding: '24px 16px' }}>
-        {/* Page Title */}
+      <Container
+        maxWidth="lg"
+        sx={{
+          padding: '24px 16px',
+          flex: 1,
+          pb: 8,
+        }}
+      >          {/* Page Title */}
         <Box
           sx={{
             borderLeft: '5px solid black',
@@ -379,7 +393,7 @@ const CreditCardSettings: React.FC = () => {
                 <Typography sx={{ mb: 2, fontFamily: 'Noto Sans', fontWeight: 'bold' }}>
                   Registered Cards
                 </Typography>
-                
+
                 {savedCards.map((card) => (
                   <Card
                     key={card.id}
@@ -461,85 +475,85 @@ const CreditCardSettings: React.FC = () => {
               </Box>
             )}
 
-        <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-          <DialogTitle>Delete Card</DialogTitle>
-          <DialogContent>
-            <Typography>
-              Are you sure you want to delete this card?
-            </Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-            <Button
-              color="error"
-              onClick={handleDeleteCard}
-            >
-              Delete
-            </Button>
-          </DialogActions>
-        </Dialog>
+            <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+              <DialogTitle>Delete Card</DialogTitle>
+              <DialogContent>
+                <Typography>
+                  Are you sure you want to delete this card?
+                </Typography>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+                <Button
+                  color="error"
+                  onClick={handleDeleteCard}
+                >
+                  Delete
+                </Button>
+              </DialogActions>
+            </Dialog>
 
-        {/* Display mode */}
-        {!isEditing && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', marginTop: '32px' }}>
-            <Button
-              type="button"
-              variant="contained"
-              onClick={() => setIsEditing(true)}
-              sx={{
-                backgroundColor: 'black',
-                color: 'white',
-                padding: '16px 32px',
-                borderRadius: '4px',
-                fontFamily: 'Noto Sans',
-                fontWeight: 'bold',
-                fontSize: '16px',
-                textTransform: 'none',
-                minWidth: '400px',
-                '&:hover': { backgroundColor: '#333' },
-              }}
-            >
-              Add new card
-            </Button>
-          </Box>
-        )}
+            {/* Display mode */}
+            {!isEditing && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', marginTop: '32px' }}>
+                <Button
+                  type="button"
+                  variant="contained"
+                  onClick={() => setIsEditing(true)}
+                  sx={{
+                    backgroundColor: 'black',
+                    color: 'white',
+                    padding: '16px 32px',
+                    borderRadius: '4px',
+                    fontFamily: 'Noto Sans',
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                    textTransform: 'none',
+                    minWidth: '400px',
+                    '&:hover': { backgroundColor: '#333' },
+                  }}
+                >
+                  Add new card
+                </Button>
+              </Box>
+            )}
 
 
-        {/* Add new card mode */}
-        {isEditing && (
-          <>
-            <Box
-              sx={{
-                borderLeft: '5px solid black',
-                paddingLeft: '20px',
-                paddingY: '8px',
-                marginBottom: '24px',
-                marginLeft: '16px',
-                marginTop: '32px',
-              }}
-            >
-              <Typography
-                sx={{
-                  fontFamily: 'Noto Sans',
-                  fontWeight: 'bold',
-                  fontSize: '20px',
-                  color: 'black',
-                }}
-              >
-                New Credit Card
-              </Typography>
-            </Box>
+            {/* Add new card mode */}
+            {isEditing && (
+              <>
+                <Box
+                  sx={{
+                    borderLeft: '5px solid black',
+                    paddingLeft: '20px',
+                    paddingY: '8px',
+                    marginBottom: '24px',
+                    marginLeft: '16px',
+                    marginTop: '32px',
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontFamily: 'Noto Sans',
+                      fontWeight: 'bold',
+                      fontSize: '20px',
+                      color: 'black',
+                    }}
+                  >
+                    New Credit Card
+                  </Typography>
+                </Box>
 
-            <Elements stripe={stripePromise}>
-              <CardForm 
-                formData={formData} 
-                handleInputChange={handleInputChange} 
-                handleSubmit={handleSubmit} 
-                setIsEditing={setIsEditing} 
-              />
-            </Elements>
-          </>
-        )}
+                <Elements stripe={stripePromise}>
+                  <CardForm
+                    formData={formData}
+                    handleInputChange={handleInputChange}
+                    handleSubmit={handleSubmit}
+                    setIsEditing={setIsEditing}
+                  />
+                </Elements>
+              </>
+            )}
           </>
         )}
       </Container>
