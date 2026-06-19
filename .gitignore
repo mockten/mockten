@@ -33,3 +33,7 @@ PR_SUMMARY*
 step*
 package-lock.json
 scratch/
+.env
+**/ .env
+**/.env
+minIO/.env
