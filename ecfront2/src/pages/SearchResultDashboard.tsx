@@ -408,7 +408,7 @@ const SearchResultNew: React.FC = () => {
       setSortOrder(s);
     }
 
-    if (query && page !== currentPage) {
+    if (page !== currentPage) {
       setCurrentPage(page);
     }
 
