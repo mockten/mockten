@@ -16,6 +16,19 @@ export default defineConfig(({ mode }) => {
           if (!isTestMode) return;
           server.middlewares.use('/api/test/auth-backdoor', async (req, res) => {
             try {
+              const url = new URL(req.url || '', 'http://localhost');
+              const username = url.searchParams.get('username') || 'superadmin';
+              let password = url.searchParams.get('password');
+              if (!password) {
+                if (username.startsWith('dev_user_')) {
+                  const match = username.match(/\d+/);
+                  const num = match ? match[0] : '001';
+                  password = `devpass${num}`;
+                } else {
+                  password = username;
+                }
+              }
+
               // Call API Gateway to get the token, which proxies to Keycloak
               const tokenRes = await fetch('http://localhost:8082/api/uam/token', {
                 method: 'POST',
@@ -23,8 +36,8 @@ export default defineConfig(({ mode }) => {
                   'Content-Type': 'application/x-www-form-urlencoded',
                 },
                 body: new URLSearchParams({
-                  username: 'superadmin',
-                  password: 'superadmin',
+                  username,
+                  password,
                 })
               });
 

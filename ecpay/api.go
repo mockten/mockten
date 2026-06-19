@@ -63,7 +63,10 @@ func getUser(c *gin.Context) UserContext {
 					if email == "" {
 						email = claims.PreferredUsername + "@example.com"
 					}
-					userID := claims.PreferredUsername
+					userID := claims.Email
+					if userID == "" {
+						userID = claims.PreferredUsername
+					}
 					if userID == "" {
 						userID = claims.Sub
 					}
@@ -349,13 +352,15 @@ func handleCreatePayment(c *gin.Context) {
 	params := &stripe.PaymentIntentParams{
 		Amount:        stripe.Int64(req.Amount * 100), // convert to cents assuming USD
 		Currency:      stripe.String(string(stripe.CurrencyUSD)),
-		Customer:      stripe.String(stripeCustomerID),
 		PaymentMethod: stripe.String(spmID),
 		Confirm:       stripe.Bool(true),
 		AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
 			Enabled: stripe.Bool(true),
 			AllowRedirects: stripe.String("never"),
 		},
+	}
+	if !strings.HasPrefix(stripeCustomerID, "cus_dev_") {
+		params.Customer = stripe.String(stripeCustomerID)
 	}
 	pi, err := paymentintent.New(params)
 

@@ -1088,7 +1088,7 @@ func getGeoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := `
-SELECT TRIM(CONCAT(COALESCE(ue.FIRST_NAME, ''), ' ', COALESCE(ue.LAST_NAME, ''))) as user_name, g.geo_id, g.is_primary, g.country_code, g.postal_code, g.prefecture, g.city, g.town, g.building_name, g.room_number
+SELECT TRIM(CONCAT(COALESCE(ue.FIRST_NAME, ''), ' ', COALESCE(ue.LAST_NAME, ''))) as user_name, g.geo_id, g.is_primary, COALESCE(g.country_code, '') as country_code, COALESCE(g.postal_code, '') as postal_code, COALESCE(g.prefecture, '') as prefecture, COALESCE(g.city, '') as city, COALESCE(g.town, '') as town, COALESCE(g.building_name, '') as building_name, COALESCE(g.room_number, '') as room_number
 FROM Geo g
 LEFT JOIN USER_ENTITY ue ON g.user_id = ue.EMAIL
 WHERE g.user_id = ?

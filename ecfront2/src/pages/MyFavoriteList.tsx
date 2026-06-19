@@ -322,7 +322,7 @@ const FavoritesListNew: React.FC = () => {
                     <img 
                       src={item.image} 
                       alt={item.name} 
-                      style={{ width: '64px', height: '64px', objectFit: 'contain' }} 
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '10px' }} 
                       onError={(e) => { e.currentTarget.src = photoSvg; }}
                     />
                   </Box>

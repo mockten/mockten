@@ -458,18 +458,20 @@ const DashboardNew: React.FC = () => {
 
                     <Box
                       sx={{
-                        height: '120px',
+                        width: '100%',
+                        aspectRatio: '1/1',
                         backgroundColor: '#f5f5f5',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         position: 'relative',
+                        overflow: 'hidden',
                       }}
                     >
                       <img 
                         src={product.image} 
                         alt="Product" 
-                        style={{ width: '80px', height: '80px', objectFit: 'contain' }} 
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '12px' }} 
                         onError={(e) => { e.currentTarget.src = photoSvg; }}
                       />
                       <IconButton

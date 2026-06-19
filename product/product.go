@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -72,6 +73,7 @@ type ItemDetailResponse struct {
 	VendorUserName    string           `json:"vendorUserName"`
 	VendorDescription string           `json:"vendorDescription"`
 	Reviews           []ReviewResponse `json:"reviews,omitempty"`
+	ImageURL          string           `json:"imageUrl"`
 }
 
 type ItemReviewsResponse struct {
@@ -330,6 +332,20 @@ func getItemReviewsHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
+// getImageURL checks if the image exists in MinIO.
+// パフォーマンス補足:
+// POCレベルではリクエストごとに MinIO を HEAD チェックするのは許容範囲。
+// 本番化する場合は起動時に存在する画像のリストをメモリキャッシュし、
+// 定期的に更新するか、新規画像アップロード時にキャッシュをクリアする仕組みにすること。
+func getImageURL(productID string, categoryID string) string {
+	imageURL := fmt.Sprintf("/api/storage/%s.png", productID)
+	resp, err := http.Head(fmt.Sprintf("http://minio-service.default.svc.cluster.local:9000/photos/%s.png", productID))
+	if err != nil || resp.StatusCode != 200 {
+		return "/api/storage/placeholder.png"
+	}
+	return imageURL
+}
+
 func getItemDetailHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		productID := c.Param("productId")
@@ -363,7 +379,8 @@ SELECT
   p.avg_review,
   p.review_count,
   ue.USERNAME AS vendor_username,
-  COALESCE(ua.VALUE, '') AS vendor_description
+  COALESCE(ua.VALUE, '') AS vendor_description,
+  p.category_id
 FROM Product p
 JOIN Category c ON p.category_id = c.category_id
 LEFT JOIN Stock t ON p.product_id = t.product_id
@@ -394,6 +411,7 @@ LIMIT 1
 			reviewCount       sql.NullInt64
 			vendorUserName    sql.NullString
 			vendorDescription sql.NullString
+			categoryID        string
 		)
 
 		err := db.QueryRow(query, productID).Scan(
@@ -421,6 +439,7 @@ LIMIT 1
 			&reviewCount,
 			&vendorUserName,
 			&vendorDescription,
+			&categoryID,
 		)
 
 		if err != nil {
@@ -505,6 +524,8 @@ LIMIT 1
 		if len(reviewsPreview) > 0 {
 			resp.Reviews = reviewsPreview
 		}
+
+		resp.ImageURL = getImageURL(resp.ProductID, categoryID)
 
 		c.JSON(http.StatusOK, resp)
 	}

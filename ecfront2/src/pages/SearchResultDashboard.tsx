@@ -824,18 +824,26 @@ const SearchResultNew: React.FC = () => {
                 >
                   <Box
                     sx={{
-                      height: '100px',
+                      width: '100%',
+                      aspectRatio: '1/1',
                       backgroundColor: '#f5f5f5',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       position: 'relative',
+                      overflow: 'hidden',
                     }}
                   >
                     <img
                       src={`/api/storage/${product.product_id}.png`}
                       alt="Product"
-                      style={{ width: '64px', height: '64px', filter: product.stocks === 0 ? 'grayscale(100%)' : 'none', objectFit: 'contain' }}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        filter: product.stocks === 0 ? 'grayscale(100%)' : 'none',
+                        objectFit: 'contain',
+                        padding: '12px'
+                      }}
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = photoSvg;
                       }}
