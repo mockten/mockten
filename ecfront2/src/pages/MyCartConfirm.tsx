@@ -10,12 +10,14 @@ import {
   Divider,
   Grid,
 } from '@mui/material';
+import {
+  KeyboardArrowRight,
+} from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 
 // Sample photo icon when a customer does not set prodct image.
 import photoSvg from "../assets/photo.svg";
-const arrowRightIcon = "http://localhost:3845/assets/ce1540ba1f8cb0bde2e26ff8f9fc566f7be994a6.svg";
 
 
 const MyCartConfirm: React.FC = () => {
@@ -23,11 +25,11 @@ const MyCartConfirm: React.FC = () => {
   const location = useLocation();
 
   // Retrieve state passed from checkout page. Fallbacks provided for safety.
-  const { 
-    shippingAddress = {}, 
-    selectedDate = '', 
-    selectedTime = '', 
-    cartItems = [], 
+  const {
+    shippingAddress = {},
+    selectedDate = '',
+    selectedTime = '',
+    cartItems = [],
     orderSummary = { subtotal: 0, shipping: 0, total: 0 },
     selectedCardId = '',
     isFromCart = false
@@ -242,10 +244,11 @@ const MyCartConfirm: React.FC = () => {
                   fontSize: '16px',
                   color: 'black',
                 }}
+                onClick={() => navigate('/cancellation-policy')}
               >
                 Cancellation Policy
               </Typography>
-              <img src={arrowRightIcon} alt="Arrow" style={{ width: '24px', height: '24px' }} />
+              <KeyboardArrowRight sx={{ width: '16px', height: '16px' }} />
             </Box>
 
             {/* Item List */}
@@ -274,9 +277,9 @@ const MyCartConfirm: React.FC = () => {
                       flexShrink: 0,
                     }}
                   >
-                    <img 
-                      src={item.image || photoSvg} 
-                      alt={item.name} 
+                    <img
+                      src={item.image || photoSvg}
+                      alt={item.name}
                       style={{ width: '64px', height: '64px', objectFit: 'contain' }}
                       onError={(e) => { e.currentTarget.src = photoSvg; }}
                     />
@@ -317,15 +320,29 @@ const MyCartConfirm: React.FC = () => {
                       Quantity：{item.quantity || 1}
                     </Typography>
                     {item.shipping_type && (
-                       <Typography
-                       sx={{
-                         fontFamily: 'Noto Sans',
-                         fontSize: '16px',
-                         color: '#666666',
-                       }}
-                     >
-                       Shipping：{item.shipping_type}
-                     </Typography>
+                      <Typography
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontSize: '16px',
+                          color: '#666666',
+                        }}
+                      >
+                        Shipping：{item.shipping_type}
+                      </Typography>
+                    )}
+                    {item.saleFlag && item.discountRate && item.discountRate > 0 ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'red', textDecoration: 'line-through' }}>
+                          ${item.price.toLocaleString()}
+                        </Typography>
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
+                          ${Math.round(item.price * (1 - item.discountRate)).toLocaleString()}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', marginTop: '4px' }}>
+                        Price : ${item.price ? item.price.toLocaleString() : '0'}
+                      </Typography>
                     )}
                   </Box>
                 </Box>

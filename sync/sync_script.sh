@@ -27,6 +27,9 @@ SELECT
   t.stocks,
   p.avg_review,
   p.review_count,
+  p.sale_flag,
+  COALESCE(p.sale_id, '') AS sale_id,
+  COALESCE(ts.discount_rate, 0.0) AS discount_rate,
   GREATEST(
     IFNULL(p.last_update, '1970-01-01 00:00:00'),
     IFNULL(c.last_update, '1970-01-01 00:00:00'),
@@ -38,6 +41,7 @@ JOIN USER_GROUP_MEMBERSHIP ugm ON ue.ID = ugm.USER_ID
 JOIN KEYCLOAK_GROUP kg ON ugm.GROUP_ID = kg.ID
 JOIN Category c ON p.category_id = c.category_id
 JOIN Stock t ON p.product_id = t.product_id
+LEFT JOIN TimeSale ts ON p.sale_id = ts.id
 WHERE kg.NAME = 'Seller'
 HAVING row_last_update > '$LAST_SYNC' AND row_last_update <= '$WATERMARK'
 " > /tmp/updated_products.tsv
@@ -55,11 +59,14 @@ if [ -s /tmp/updated_products.tsv ]; then
         condition: .[5],
         stocks: (if (.[6] == null or .[6] == "") then 0 else (.[6] | tonumber) end),
         avg_review: (if (.[7] == null or .[7] == "") then 0 else (.[7] | tonumber) end),
-        review_count: (if (.[8] == null or .[8] == "") then 0 else (.[8] | tonumber) end)
+        review_count: (if (.[8] == null or .[8] == "") then 0 else (.[8] | tonumber) end),
+        sale_flag: (if .[9] == "1" then true else false end),
+        sale_id: .[10],
+        discount_rate: (if (.[11] == null or .[11] == "") then 0.0 else (.[11] | tonumber) end)
       })
   ' /tmp/updated_products.tsv > /tmp/updated_products.json
 
-  http_code=$(curl -s -o /tmp/meili_sync_resp.txt -w "%{http_code}" -X POST "$MEILI_URL/indexes/products/documents" \
+  http_code=$(curl -s -o /tmp/meili_sync_resp.txt -w "%{http_code}" -X POST "$MEILI_URL/indexes/products/documents?primaryKey=product_id" \
     -H 'Content-Type: application/json' \
     --data-binary @/tmp/updated_products.json)
 

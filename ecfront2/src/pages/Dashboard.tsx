@@ -47,6 +47,9 @@ const DashboardNew: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
 
   const [rankingProducts, setRankingProducts] = useState<Product[]>([]);
+  const [activeSales, setActiveSales] = useState<{ id: string; name: string }[]>([]);
+  const [slideIndex, setSlideIndex] = useState(0);
+  const [saleProducts, setSaleProducts] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchRanking = async () => {
@@ -103,7 +106,40 @@ const DashboardNew: React.FC = () => {
       }
     };
     fetchCategories();
+
+    const fetchSales = async () => {
+      try {
+        const res = await apiClient.get('/api/sale/active');
+        if (res.data && Array.isArray(res.data)) {
+          setActiveSales(res.data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch active sales', e);
+      }
+    };
+    fetchSales();
+
+    const fetchSaleProducts = async () => {
+      try {
+        const res = await apiClient.get('/api/sale/products/random');
+        if (res.data && res.data.items) {
+          setSaleProducts(res.data.items.slice(0, 7));
+        }
+      } catch (e) {
+        console.error('Failed to fetch sale products', e);
+      }
+    };
+    fetchSaleProducts();
   }, []);
+
+  useEffect(() => {
+    if (activeSales.length >= 4) {
+      const timer = setInterval(() => {
+        setSlideIndex(prev => (prev + 1) % activeSales.length);
+      }, 3000);
+      return () => clearInterval(timer);
+    }
+  }, [activeSales]);
 
   const handleToggleFavorite = async (e: React.MouseEvent, productId: string) => {
     e.stopPropagation();
@@ -158,6 +194,20 @@ const DashboardNew: React.FC = () => {
     navigate(`/item/${productId}`);
   };
 
+  const handleSaleClick = (saleId: string) => {
+    navigate(`/search`, { state: { saleId } });
+  };
+
+  const getDisplaySales = () => {
+    if (activeSales.length === 0) return [];
+    if (activeSales.length < 4) return activeSales;
+    const items = [];
+    for (let i = 0; i < 3; i++) {
+      items.push(activeSales[(slideIndex + i) % activeSales.length]);
+    }
+    return items;
+  };
+
   return (
     <Box sx={{  width: '100vw', minHeight: '100vh', backgroundColor: 'white' }}>
       {/* App Bar */}
@@ -167,45 +217,37 @@ const DashboardNew: React.FC = () => {
       <Container maxWidth='lg' sx={{ padding: '72px 0' }}>
         {/* Hero Section */}
         <Box sx={{ display: 'flex', gap: '16px', marginBottom: '64px' }}>
-          <Box
-            sx={{
-              flex: 1,
-              height: '240px',
-              backgroundColor: '#f5f5f5',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '8px',
-            }}
-          >
-            <PhotoOutlined />
-          </Box>
-          <Box
-            sx={{
-              flex: 1,
-              height: '240px',
-              backgroundColor: '#f5f5f5',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '8px',
-            }}
-          >
-            <PhotoOutlined />
-          </Box>
-          <Box
-            sx={{
-              flex: 1,
-              height: '240px',
-              backgroundColor: '#f5f5f5',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '8px',
-            }}
-          >
-            <PhotoOutlined />
-          </Box>
+          {getDisplaySales().map((sale) => (
+            <Box
+              key={sale.id}
+              onClick={() => handleSaleClick(sale.id)}
+              sx={{
+                flex: 1,
+                height: '240px',
+                backgroundColor: '#f5f5f5',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                overflow: 'hidden',
+                '&:hover': {
+                  boxShadow: 3,
+                  transform: 'translateY(-2px)',
+                  transition: 'all 0.2s',
+                },
+              }}
+            >
+              <img
+                src={`/api/storage/sale/${sale.id}.png`}
+                alt={sale.name}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(e) => {
+                  e.currentTarget.src = photoSvg;
+                }}
+              />
+            </Box>
+          ))}
         </Box>
 
         {/* Limited-time sale Section */}
@@ -226,22 +268,91 @@ const DashboardNew: React.FC = () => {
             Limited-time sale!
           </Typography>
           
-          <Box sx={{ display: 'flex', gap: '16px' }}>
-            {Array.from({ length: 7 }, (_, index) => (
+          <Box sx={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '16px' }}>
+            {saleProducts.map((product) => (
               <Box
-                key={index}
-                onClick={() => handleProductClick(index.toString())}
+                key={product.product_id}
+                onClick={() => handleProductClick(product.product_id)}
                 sx={{
                   width: '120px',
-                  height: '120px',
-                  backgroundColor: '#f5f5f5',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '8px',
+                  flexDirection: 'column',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    transition: 'all 0.2s',
+                  },
                 }}
               >
-                <PhotoOutlined />
+                <Box
+                  sx={{
+                    width: '120px',
+                    height: '120px',
+                    backgroundColor: '#f5f5f5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '8px',
+                    marginBottom: '8px',
+                    position: 'relative',
+                  }}
+                >
+                  <img
+                    src={`/api/storage/${product.product_id}.png`}
+                    alt={product.product_name}
+                    style={{ width: '80px', height: '80px', objectFit: 'contain' }}
+                    onError={(e) => {
+                      e.currentTarget.src = photoSvg;
+                    }}
+                  />
+                </Box>
+                <Typography
+                  sx={{
+                    fontFamily: 'Noto Sans',
+                    fontSize: '12px',
+                    color: 'black',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    marginBottom: '4px',
+                  }}
+                >
+                  {product.product_name}
+                </Typography>
+                {product.discount_rate && product.discount_rate > 0 ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                    <Typography
+                      sx={{
+                        fontFamily: 'Noto Sans',
+                        fontSize: '12px',
+                        color: 'red',
+                        textDecoration: 'line-through',
+                      }}
+                    >
+                      ${product.price}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontFamily: 'Noto Sans',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        color: 'black',
+                      }}
+                    >
+                      ${Math.round(product.price * (1 - product.discount_rate))}
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Typography
+                    sx={{
+                      fontFamily: 'Noto Sans',
+                      fontSize: '12px',
+                      color: '#666666',
+                    }}
+                  >
+                    ${product.price}
+                  </Typography>
+                )}
               </Box>
             ))}
           </Box>

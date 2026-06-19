@@ -31,6 +31,8 @@ type Product struct {
 	RegistDay        time.Time `db:"regist_day"`
 	LastUpdate       time.Time `db:"last_update"`
 	Stocks           int       `db:"stocks"`
+	SaleFlag         bool      `db:"sale_flag"`
+	DiscountRate     float64   `db:"discount_rate"`
 }
 
 // For API response (image URL is built in the frontend)
@@ -46,6 +48,8 @@ type ProductDTO struct {
 	RegistDay        time.Time `json:"regist_day"`
 	LastUpdate       time.Time `json:"last_update"`
 	Stocks           int       `json:"stocks"`
+	SaleFlag         bool      `json:"sale_flag"`
+	DiscountRate     float64   `json:"discount_rate"`
 }
 
 type CartViewItem struct {

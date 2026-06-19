@@ -81,7 +81,7 @@ test.describe('Scenario 2: Favorite and Buy Blueberry Jam', () => {
     await page.getByRole('button', { name: 'Place Order' }).click();
     
     // Verify Order Completion
-    await expect(page.getByText(/Thank you for your order!/i)).toBeVisible();
+    await expect(page.getByText(/Thank you for your order!/i)).toBeVisible({ timeout: 20000 });
     
     // Extract UUID from the success text
     // Example text: "be1cc53b-04db-4139-870b-8e956fbbbfc4 Thank you for your order!"

@@ -40,6 +40,9 @@ interface Product {
   stocks: number;
   avg_review?: number;
   review_count?: number;
+  discount_rate?: number;
+  sale_flag?: boolean;
+  sale_id?: string;
 }
 
 interface Category {
@@ -72,6 +75,8 @@ const SearchResultNew: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [activeSales, setActiveSales] = useState<{ id: string; name: string }[]>([]);
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<SearchFilters>({
     priceRange: [0, 1000],
@@ -229,6 +234,28 @@ const SearchResultNew: React.FC = () => {
     };
 
     try {
+      if (selectedSaleId) {
+        const response = await fetch(`/api/sale/products/random?sale_id=${selectedSaleId}`);
+        if (!response.ok) {
+          applyIfLatest(() => {
+            setProducts([]);
+            setTotalResults(0);
+          });
+          return;
+        }
+        const data = await response.json();
+        const saleItems = data.items || [];
+        const total = saleItems.length;
+        const start = (page - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const slice = saleItems.slice(start, end);
+        applyIfLatest(() => {
+          setProducts(slice);
+          setTotalResults(total);
+        });
+        return;
+      }
+
       if (s === 'default') {
         const url = buildSearchUrl(query, page, f);
         const response = await fetch(url);
@@ -336,7 +363,20 @@ const SearchResultNew: React.FC = () => {
       }
     };
 
+    const fetchSales = async () => {
+      try {
+        const res = await fetch('/api/sale/active');
+        if (res.ok) {
+          const data = await res.json();
+          setActiveSales(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
     fetchCategories();
+    fetchSales();
   }, []);
 
   useEffect(() => {
@@ -358,6 +398,12 @@ const SearchResultNew: React.FC = () => {
       navigate(location.search, { replace: true, state: {} });
     }
 
+    const initialSaleId = (location.state as any)?.saleId;
+    if (initialSaleId && selectedSaleId !== initialSaleId) {
+      setSelectedSaleId(initialSaleId);
+      navigate(location.search, { replace: true, state: {} });
+    }
+
     if (s !== sortOrder) {
       setSortOrder(s);
     }
@@ -368,7 +414,7 @@ const SearchResultNew: React.FC = () => {
 
     // Fetch even if query is empty (backend will handle empty as all-results)
     fetchProducts(query, page, filters, s);
-  }, [location.search, filters]);
+  }, [location.search, filters, selectedSaleId]);
 
   useEffect(() => {
     const fetchFavorites = async () => {
@@ -593,6 +639,35 @@ const SearchResultNew: React.FC = () => {
                 paddingLeft: '20px',
               }}
             >
+              Sale
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '8px', paddingLeft: '20px' }}>
+              {activeSales.map((sale) => (
+                <Chip
+                  key={sale.id}
+                  label={sale.name}
+                  onClick={() => {
+                    setSelectedSaleId(prev => prev === sale.id ? null : sale.id);
+                    navigateWithPageReset();
+                  }}
+                  color={selectedSaleId === sale.id ? 'primary' : 'default'}
+                  size="small"
+                />
+              ))}
+            </Box>
+          </Box>
+
+          <Box sx={{ marginBottom: '24px' }}>
+            <Typography
+              sx={{
+                fontFamily: 'Noto Sans',
+                fontWeight: 'bold',
+                fontSize: '16px',
+                color: 'black',
+                marginBottom: '16px',
+                paddingLeft: '20px',
+              }}
+            >
               Review
             </Typography>
             <Box sx={{ paddingLeft: '20px' }}>
@@ -687,6 +762,7 @@ const SearchResultNew: React.FC = () => {
               onClick={() => {
                 setPriceMinInput('');
                 setPriceMaxInput('');
+                setSelectedSaleId(null);
                 setFilters({
                   priceRange: [0, 1000],
                   category: [],
@@ -903,16 +979,43 @@ const SearchResultNew: React.FC = () => {
                       {renderStars(product.avg_review ?? product.ranking ?? 0)}
                     </Box>
 
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontFamily: 'Noto Sans',
-                        fontSize: '14px',
-                        color: '#666666',
-                      }}
-                    >
-                      ${product.price}
-                    </Typography>
+                    {product.discount_rate && product.discount_rate > 0 ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontFamily: 'Noto Sans',
+                            fontSize: '14px',
+                            color: 'red',
+                            textDecoration: 'line-through',
+                          }}
+                        >
+                          ${product.price}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontFamily: 'Noto Sans',
+                            fontSize: '14px',
+                            fontWeight: 'bold',
+                            color: 'black',
+                          }}
+                        >
+                          ${Math.round(product.price * (1 - product.discount_rate))}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontSize: '14px',
+                          color: '#666666',
+                        }}
+                      >
+                        ${product.price}
+                      </Typography>
+                    )}
                   </CardContent>
                 </Card>
               </Grid>
