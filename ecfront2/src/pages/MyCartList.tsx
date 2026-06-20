@@ -87,6 +87,39 @@ const CartListNew: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
+
+  const getUserIdFromToken = () => {
+    const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken') || localStorage.getItem('mockten_access_token');
+    if (!token) return '';
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      const decoded = JSON.parse(jsonPayload);
+      return decoded.email || decoded.preferred_username || decoded.sub || '';
+    } catch (e) {
+      console.error('Failed to decode JWT token', e);
+      return '';
+    }
+  };
+
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      try {
+        const userId = getUserIdFromToken();
+        const res = await apiClient.get(`/api/recommendation?user_id=${userId}&limit=4`);
+        if (res.data && Array.isArray(res.data.recommendations)) {
+          setRecommendedProducts(res.data.recommendations);
+        }
+      } catch (err) {
+        console.error('Failed to fetch recommendations', err);
+      }
+    };
+    fetchRecommendations();
+  }, []);
 
   useEffect(() => {
     const initCart = async () => {
@@ -193,40 +226,7 @@ const CartListNew: React.FC = () => {
     }
   };
 
-  const mockRecommendedProducts: RecommendedProduct[] = [
-    {
-      id: 1,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      price: 2999,
-      rating: 4.5,
-      image: photoSvg,
-    },
-    {
-      id: 2,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      price: 3999,
-      rating: 4.5,
-      image: photoSvg,
-    },
-    {
-      id: 3,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      price: 4999,
-      rating: 4.5,
-      image: photoSvg,
-    },
-    {
-      id: 4,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      price: 5999,
-      rating: 4.5,
-      image: photoSvg,
-    },
-  ];
+
 
   const handleCheckout = () => {
     const fee = calculateShipping();
@@ -674,58 +674,116 @@ const CartListNew: React.FC = () => {
           </Typography>
 
           <Grid container spacing={2}>
-            {mockRecommendedProducts.map((product) => (
-              <Grid item xs={12} sm={6} md={3} key={product.id}>
-                <Card
-                  sx={{
-                    cursor: 'pointer',
-                    '&:hover': {
-                      boxShadow: 3,
-                    },
-                  }}
-                  onClick={() => navigate(`/item-new/${product.id}`)}
-                >
-                  <Box
+            {recommendedProducts.length > 0 ? (
+              recommendedProducts.map((product) => (
+                <Grid item xs={12} sm={6} md={3} key={product.product_id}>
+                  <Card
                     sx={{
-                      height: '100px',
-                      backgroundColor: '#f5f5f5',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      '&:hover': {
+                        boxShadow: 3,
+                      },
                     }}
+                    onClick={() => navigate(`/item/${product.product_id}`)}
                   >
-                    <img src={product.image} alt="Product" style={{ width: '64px', height: '64px' }} />
-                  </Box>
-                  <CardContent sx={{ padding: '8px' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '8px' }}>
-                      {renderStars(product.rating)}
+                    <Box
+                      sx={{
+                        height: '100px',
+                        backgroundColor: '#f5f5f5',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <img
+                        src={`/api/storage/${product.product_id}.png`}
+                        alt={product.product_name}
+                        style={{ width: '64px', height: '64px', objectFit: 'contain' }}
+                        onError={(e) => {
+                          e.currentTarget.src = photoSvg;
+                        }}
+                      />
                     </Box>
-                    <Typography
-                      variant="h6"
+                    <CardContent sx={{ padding: '8px' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '8px' }}>
+                        {renderStars(4.5)}
+                      </Box>
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontWeight: 'bold',
+                          fontSize: '16px',
+                          color: 'black',
+                          marginBottom: '8px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {product.product_name}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          color: 'black',
+                        }}
+                      >
+                        ${product.price}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))
+            ) : (
+              Array.from({ length: 4 }, (_, index) => (
+                <Grid item xs={12} sm={6} md={3} key={index}>
+                  <Card>
+                    <Box
                       sx={{
-                        fontFamily: 'Noto Sans',
-                        fontWeight: 'bold',
-                        fontSize: '16px',
-                        color: 'black',
-                        marginBottom: '8px',
+                        height: '100px',
+                        backgroundColor: '#f5f5f5',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
                     >
-                      {product.name}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontFamily: 'Noto Sans',
-                        fontSize: '14px',
-                        color: '#666666',
-                      }}
-                    >
-                      {product.description}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
+                      <img src={photoSvg} alt="Placeholder" style={{ width: '64px', height: '64px' }} />
+                    </Box>
+                    <CardContent sx={{ padding: '8px' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '8px' }}>
+                        {renderStars(4.5)}
+                      </Box>
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontWeight: 'bold',
+                          fontSize: '16px',
+                          color: 'black',
+                          marginBottom: '8px',
+                        }}
+                      >
+                        Sample
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontSize: '14px',
+                          color: '#666666',
+                        }}
+                      >
+                        Product description and price will be included.
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))
+            )}
           </Grid>
         </Box>
       </Container>

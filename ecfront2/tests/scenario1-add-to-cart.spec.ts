@@ -47,6 +47,9 @@ test.describe('Scenario 1: Add Lemongrass to Cart', () => {
     // Click Save
     await page.getByRole('button', { name: 'Save' }).click();
     
+    // Wait for save completion
+    await expect(page.getByText('Card successfully saved')).toBeVisible();
+    
     // 3. Search and Add "Lemongrass" to Cart
     await page.goto('/');
     

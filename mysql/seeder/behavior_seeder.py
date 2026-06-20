@@ -44,16 +44,47 @@ USER_PERSONA_MAP = {
 }
 
 def get_db_connection():
-    return pymysql.connect(
-        host=MYSQL_HOST,
-        port=MYSQL_PORT,
-        user=MYSQL_USER,
-        password=MYSQL_PASSWORD,
-        database=MYSQL_DB,
-        cursorclass=pymysql.cursors.DictCursor
-    )
+    import time
+    for attempt in range(1, 16):
+        try:
+            return pymysql.connect(
+                host=MYSQL_HOST,
+                port=MYSQL_PORT,
+                user=MYSQL_USER,
+                password=MYSQL_PASSWORD,
+                database=MYSQL_DB,
+                cursorclass=pymysql.cursors.DictCursor
+            )
+        except Exception as conn_err:
+            if attempt == 15:
+                raise conn_err
+            print(f"Database connection attempt {attempt} failed ({conn_err}). Retrying in 2 seconds...")
+            time.sleep(2)
 
 def main():
+    import time
+    print("Waiting for Keycloak database tables to be initialized...")
+    for attempt in range(1, 61):
+        try:
+            # Open and close separate connection to avoid Repeatable Read transaction pinning
+            temp_conn = get_db_connection()
+            try:
+                with temp_conn.cursor() as cursor:
+                    cursor.execute("SHOW TABLES LIKE 'USER_GROUP_MEMBERSHIP'")
+                    res1 = cursor.fetchone()
+                    cursor.execute("SHOW TABLES LIKE 'USER_ENTITY'")
+                    res2 = cursor.fetchone()
+                    if res1 and res2:
+                        print("Keycloak database tables successfully initialized.")
+                        break
+            finally:
+                temp_conn.close()
+        except Exception as tbl_err:
+            print(f"Attempt {attempt}: waiting for Keycloak tables... ({tbl_err})")
+        time.sleep(2)
+    else:
+        print("Warning: Keycloak database tables were not found after 120 seconds. Proceeding anyway...")
+
     print(f"Connecting to MySQL database at {MYSQL_HOST}:{MYSQL_PORT}...")
     conn = get_db_connection()
     try:
@@ -162,6 +193,18 @@ def main():
             
             conn.commit()
             print(f"Successfully simulated and committed {total_purchases_simulated} purchases.")
+            
+            # Trigger recommendation model training
+            try:
+                print("Triggering recommendation model training...")
+                train_url = "http://localhost/api/recommendation/train"
+                resp = requests.post(train_url, json={}, timeout=5)
+                if resp.status_code == 200:
+                    print("Successfully triggered recommendation model training.")
+                else:
+                    print(f"Failed to trigger model training: {resp.status_code} - {resp.text}")
+            except Exception as e:
+                print(f"Error triggering model training: {e}")
             
     finally:
         conn.close()

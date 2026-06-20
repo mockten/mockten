@@ -50,6 +50,39 @@ const DashboardNew: React.FC = () => {
   const [activeSales, setActiveSales] = useState<{ id: string; name: string }[]>([]);
   const [slideIndex, setSlideIndex] = useState(0);
   const [saleProducts, setSaleProducts] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+
+  const getUserIdFromToken = () => {
+    const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken') || localStorage.getItem('mockten_access_token');
+    if (!token) return '';
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      const decoded = JSON.parse(jsonPayload);
+      return decoded.email || decoded.preferred_username || decoded.sub || '';
+    } catch (e) {
+      console.error('Failed to decode JWT token', e);
+      return '';
+    }
+  };
+
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      try {
+        const userId = getUserIdFromToken();
+        const res = await apiClient.get(`/api/recommendation?user_id=${userId}&limit=7`);
+        if (res.data && Array.isArray(res.data.recommendations)) {
+          setRecommendations(res.data.recommendations);
+        }
+      } catch (err) {
+        console.error('Failed to fetch recommendations', err);
+      }
+    };
+    fetchRecommendations();
+  }, []);
 
   useEffect(() => {
     const fetchRanking = async () => {
@@ -376,24 +409,88 @@ const DashboardNew: React.FC = () => {
             Top picks for you
           </Typography>
           
-          <Box sx={{ display: 'flex', gap: '16px' }}>
-            {Array.from({ length: 7 }, (_, index) => (
-              <Box
-                key={index}
-                onClick={() => handleProductClick(index.toString())}
-                sx={{
-                  width: '120px',
-                  height: '120px',
-                  backgroundColor: '#f5f5f5',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '8px',
-                }}
-              >
-                <PhotoOutlined />
-              </Box>
-            ))}
+          <Box sx={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '16px' }}>
+            {recommendations.length > 0 ? (
+              recommendations.map((product) => (
+                <Box
+                  key={product.product_id}
+                  onClick={() => handleProductClick(product.product_id)}
+                  sx={{
+                    width: '120px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      transition: 'all 0.2s',
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: '120px',
+                      height: '120px',
+                      backgroundColor: '#f5f5f5',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '8px',
+                      marginBottom: '8px',
+                      position: 'relative',
+                    }}
+                  >
+                    <img
+                      src={`/api/storage/${product.product_id}.png`}
+                      alt={product.product_name}
+                      style={{ width: '80px', height: '80px', objectFit: 'contain' }}
+                      onError={(e) => {
+                        e.currentTarget.src = photoSvg;
+                      }}
+                    />
+                  </Box>
+                  <Typography
+                    sx={{
+                      fontFamily: 'Noto Sans',
+                      fontSize: '12px',
+                      color: 'black',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {product.product_name}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontFamily: 'Noto Sans',
+                      fontSize: '12px',
+                      color: 'black',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    ${product.price}
+                  </Typography>
+                </Box>
+              ))
+            ) : (
+              Array.from({ length: 7 }, (_, index) => (
+                <Box
+                  key={index}
+                  sx={{
+                    width: '120px',
+                    height: '120px',
+                    backgroundColor: '#f5f5f5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '8px',
+                  }}
+                >
+                  <PhotoOutlined />
+                </Box>
+              ))
+            )}
           </Box>
         </Box>
 

@@ -5,8 +5,12 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const isTestMode = process.env.NODE_ENV === 'test' || process.env.TEST_MODE === 'true';
-
   return {
+    server: {
+      watch: {
+        ignored: ['**/test-results/**', '**/playwright-report/**']
+      }
+    },
     plugins: [
       react(),
       tailwindcss(),

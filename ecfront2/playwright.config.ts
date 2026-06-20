@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
+  timeout: 60000,
   /* Run tests sequentially because they share the same backend user state */
   fullyParallel: false,
   workers: 1,

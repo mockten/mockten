@@ -346,3 +346,43 @@ services:
           - GET
           - OPTIONS
 
+  - name: recommendation-service
+    url: http://recommendation-service.default.svc.cluster.local:8080
+    routes:
+      - name: get-recommendations
+        paths: [ /api/recommendation ]
+        methods: [ GET ]
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /recommend
+      - name: get-similar-items
+        paths: [ /api/recommendation/similar ]
+        methods: [ GET ]
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /similar
+      - name: train-model
+        paths: [ /api/recommendation/train ]
+        methods: [ POST ]
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /train
+      - name: get-model-status
+        paths: [ /api/recommendation/model/status ]
+        methods: [ GET ]
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /model/status
+
