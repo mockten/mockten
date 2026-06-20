@@ -39,5 +39,4 @@ scratch/
 minIO/.env
 .DS_Store
 **/.DS_Store
-minIO/photos/*.png
-minIO/progress.json
+
