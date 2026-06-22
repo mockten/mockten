@@ -979,7 +979,11 @@ const ItemDetailNew: React.FC = () => {
                           {key.charAt(0).toUpperCase() + key.slice(1)}
                         </TableCell>
                         <TableCell sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black' }}>
-                          {value}
+                          {key === 'vendor' && value && value !== 'N/A' ? (
+                            <a href={`/search?q=${encodeURIComponent(value)}`} style={{ color: '#1976d2', textDecoration: 'none' }}>
+                              {value}
+                            </a>
+                          ) : value}
                         </TableCell>
                       </TableRow>
                     ))}

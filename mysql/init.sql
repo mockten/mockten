@@ -582,7 +582,21 @@ INSERT INTO Seller (seller_id, seller_name) VALUES
 ('supplement_co@example.com', 'Supplement Co.'),
 ('wellness_shop@example.com', 'Wellness & Health Shop'),
 ('misc_shop@example.com', 'Misc Shop'),
-('general_store@example.com', 'General Store')
+('general_store@example.com', 'General Store'),
+('food@example.com', 'Daily Foods Co.'),
+('drink@example.com', 'Beverage House'),
+('cooking@example.com', 'Kitchen Craft Co.'),
+('sweets@example.com', 'Sweet Treats Co.'),
+('vegetable@example.com', 'Fresh Harvest Market'),
+('jam@example.com', 'Orchard Jam Co.'),
+('greengrocer@example.com', 'Green Grocer Market'),
+('fruit@example.com', 'Fruitful Farms'),
+('water@example.com', 'Pure Water Supply'),
+('toycompany@example.com', 'Toy Company Inc.'),
+('headphonecompany@example.com', 'Sound Tech Co.'),
+('space@example.com', 'Space Hobby Store'),
+('sportscompany@example.com', 'Sports Pro Co.'),
+('healthcompany@example.com', 'Health Plus Co.')
 ON DUPLICATE KEY UPDATE seller_name = VALUES(seller_name);
 
 INSERT INTO Product (product_id, product_name, seller_id, price, category_id, summary, product_condition, geo_id, avg_review, review_count) VALUES

@@ -244,7 +244,8 @@ const SearchResultNew: React.FC = () => {
           return;
         }
         const data = await response.json();
-        const saleItems = data.items || [];
+        let saleItems = data.items || [];
+        if (f.stock) saleItems = saleItems.filter((item: any) => item.stocks > 0);
         const total = saleItems.length;
         const start = (page - 1) * itemsPerPage;
         const end = start + itemsPerPage;

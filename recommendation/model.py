@@ -13,9 +13,9 @@ class RecommendationModel:
         #           It works by iteratively sampling negative items until it finds a violating one,
         #           making it highly suitable for positive-only implicit purchase interaction data.
         self.model = LightFM(
-            no_components=64,
+            no_components=128,
             loss='warp',
-            learning_rate=0.05,
+            learning_rate=0.03,
             item_alpha=1e-6,
             user_alpha=1e-6,
             random_state=42
@@ -82,8 +82,8 @@ class RecommendationModel:
         self.model.fit(
             interactions_matrix,
             item_features=self.item_features_matrix,
-            epochs=30,
-            num_threads=2
+            epochs=60,
+            num_threads=4
         )
 
         # 5. Track training metadata

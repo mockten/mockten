@@ -1,16 +1,24 @@
 version: "3"
 tasks:
-  build: 
+  build:
     cmds:
-      - (if [ -f ecfront2.pid ]; then kill $(cat ecfront2.pid) || true; rm -f ecfront2.pid; fi)
-      - (lsof -t -i :5173 | xargs kill -9 || true)
-      - docker-compose up -d
+      - (touch ecfront2.log)
+      - (docker compose up -d || docker-compose up -d)
       - (for i in {1..30}; do docker exec -i mysql-service.default.svc.cluster.local mysql -umocktenusr -pmocktenpassword mocktendb -e "SELECT 1" >/dev/null 2>&1 && break || sleep 1; done)
       - (for i in {1..30}; do docker exec -i mysql-service.default.svc.cluster.local mysql -umocktenusr -pmocktenpassword mocktendb < mysql/test_insert.sql 2>/dev/null && break || sleep 1; done)
       - (python3 mysql/seeder/behavior_seeder.py)
       - |
+        for i in {1..30}; do
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -u airflow:airflow http://localhost:8085/api/v1/health 2>/dev/null || echo "000")
+          if [ "$STATUS" = "200" ]; then break; fi
+          sleep 2
+        done
+        curl -s -u airflow:airflow -X POST http://localhost:8085/api/v1/dags/mockten_data_pipeline/dagRuns \
+          -H "Content-Type: application/json" \
+          -d '{"conf":{}}' > /dev/null || true
+      - |
         cd ecfront2
-        TEST_MODE=true npm run dev -- --host 0.0.0.0 --port 5173 > ../ecfront2.log 2>&1 &
+        TEST_MODE=true npm run dev -- --host 0.0.0.0 --port 5173 > ../ecfront2.log 2>&1 < /dev/null &
         for i in 1 2 3 4 5 6 7 8 9 10; do
           VITE_PID=$(lsof -t -i :5173 | head -n 1)
           if [ -n "$VITE_PID" ]; then
@@ -21,22 +29,25 @@ tasks:
         done
       - sleep 3
       - task: hc
-  destroy: 
+  destroy:
     cmds:
       - (if [ -f ecfront2.pid ]; then kill $(cat ecfront2.pid) || true; rm -f ecfront2.pid; fi)
       - (lsof -t -i :5173 | xargs kill -9 || true)
-      - docker-compose down -v --remove-orphans || true
+      - (docker compose down -v --remove-orphans || docker-compose down -v --remove-orphans || true)
+      - (rm -f ecfront2.log ecfront2.pid zap-report.html || true)
+      - (docker image prune -f || true)
+      - (docker builder prune --keep-storage 5GB -f || true)
   hc:
     desc: Verify that all containers and the React frontend process are healthy and running
     cmds:
       - |
-        for container in mysql-service.default.svc.cluster.local redis-service.default.svc.cluster.local uam-service.default.svc.cluster.local minio-service.default.svc.cluster.local apigw meilisearch-service.default.svc.cluster.local searchitem-service.default.svc.cluster.local product-service.default.svc.cluster.local cart-service.default.svc.cluster.local mockten-sync geocoding-service.default.svc.cluster.local ecpay-service.default.svc.cluster.local ranking-service.default.svc.cluster.local sale-service.default.svc.cluster.local shipment-service.default.svc.cluster.local recommendation-service.default.svc.cluster.local nginx mockten-dashboard; do
+        for container in mysql-service.default.svc.cluster.local redis-service.default.svc.cluster.local uam-service.default.svc.cluster.local minio-service.default.svc.cluster.local apigw meilisearch-service.default.svc.cluster.local searchitem-service.default.svc.cluster.local product-service.default.svc.cluster.local cart-service.default.svc.cluster.local mockten-sync geocoding-service.default.svc.cluster.local ecpay-service.default.svc.cluster.local ranking-service.default.svc.cluster.local sale-service.default.svc.cluster.local shipment-service.default.svc.cluster.local recommendation-service.default.svc.cluster.local nginx mockten-dashboard mongo-service.default.svc.cluster.local; do
           if [ -z "$(docker ps -q -f name=$container -f status=running)" ]; then
             echo "Error: Container $container is not running!"
             exit 1
           fi
         done
-        echo "All 18 containers are successfully running."
+        echo "All 19 containers are successfully running."
       - |
         if [ ! -f ecfront2.pid ]; then
           echo "Error: ecfront2.pid file does not exist!"
@@ -58,16 +69,112 @@ tasks:
   recommendation-train:
     desc: Run the recommendation model training job as a standalone container using docker-compose
     cmds:
-      - docker-compose run --rm recommendation python train.py
+      - (docker compose run --rm recommendation python train.py || docker-compose run --rm recommendation python train.py)
   ci:
     desc: Run CI workflows locally using act
     cmds:
-      - act pull_request -W .github/workflows/ci.yml
-      - docker builder prune -a -f
+      - act pull_request -W .github/workflows/ci.yml --concurrent-jobs 1 --secret-file .secrets
+      - (docker builder prune --keep-storage 5GB -f || true)
   e2e:
     desc: Run Playwright E2E test suite locally
     cmds:
       - (cd ecfront2 && npx playwright test)
+  ie2e:
+    desc: Run Playwright E2E test suite inside Docker container (for Dashboard use)
+    cmds:
+      - |
+        docker run --rm \
+          --network mockten_nw \
+          --user root \
+          -e PLAYWRIGHT_BASE_URL=http://nginx \
+          -v "${HOST_WORKSPACE_PATH:-$PWD}/ecfront2:/work" \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -v /usr/bin/docker:/usr/bin/docker \
+          -w /work \
+          mcr.microsoft.com/playwright:v1.60.0-noble \
+          npx playwright test --reporter=list
+  ie2e-spec:
+    desc: Run a single Playwright spec inside Docker container (for Dashboard use)
+    cmds:
+      - |
+        docker run --rm \
+          --network mockten_nw \
+          --user root \
+          -e PLAYWRIGHT_BASE_URL=http://nginx \
+          -v "${HOST_WORKSPACE_PATH:-$PWD}/ecfront2:/work" \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -v /usr/bin/docker:/usr/bin/docker \
+          -w /work \
+          mcr.microsoft.com/playwright:v1.60.0-noble \
+          npx playwright test --reporter=list "tests/{{.SPEC}}"
+  trivy:
+    desc: Scan all container images for HIGH/CRITICAL vulnerabilities using Trivy
+    cmds:
+      - |
+        FAILED=0
+        echo "=== [Container Scan] Trivy Image Scanning ==="
+        for img in mockten-redis mockten-mysql uam apigw minio meilisearch searchitem product cart mockten-sync mockten-geocoding mockten-ecpay mockten-ranking mockten-sale mockten-shipment mockten-recommendation mockten-mongodb mockten-dashboard; do
+          echo ""
+          echo "Scanning image: $img:latest..."
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "${HOST_WORKSPACE_PATH:-$PWD}:/workspace" -v trivy-cache:/root/.cache aquasec/trivy:latest image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /workspace/.trivyignore "$img:latest" || FAILED=1
+        done
+        if [ $FAILED -ne 0 ]; then
+          echo "Container image scan FAILED: HIGH or CRITICAL vulnerabilities found!"
+          exit 1
+        fi
+        echo "Container image scan PASSED."
+
+  sca:
+    desc: Software Composition Analysis - scan dependencies for known vulnerabilities
+    cmds:
+      - |
+        echo "=== [SCA] Scanning Dependencies for Known Vulnerabilities ==="
+        docker run --rm -v "${HOST_WORKSPACE_PATH:-$PWD}:/workspace" -v trivy-cache:/root/.cache aquasec/trivy:latest fs --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln /workspace
+        echo "SCA scan PASSED."
+
+  sast:
+    desc: Static Application Security Testing - scan source code for secrets and misconfigurations
+    cmds:
+      - |
+        echo "=== [SAST] Scanning Source Code for Secrets and Misconfigurations ==="
+        SKIP_ARGS=""
+        while IFS= read -r line || [ -n "$line" ]; do
+          case "$line" in \#*|''|*\**|*\?*|*\[*) continue ;; esac
+          line="${line#/}"
+          [ -e "${HOST_WORKSPACE_PATH:-$PWD}/$line" ] && SKIP_ARGS="$SKIP_ARGS,/workspace/$line"
+        done < "${HOST_WORKSPACE_PATH:-$PWD}/.gitignore"
+        SKIP_ARGS="${SKIP_ARGS#,}"
+        [ -n "$SKIP_ARGS" ] && SKIP_OPT="--skip-files $SKIP_ARGS" || SKIP_OPT=""
+        docker run --rm -v "${HOST_WORKSPACE_PATH:-$PWD}:/workspace" -v trivy-cache:/root/.cache aquasec/trivy:latest fs --exit-code 1 --severity HIGH,CRITICAL --scanners secret ${SKIP_OPT} /workspace
+        echo "SAST scan PASSED."
+
+  dast:
+    desc: Dynamic Application Security Testing - baseline scan running services via OWASP ZAP
+    cmds:
+      - |
+        echo "=== [DAST] OWASP ZAP Baseline Scan against running services ==="
+        docker run --rm --network mockten_nw \
+          -v "${HOST_WORKSPACE_PATH:-$PWD}:/zap/wrk:rw" \
+          ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+          -t http://nginx \
+          -r zap-report.html \
+          -I || true
+        echo "DAST scan completed. Report saved to zap-report.html (if containers are running)."
+
+  infosec:
+    desc: Run all security scans (trivy, sca, sast, dast)
+    cmds:
+      - |
+        FAILED=0
+        task trivy || FAILED=1
+        task sca || FAILED=1
+        task sast || FAILED=1
+        task dast || FAILED=1
+        if [ $FAILED -ne 0 ]; then
+          echo "Security scan FAILED: vulnerabilities detected!"
+          exit 1
+        fi
+        echo "All security scans PASSED."
   setup:
     cmds:
       - (cd redis && docker build -t mockten-redis .)
@@ -86,4 +193,7 @@ tasks:
       - (cd sale && docker build -t mockten-sale .)
       - (cd shipment && docker build -t mockten-shipment .)
       - (cd recommendation && docker build -t mockten-recommendation .)
+      - (cd mongodb && docker build -t mockten-mongodb .)
+      - (cd monitoring/dashboard && docker build -t mockten-dashboard .)
+      - (cd airflow && docker build -t mockten-airflow .)
       - (pip3 install -r mysql/seeder/requirements.txt || pip install -r mysql/seeder/requirements.txt)

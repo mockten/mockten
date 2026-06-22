@@ -39,15 +39,6 @@ interface Order {
   image: string;
 }
 
-interface RecommendedProduct {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  rating: number;
-  image: string;
-}
-
 const OrderHistoryNew: React.FC = () => {
   const navigate = useNavigate();
 

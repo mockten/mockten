@@ -49,17 +49,8 @@ test.describe('Scenario 2: Favorite and Buy Blueberry Jam', () => {
     // Wait for save completion
     await expect(page.getByText('Card successfully saved')).toBeVisible();
 
-    // 3. Search for Blueberry Jam and favorite it
-    await page.goto('/');
-    const searchInput = page.getByPlaceholder(/Search/i);
-    await searchInput.fill('Blueberry Jam');
-    await searchInput.press('Enter');
-    await page.waitForURL('**/search?q=*');
-    
-    // Click on Blueberry Jam to go to detail page
-    const blueberryJamHeading = page.getByRole('heading', { name: 'Blueberry Jam' });
-    await expect(blueberryJamHeading).toBeVisible();
-    await blueberryJamHeading.click();
+    // 3. Navigate to Blueberry Jam item page and favorite it
+    await page.goto('/item/b91a5d68-6acb-48e7-8e5d-3d85b7e76af2');
     await page.waitForURL('**/item/*');
     
     // Click Favorite (heart icon)

@@ -14,7 +14,7 @@ export default defineConfig({
   reporter: 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    baseURL: 'http://localhost',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost',
     trace: 'on-first-retry',
   },
 

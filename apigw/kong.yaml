@@ -1,5 +1,15 @@
 _format_version: "3.0"
 services:
+  - name: dashboard-stats
+    url: http://mockten-dashboard:3001/api/stats
+    routes:
+      - name: dashboard-stats-route
+        paths:
+          - /api/stats
+        methods:
+          - GET
+        strip_path: true
+
   - name: keycloak-token
     url: http://uam-service.default.svc.cluster.local/realms/mockten-realm-dev/protocol/openid-connect/token
     routes:

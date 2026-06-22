@@ -396,7 +396,7 @@ LEFT JOIN Stock t ON p.product_id = t.product_id
 LEFT JOIN Seller s ON p.seller_id = s.seller_id
 LEFT JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
 LEFT JOIN USER_ATTRIBUTE ua ON ue.ID = ua.USER_ID AND ua.NAME = 'description'
-LEFT JOIN Geo g ON p.geo_id = g.user_id
+LEFT JOIN Geo g ON p.geo_id = g.geo_id
 LEFT JOIN TimeSale ts ON p.sale_id = ts.id
 WHERE p.product_id = ?
 LIMIT 1

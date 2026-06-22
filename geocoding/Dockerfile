@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine AS builder
+FROM golang:1.26-alpine AS builder
 WORKDIR /app
 
 # Copy sources only (no host go.mod/go.sum needed)
@@ -12,7 +12,7 @@ RUN go mod tidy
 # Build static binary
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /app/geocode-service main.go
 
-FROM alpine:3.19
+FROM alpine:3
 WORKDIR /app
 COPY --from=builder /app/geocode-service /app/geocode-service
 COPY --from=builder /app/config.json /app/config.json

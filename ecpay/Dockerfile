@@ -1,4 +1,4 @@
-FROM golang:1.25 AS builder
+FROM golang:1.26 AS builder
 
 RUN apt-get update &&\
     apt-get -y install sysv-rc-conf &&\

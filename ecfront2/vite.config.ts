@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => {
   const isTestMode = process.env.NODE_ENV === 'test' || process.env.TEST_MODE === 'true';
   return {
     server: {
+      allowedHosts: ['nginx', 'localhost'],
       watch: {
         ignored: ['**/test-results/**', '**/playwright-report/**']
       }

@@ -74,15 +74,6 @@ interface CartItem {
   discountRate?: number;
 }
 
-interface RecommendedProduct {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  rating: number;
-  image: string;
-}
-
 const CartListNew: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -378,7 +369,7 @@ const CartListNew: React.FC = () => {
                     <img
                       src={item.image}
                       alt={item.name}
-                      style={{ width: '64px', height: '64px', objectFit: 'contain' }}
+                      style={{ width: '120px', height: '120px', objectFit: 'contain' }}
                       onError={(e) => {
                         e.currentTarget.src = photoSvg;
                       }}
@@ -698,7 +689,7 @@ const CartListNew: React.FC = () => {
                       <img
                         src={`/api/storage/${product.product_id}.png`}
                         alt={product.product_name}
-                        style={{ width: '64px', height: '64px', objectFit: 'contain' }}
+                        style={{ width: '90px', height: '90px', objectFit: 'contain' }}
                         onError={(e) => {
                           e.currentTarget.src = photoSvg;
                         }}

@@ -40,3 +40,5 @@ minIO/.env
 .DS_Store
 **/.DS_Store
 
+minIO/chrome_profile/*
+minIO/photos/debug*

@@ -56,6 +56,9 @@ services:
       - "8002:8002"
     tty: true
     stdin_open: true
+    environment:
+      KONG_NGINX_HTTP_LOG_FORMAT: "with_rt '$$remote_addr - $$remote_user [$$time_local] \"$$request\" $$status $$body_bytes_sent rt=$$upstream_response_time kong_request_id: \"$$kong_request_id\"'"
+      KONG_PROXY_ACCESS_LOG: "/tmp/access.log with_rt"
 
   meilisearch:
     container_name: meilisearch-service.default.svc.cluster.local
@@ -176,6 +179,19 @@ services:
     tty: true
     stdin_open: true
 
+  mongodb:
+    container_name: mongo-service.default.svc.cluster.local
+    image: mockten-mongodb
+    build:
+      context: ./mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: bar
+      MONGO_INITDB_ROOT_PASSWORD: bar
+    networks:
+      - mockten_nw
+    ports:
+      - "27017:27017"
+
   # ── Monitoring Stack ──────────────────────────────────────────────────────
   dashboard:
     container_name: mockten-dashboard
@@ -183,12 +199,87 @@ services:
     build:
       context: ./monitoring/dashboard
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./ecfront2.log:/app/ecfront2.log:ro
+      - ./apigw/kong.yaml:/app/kong.yaml:ro
+      - ./uam/realm-export-dev.json:/app/realm-export-dev.json:ro
+      - ./ecfront2/tests:/app/tests:ro
+      - ./ecfront2:/app/ecfront2
+      - ./Taskfile.yaml:/app/Taskfile.yaml:ro
+      - ./.github/workflows/ci.yml:/app/.github/workflows/ci.yml:ro
+      - ./:${HOST_WORKSPACE_PATH:-${PWD}}
+    environment:
+      - HOST_WORKSPACE_PATH=${HOST_WORKSPACE_PATH:-${PWD}}
+    networks:
+      - mockten_nw
+
+  # ── Airflow Stack ─────────────────────────────────────────────────────────
+  airflow-postgres:
+    container_name: airflow-postgres
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-postgres-data:/var/lib/postgresql/data
+    networks:
+      - mockten_nw
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 10
+
+  airflow-webserver:
+    container_name: airflow-webserver
+    image: mockten-airflow
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+    command: ["airflow", "webserver"]
+    ports:
+      - "8085:8080"
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: "j7zLQ3S9kBh2vXpNqWcYeRaFmTuGdIoK8sE4wPlZnJy0="
+      AIRFLOW__WEBSERVER__SECRET_KEY: "mockten-airflow-secret"
+      AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      MYSQL_HOST: mysql-service.default.svc.cluster.local
+      MINIO_ENDPOINT: minio-service.default.svc.cluster.local:9000
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    networks:
+      - mockten_nw
+
+  airflow-scheduler:
+    container_name: airflow-scheduler
+    image: mockten-airflow
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+    command: ["airflow", "scheduler"]
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: "j7zLQ3S9kBh2vXpNqWcYeRaFmTuGdIoK8sE4wPlZnJy0="
+      AIRFLOW__WEBSERVER__SECRET_KEY: "mockten-airflow-secret"
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      MYSQL_HOST: mysql-service.default.svc.cluster.local
+      MINIO_ENDPOINT: minio-service.default.svc.cluster.local:9000
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
     networks:
       - mockten_nw
 
 networks:
   mockten_nw:
     name: mockten_nw
+
+volumes:
+  airflow-postgres-data:
 

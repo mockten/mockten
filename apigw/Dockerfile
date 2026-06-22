@@ -2,6 +2,8 @@ FROM kong/kong-gateway:3.9
 
 USER root
 
+RUN apt-get update && apt-get upgrade -y && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 ENV KONG_DATABASE=off \
     KONG_PROXY_LISTEN=0.0.0.0:8082 \
     KONG_ADMIN_LISTEN=0.0.0.0:8001 \

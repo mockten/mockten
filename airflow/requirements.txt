@@ -1,0 +1,8 @@
+pandas==2.2.2
+pyarrow==23.0.1
+pymysql==1.1.1
+minio==7.2.7
+lightfm==1.17
+scikit-learn==1.5.1
+numpy==1.26.4
+scipy==1.13.1
