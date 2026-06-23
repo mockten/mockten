@@ -12,7 +12,7 @@ const { MongoClient } = require('mongodb');
 const app = express();
 app.use(express.json());
 
-// ── DB connections (lazy) ─────────────────────────────────────────────────────
+// ── DB connections ────────────────────────────────────────────────────────────
 const MYSQL_CONFIG = {
   host:     'mysql-service.default.svc.cluster.local',
   port:     3306,
@@ -22,14 +22,24 @@ const MYSQL_CONFIG = {
   connectTimeout: 5000,
 };
 
+// Reuse a pool instead of creating a new connection per request
+const mysqlPool = mysql.createPool({
+  ...MYSQL_CONFIG,
+  connectionLimit: 10,
+  waitForConnections: true,
+  queueLimit: 0,
+});
+
 function getRedis() {
   return new Redis({
     host: 'redis-service.default.svc.cluster.local',
     port: 6379,
     password: 'mocktenpass',
     connectTimeout: 3000,
-    maxRetriesPerRequest: 1,
+    maxRetriesPerRequest: 0,
     lazyConnect: true,
+    retryStrategy: () => null,
+    enableOfflineQueue: false,
   });
 }
 
@@ -80,7 +90,7 @@ const ALLOWED_TABLES = [
 app.get('/api/db/mysql/tables', async (req, res) => {
   let conn;
   try {
-    conn = await mysql.createConnection(MYSQL_CONFIG);
+    conn = await mysqlPool.getConnection();
     const [rows] = await conn.query(
       `SELECT TABLE_NAME as name, TABLE_ROWS as approxRows
        FROM information_schema.TABLES
@@ -92,7 +102,7 @@ app.get('/api/db/mysql/tables', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   } finally {
-    if (conn) await conn.end().catch(() => {});
+    if (conn) conn.release();
   }
 });
 
@@ -105,7 +115,7 @@ app.get('/api/db/mysql/table/:table', async (req, res) => {
 
   let conn;
   try {
-    conn = await mysql.createConnection(MYSQL_CONFIG);
+    conn = await mysqlPool.getConnection();
     // Get column names first
     const [cols] = await conn.query(
       `SELECT COLUMN_NAME FROM information_schema.COLUMNS
@@ -143,7 +153,7 @@ app.get('/api/db/mysql/table/:table', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   } finally {
-    if (conn) await conn.end().catch(() => {});
+    if (conn) conn.release();
   }
 });
 
@@ -155,7 +165,7 @@ app.post('/api/db/mysql/table/:table', async (req, res) => {
 
   let conn;
   try {
-    conn = await mysql.createConnection(MYSQL_CONFIG);
+    conn = await mysqlPool.getConnection();
     const keys = Object.keys(row);
     const values = Object.values(row);
     const columnsString = keys.map(k => `\`${k}\``).join(', ');
@@ -167,7 +177,7 @@ app.post('/api/db/mysql/table/:table', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   } finally {
-    if (conn) await conn.end().catch(() => {});
+    if (conn) conn.release();
   }
 });
 
@@ -177,13 +187,15 @@ app.delete('/api/db/mysql/table/:table', async (req, res) => {
   // Support composite PK via pkNames[]=col1&pkNames[]=col2&pkValues[]=v1&pkValues[]=v2
   // or legacy single: pkName=col&pkValue=val
   const { pkName, pkValue } = req.query;
-  const pkNames = req.query['pkNames[]'] ? [].concat(req.query['pkNames[]']) : (pkName ? [pkName] : []);
-  const pkValues = req.query['pkValues[]'] ? [].concat(req.query['pkValues[]']) : (pkValue !== undefined ? [pkValue] : []);
+  const rawPkNames = req.query.pkNames ?? req.query['pkNames[]'];
+  const rawPkValues = req.query.pkValues ?? req.query['pkValues[]'];
+  const pkNames = rawPkNames ? [].concat(rawPkNames) : (pkName ? [pkName] : []);
+  const pkValues = rawPkValues ? [].concat(rawPkValues) : (pkValue !== undefined ? [pkValue] : []);
   if (pkNames.length === 0) return res.status(400).json({ error: 'primary key info required' });
 
   let conn;
   try {
-    conn = await mysql.createConnection(MYSQL_CONFIG);
+    conn = await mysqlPool.getConnection();
     const whereClause = pkNames.map(k => `\`${k}\` = ?`).join(' AND ');
     const sql = `DELETE FROM \`${table}\` WHERE ${whereClause}`;
     await conn.query(sql, pkValues);
@@ -191,7 +203,7 @@ app.delete('/api/db/mysql/table/:table', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   } finally {
-    if (conn) await conn.end().catch(() => {});
+    if (conn) conn.release();
   }
 });
 
@@ -208,7 +220,7 @@ app.put('/api/db/mysql/table/:table', async (req, res) => {
 
   let conn;
   try {
-    conn = await mysql.createConnection(MYSQL_CONFIG);
+    conn = await mysqlPool.getConnection();
     const pkSet = new Set(pks);
     const keys = Object.keys(row).filter(k => !pkSet.has(k));
     const values = keys.map(k => row[k]);
@@ -221,7 +233,7 @@ app.put('/api/db/mysql/table/:table', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   } finally {
-    if (conn) await conn.end().catch(() => {});
+    if (conn) conn.release();
   }
 });
 
@@ -454,8 +466,15 @@ app.put('/api/db/mongo/collection/:collection', async (req, res) => {
   }
 });
 
+let _topologyCache = null;
+let _topologyCacheAt = 0;
+const TOPOLOGY_CACHE_TTL = 10000; // 10 seconds
+
 app.get('/api/topology', async (req, res) => {
   try {
+    if (_topologyCache && Date.now() - _topologyCacheAt < TOPOLOGY_CACHE_TTL) {
+      return res.json(_topologyCache);
+    }
     const running = await docker.listContainers({ all: true });
     const stateMap = {};
     running.forEach(c => {
@@ -486,7 +505,7 @@ app.get('/api/topology', async (req, res) => {
       { id: 'dashboard',      label: 'dashboard\n(this)',    group: 'meta'     },
       { id: 'airflow-web',    label: 'Airflow\nWebserver',   group: 'pipeline' },
       { id: 'airflow-sch',    label: 'Airflow\nScheduler',   group: 'pipeline' },
-      { id: 'airflow-pg',     label: 'Airflow\nPostgres',    group: 'data'     },
+      { id: 'mongodb',        label: 'MongoDB',               group: 'data'     },
     ];
 
     // Container name mapping for state lookup
@@ -511,7 +530,7 @@ app.get('/api/topology', async (req, res) => {
       dashboard:      'mockten-dashboard',
       'airflow-web':  'airflow-webserver',
       'airflow-sch':  'airflow-scheduler',
-      'airflow-pg':   'airflow-postgres',
+      mongodb:        'mongo-service.default.svc.cluster.local',
     };
 
     // Edges derived from environment variables + known architecture
@@ -550,10 +569,10 @@ app.get('/api/topology', async (req, res) => {
       { source: 'product',        target: 'minio' },
       // dashboard monitors everything
       { source: 'dashboard',      target: 'mysql',        dashed: true },
+      { source: 'dashboard',      target: 'mongodb',      dashed: true },
       // Airflow pipeline
       { source: 'dashboard',      target: 'airflow-web',  dashed: true },
-      { source: 'airflow-web',    target: 'airflow-pg' },
-      { source: 'airflow-sch',    target: 'airflow-pg' },
+      { source: 'airflow-web',    target: 'mysql' },
       { source: 'airflow-sch',    target: 'mysql' },
       { source: 'airflow-sch',    target: 'minio' },
       { source: 'airflow-web',    target: 'airflow-sch',  dashed: true },
@@ -570,7 +589,10 @@ app.get('/api/topology', async (req, res) => {
       }
     });
 
-    res.json({ nodes, edges });
+    const result = { nodes, edges };
+    _topologyCache = result;
+    _topologyCacheAt = Date.now();
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -720,8 +742,24 @@ function parseKongYaml() {
         mode = 'plugins';
       } else if (trimmed.startsWith('paths:')) {
         mode = 'paths';
+        // Handle inline array: paths: [ /foo, /bar ]
+        const inlineArr = trimmed.match(/^paths:\s*\[\s*([^\]]+)\s*\]/);
+        if (inlineArr && currentRoute) {
+          inlineArr[1].split(',').forEach(p => {
+            const v = p.trim().replace(/"/g, '').replace(/'/g, '');
+            if (v) currentRoute.paths.push(v);
+          });
+        }
       } else if (trimmed.startsWith('methods:')) {
         mode = 'methods';
+        // Handle inline array: methods: [ GET, POST ]
+        const inlineArr = trimmed.match(/^methods:\s*\[\s*([^\]]+)\s*\]/);
+        if (inlineArr && currentRoute) {
+          inlineArr[1].split(',').forEach(m => {
+            const v = m.trim().replace(/"/g, '').replace(/'/g, '');
+            if (v) currentRoute.methods.push(v);
+          });
+        }
       } else if (trimmed.startsWith('- ') && currentRoute) {
         const val = trimmed.replace('- ', '').trim().replace(/"/g, '').replace(/'/g, '');
         if (mode === 'paths') {
@@ -934,7 +972,7 @@ app.post('/api/db/mysql/query', async (req, res) => {
 
   let conn;
   try {
-    conn = await mysql.createConnection(MYSQL_CONFIG);
+    conn = await mysqlPool.getConnection();
     const [result] = await conn.query(sql);
     if (Array.isArray(result)) {
       if (result.length === 0) {
@@ -948,7 +986,7 @@ app.post('/api/db/mysql/query', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
-    if (conn) await conn.end().catch(() => {});
+    if (conn) conn.release();
   }
 });
 
@@ -1090,7 +1128,7 @@ app.get('/api/telemetry', async (req, res) => {
   // 2. MySQL Status
   let conn;
   try {
-    conn = await mysql.createConnection(MYSQL_CONFIG);
+    conn = await mysqlPool.getConnection();
     const [statusRows] = await conn.query("SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected', 'Questions', 'Uptime')");
     statusRows.forEach(row => {
       if (row.Variable_name === 'Threads_connected') telemetry.mysql.connections = parseInt(row.Value);
@@ -1100,7 +1138,7 @@ app.get('/api/telemetry', async (req, res) => {
   } catch (e) {
     console.error('MySQL telemetry error:', e.message);
   } finally {
-    if (conn) await conn.end().catch(() => {});
+    if (conn) conn.release();
   }
 
   // 3. Redis Status
@@ -1169,13 +1207,13 @@ async function collectMetricsSnapshot() {
     // Collect telemetry
     let mysqlConn = 0, redisClients = 0, mongoConn = 0, kongTotal = 0;
     try {
-      const conn = await require('mysql2/promise').createConnection({ host:'mysql-service.default.svc.cluster.local', port:3306, user:'mocktenusr', password:'mocktenpassword', database:'mocktendb', connectTimeout:3000 });
+      const conn = await mysqlPool.getConnection();
       const [rows] = await conn.query("SHOW STATUS WHERE Variable_name IN ('Threads_connected')");
       rows.forEach(r => { if (r.Variable_name === 'Threads_connected') mysqlConn = parseInt(r.Value); });
-      await conn.end();
+      conn.release();
     } catch {}
     try {
-      const r = new (require('ioredis'))({ host:'redis-service.default.svc.cluster.local', port:6379, password:'mocktenpass', connectTimeout:2000, maxRetriesPerRequest:1, lazyConnect:true });
+      const r = new (require('ioredis'))({ host:'redis-service.default.svc.cluster.local', port:6379, password:'mocktenpass', connectTimeout:2000, maxRetriesPerRequest:0, lazyConnect:true, retryStrategy: () => null, enableOfflineQueue: false });
       await r.connect();
       const info = await r.info('clients');
       const m = info.match(/connected_clients:(\d+)/);
@@ -1190,7 +1228,10 @@ async function collectMetricsSnapshot() {
       await mc.close().catch(() => {});
     } catch {}
     try {
-      const kr = await fetch('http://apigw:8001/status');
+      const ac = new AbortController();
+      const tid = setTimeout(() => ac.abort(), 3000);
+      const kr = await fetch('http://apigw:8001/status', { signal: ac.signal });
+      clearTimeout(tid);
       if (kr.ok) { const kd = await kr.json(); kongTotal = kd.server?.total_requests || 0; }
     } catch {}
 
@@ -1289,7 +1330,7 @@ app.get('/api/frontend/status', async (req, res) => {
       lastSyncTime = timestamp;
       let conn;
       try {
-        conn = await mysql.createConnection(MYSQL_CONFIG);
+        conn = await mysqlPool.getConnection();
         const [rows] = await conn.query(
           `SELECT TIMESTAMPDIFF(MINUTE, ?, NOW()) AS diff_minutes`,
           [timestamp]
@@ -1300,7 +1341,7 @@ app.get('/api/frontend/status', async (req, res) => {
       } catch (dbErr) {
         console.error('Failed to calculate sync time diff from DB:', dbErr.message);
       } finally {
-        if (conn) await conn.end().catch(() => {});
+        if (conn) conn.release();
       }
     }
   } catch (e) {
@@ -1576,9 +1617,8 @@ wssVulnerability.on('connection', (ws, req) => {
 wssFrontendStart.on('connection', ws => {
   // The Vite frontend runs on the host (not inside this container).
   // node_modules built on macOS are incompatible with the Alpine Linux container.
-  // To start the frontend, run: task build  (or: cd ecfront2 && npm run dev)
   ws.send('The Vite frontend runs on the host machine, not inside this container.\r\n');
-  ws.send('Run "task build" from the project root to start it, then refresh this page.\r\n');
+  ws.send('Run "task start-frontend" from the project root to start only the Vite dev server.\r\n');
   ws.close();
 });
 
@@ -1586,10 +1626,38 @@ wssFrontendStart.on('connection', ws => {
 const AIRFLOW_BASE = 'http://airflow-webserver:8080/api/v1';
 const AIRFLOW_AUTH = 'Basic ' + Buffer.from('airflow:airflow').toString('base64');
 
-async function airflowFetch(path, options = {}) {
-  return fetch(`${AIRFLOW_BASE}${path}`, {
-    ...options,
-    headers: { 'Authorization': AIRFLOW_AUTH, 'Content-Type': 'application/json', ...(options.headers || {}) },
+function airflowFetch(path, options = {}) {
+  const url = new URL(AIRFLOW_BASE + path);
+  return new Promise((resolve, reject) => {
+    const reqOptions = {
+      hostname: url.hostname,
+      port: url.port || 80,
+      path: url.pathname + url.search,
+      method: options.method || 'GET',
+      headers: {
+        'Authorization': AIRFLOW_AUTH,
+        'Content-Type': 'application/json',
+        'Connection': 'close',
+        ...(options.headers || {}),
+      },
+      agent: false, // disable keep-alive pooling
+    };
+    const req = http.request(reqOptions, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        resolve({
+          status: res.statusCode,
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          json: () => Promise.resolve(JSON.parse(body)),
+          text: () => Promise.resolve(body),
+        });
+      });
+    });
+    req.setTimeout(8000, () => { req.destroy(new Error('Airflow request timeout')); });
+    req.on('error', reject);
+    if (options.body) req.write(options.body);
+    req.end();
   });
 }
 
@@ -1765,4 +1833,4 @@ app.get('/api/pipeline/layer/:layer/data', async (req, res) => {
 });
 
 const PORT = 3001;
-server.listen(PORT, () => console.log(`Dashboard server running on :${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`Dashboard server running on :${PORT}`));

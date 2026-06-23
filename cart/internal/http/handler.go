@@ -30,6 +30,7 @@ func (h *Handler) GetMeCart(c *gin.Context) {
 		return
 	}
 
+	c.Header("Cache-Control", "no-store")
 	view, err := h.viewSvc.GetCartView(c.Request.Context(), uid)
 	if err != nil {
 		if errors.Is(err, cartstore.ErrCartNotFound) {

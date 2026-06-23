@@ -1,5 +1,8 @@
 FROM golang:1.26-alpine AS task-builder
-RUN go install github.com/go-task/task/v3/cmd/task@latest
+RUN apk add --no-cache git
+RUN git clone --depth=1 https://github.com/go-task/task.git /task
+WORKDIR /task
+RUN go get golang.org/x/crypto@latest golang.org/x/net@latest && go mod tidy && CGO_ENABLED=0 go build -o /go/bin/task ./cmd/task
 
 FROM node:22-alpine
 RUN apk update && apk upgrade --no-cache && apk add --no-cache docker-cli curl tar && npm install -g npm@latest

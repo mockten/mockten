@@ -1,3 +1,8 @@
+-- Airflow metadata DB (uses same MySQL instance, separate DB)
+CREATE DATABASE IF NOT EXISTS airflow CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+GRANT ALL PRIVILEGES ON airflow.* TO 'mocktenusr'@'%';
+FLUSH PRIVILEGES;
+
 CREATE TABLE IF NOT EXISTS TimeSale (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -56,6 +61,15 @@ CREATE TABLE IF NOT EXISTS Stock (
   stocks INT,
   last_update DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_stock_last_update (last_update)
+);
+
+CREATE TABLE IF NOT EXISTS BrowsingHistory (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id VARCHAR(255) NOT NULL,
+  product_id VARCHAR(36) NOT NULL,
+  viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_bh_user_viewed (user_id, viewed_at DESC),
+  INDEX idx_bh_product (product_id)
 );
 
 CREATE TABLE IF NOT EXISTS Wishlist (
@@ -130,11 +144,13 @@ CREATE TABLE IF NOT EXISTS `Transaction` (
   status         ENUM('quoted','booked','picked_up','in_transit','delayed','delivered','canceled','failed') NOT NULL DEFAULT 'quoted',
   leg_type       ENUM('road','air','sea') NOT NULL DEFAULT 'road',
   scheduled_start DATETIME NULL,
+  quantity       INT NOT NULL DEFAULT 1,
   created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at     DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_tx_geo     (geo_id),
   KEY idx_tx_product (product_id),
-  KEY idx_tx_legtype (leg_type)
+  KEY idx_tx_legtype (leg_type),
+  KEY idx_tx_created (created_at DESC)
 );
 
 CREATE TABLE IF NOT EXISTS PaymentProfile (
@@ -1601,6 +1617,59 @@ INSERT INTO PaymentMethod (payment_method_id, user_id, stripe_customer_id, strip
 ('pm_dev_049', 'dev_user_049@example.com', 'cus_dev_049', 'pm_card_visa', 'visa', '4242', 12, 2028, 1, 'active'),
 ('pm_dev_050', 'dev_user_050@example.com', 'cus_dev_050', 'pm_card_visa', 'visa', '4242', 12, 2028, 1, 'active')
 ON DUPLICATE KEY UPDATE stripe_customer_id = VALUES(stripe_customer_id), stripe_payment_method_id = VALUES(stripe_payment_method_id), brand = VALUES(brand), last4 = VALUES(last4), exp_month = VALUES(exp_month), exp_year = VALUES(exp_year), is_default = VALUES(is_default), status = VALUES(status);
+
+-- ── API SLA Table ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS ApiSLA (
+  method      VARCHAR(10)  NOT NULL,
+  path        VARCHAR(255) NOT NULL,
+  sla_ms      INT          NOT NULL COMMENT 'Max acceptable avg response time in ms',
+  description VARCHAR(255),
+  PRIMARY KEY (method, path)
+);
+
+INSERT INTO ApiSLA (method, path, sla_ms, description) VALUES
+-- Auth / Identity
+('POST', '/api/uam/token',                    1000, 'Keycloak token issuance'),
+('GET',  '/api/uam/userinfo',                  300, 'JWT userinfo lookup'),
+('GET',  '/api/uam/auth',                      500, 'OAuth2 authorization redirect'),
+-- Product & Search
+('GET',  '/api/search',                        800, 'Full-text product search via MeiliSearch'),
+('GET',  '/api/categories',                    200, 'Static category list'),
+('GET',  '/api/item/detail/:id',               400, 'Product detail page'),
+('GET',  '/api/storage/:id.png',               500, 'Product image from MinIO'),
+-- Cart & Checkout
+('GET',  '/api/cart',                          300, 'Fetch cart items'),
+('POST', '/api/cart/items',                    300, 'Add item to cart'),
+('PUT',  '/api/cart/items/:id',                300, 'Update cart item quantity'),
+('DELETE','/api/cart/items/:id',               300, 'Remove cart item'),
+-- Favorites
+('GET',  '/api/fav',                           300, 'Fetch wishlist'),
+('POST', '/api/fav/:id',                       300, 'Add to wishlist'),
+('DELETE','/api/fav/:id',                      300, 'Remove from wishlist'),
+-- Payment & Orders
+('POST', '/api/payment-method',               3000, 'Register payment method (Stripe API call)'),
+('GET',  '/api/payment-method',                500, 'Retrieve saved payment methods'),
+('POST', '/api/checkout',                     3000, 'Process checkout (Stripe charge)'),
+('GET',  '/api/order/history',                 500, 'Order history lookup'),
+-- Recommendations
+('GET',  '/api/co-purchase',                   600, 'Co-purchase recommendations (users who bought X also bought Y, fallback: same-category popular)'),
+('GET',  '/api/recommendation',                500, 'Personalized recommendations (ML model)'),
+('GET',  '/api/recommendation/similar',        500, 'Similar item recommendations'),
+('GET',  '/api/recommendation/model/status',   200, 'Model training status'),
+('GET',  '/api/recommendation/also-bought',    600, 'Co-purchased products from Order history (fallback: same-category popular)'),
+-- Shipping & Geo
+('GET',  '/api/shipping',                      400, 'Shipping rate calculation'),
+('GET',  '/api/geo',                           300, 'User delivery address'),
+('GET',  '/api/shipment',                      400, 'Shipment tracking'),
+-- Sale
+('GET',  '/api/sale',                          300, 'Active sale products'),
+('GET',  '/api/sale/products/random',          400, 'Random sale product selection'),
+-- User Profile
+('GET',  '/api/profile',                       300, 'User profile'),
+('POST', '/api/profile',                       500, 'Update user profile + geocoding'),
+-- Stats & Monitoring
+('GET',  '/api/stats',                         200, 'API gateway telemetry from Kong logs')
+ON DUPLICATE KEY UPDATE sla_ms = VALUES(sla_ms), description = VALUES(description);
 
 UPDATE Product p
 JOIN (

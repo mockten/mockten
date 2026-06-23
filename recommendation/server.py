@@ -226,6 +226,64 @@ def get_similar_items(product_id: str = Query(..., description="UUID of target p
     finally:
         conn.close()
 
+@app.get("/also-bought")
+def get_also_bought(product_id: str = Query(..., description="UUID of the purchased product"), limit: int = Query(5, description="Number of results")):
+    """Returns products frequently co-purchased with the given product_id, based on Order transaction history.
+    Falls back to same-category products when order history is insufficient."""
+    conn = get_db_connection(MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB)
+    try:
+        with conn.cursor() as cursor:
+            # Join Orders to Transactions twice:
+            # t_target: the transaction for our product (in the same order)
+            # t_other:  other transactions in the same order
+            # transactions_json is a JSON array of transaction_id strings
+            cursor.execute("""
+                SELECT p.product_id, p.product_name, p.category_id, p.price, COUNT(*) AS co_count
+                FROM `Order` o
+                JOIN `Transaction` t_target
+                  ON JSON_CONTAINS(o.transactions_json, JSON_QUOTE(t_target.transaction_id))
+                JOIN `Transaction` t_other
+                  ON JSON_CONTAINS(o.transactions_json, JSON_QUOTE(t_other.transaction_id))
+                JOIN Product p ON t_other.product_id = p.product_id
+                WHERE t_target.product_id = %s
+                  AND t_other.product_id != %s
+                GROUP BY p.product_id, p.product_name, p.category_id, p.price
+                ORDER BY co_count DESC
+                LIMIT %s
+            """, (product_id, product_id, limit))
+            rows = cursor.fetchall()
+
+        if not rows:
+            # Fallback: highest-rated products from the same category
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT p.product_id, p.product_name, p.category_id, p.price
+                    FROM Product p
+                    WHERE p.category_id = (SELECT category_id FROM Product WHERE product_id = %s LIMIT 1)
+                      AND p.product_id != %s
+                    ORDER BY p.avg_review DESC
+                    LIMIT %s
+                """, (product_id, product_id, limit))
+                rows = cursor.fetchall()
+
+        results = []
+        for row in rows:
+            results.append({
+                "product_id": row["product_id"],
+                "product_name": row["product_name"],
+                "category_id": row["category_id"],
+                "price": float(row["price"]),
+                "image_url": f"/api/storage/{row['product_id']}.png",
+            })
+
+        return {"product_id": product_id, "also_bought": results, "count": len(results)}
+    except Exception as e:
+        logger.error(f"Error fetching also-bought items: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch also-bought items")
+    finally:
+        conn.close()
+
+
 @app.post("/train")
 def train_model(request: TrainRequest, background_tasks: BackgroundTasks):
     global is_training_in_progress

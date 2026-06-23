@@ -1,6 +1,8 @@
-FROM alpine:latest
+FROM debian:bookworm-slim
 
-RUN apk add --no-cache bash curl jq mariadb-client
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash curl jq default-mysql-client \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY *.sh /
 RUN chmod +x /*.sh

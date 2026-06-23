@@ -13,6 +13,11 @@ services:
       - mockten_nw
     ports:
       - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "mocktenusr", "-pmocktenpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   redis:
     container_name: redis-service.default.svc.cluster.local
@@ -214,22 +219,6 @@ services:
       - mockten_nw
 
   # ── Airflow Stack ─────────────────────────────────────────────────────────
-  airflow-postgres:
-    container_name: airflow-postgres
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
-    volumes:
-      - airflow-postgres-data:/var/lib/postgresql/data
-    networks:
-      - mockten_nw
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
-      interval: 5s
-      retries: 10
-
   airflow-webserver:
     container_name: airflow-webserver
     image: mockten-airflow
@@ -238,16 +227,17 @@ services:
     ports:
       - "8085:8080"
     depends_on:
-      airflow-postgres:
+      mysql:
         condition: service_healthy
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "mysql+mysqldb://mocktenusr:mocktenpassword@mysql-service.default.svc.cluster.local/airflow?charset=utf8mb4"
       AIRFLOW__CORE__FERNET_KEY: "j7zLQ3S9kBh2vXpNqWcYeRaFmTuGdIoK8sE4wPlZnJy0="
       AIRFLOW__WEBSERVER__SECRET_KEY: "mockten-airflow-secret"
       AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       MYSQL_HOST: mysql-service.default.svc.cluster.local
       MINIO_ENDPOINT: minio-service.default.svc.cluster.local:9000
     volumes:
@@ -261,14 +251,15 @@ services:
     entrypoint: ["/bin/bash", "/entrypoint.sh"]
     command: ["airflow", "scheduler"]
     depends_on:
-      airflow-postgres:
+      mysql:
         condition: service_healthy
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "mysql+mysqldb://mocktenusr:mocktenpassword@mysql-service.default.svc.cluster.local/airflow?charset=utf8mb4"
       AIRFLOW__CORE__FERNET_KEY: "j7zLQ3S9kBh2vXpNqWcYeRaFmTuGdIoK8sE4wPlZnJy0="
       AIRFLOW__WEBSERVER__SECRET_KEY: "mockten-airflow-secret"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       MYSQL_HOST: mysql-service.default.svc.cluster.local
       MINIO_ENDPOINT: minio-service.default.svc.cluster.local:9000
     volumes:
@@ -279,7 +270,4 @@ services:
 networks:
   mockten_nw:
     name: mockten_nw
-
-volumes:
-  airflow-postgres-data:
 

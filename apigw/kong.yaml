@@ -1,4 +1,17 @@
 _format_version: "3.0"
+
+# Global proxy-cache plugin — caches GET responses in memory
+# TTL 30s for frequently-read, rarely-changing endpoints
+plugins:
+  - name: proxy-cache
+    config:
+      response_code: [200]
+      request_method: [GET]
+      content_type: [application/json, application/json; charset=utf-8]
+      cache_ttl: 30
+      strategy: memory
+      cache_control: true
+
 services:
   - name: dashboard-stats
     url: http://mockten-dashboard:3001/api/stats
@@ -154,6 +167,12 @@ services:
         strip_path: true
         methods:
           - GET
+        plugins:
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - Authorization
   - name: categories
     url: http://searchitem-service.default.svc.cluster.local:50051/v1/categories
     routes:
@@ -190,6 +209,41 @@ services:
         strip_path: true
         methods:
           - POST
+  - name: browsing-history-service
+    url: http://product-service.default.svc.cluster.local:50052
+    routes:
+      - name: record-browsing-history
+        paths:
+          - ~/api/browsing-history/([^/]+)$
+        methods:
+          - POST
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: "/v1/browsing-history/$(uri_captures[1])"
+      - name: get-co-purchase
+        paths: [ /api/co-purchase ]
+        methods: [ GET ]
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1/co-purchase
+      - name: get-browsing-history-recommendations
+        paths:
+          - /api/browsing-history/recommendations
+        methods:
+          - GET
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1/browsing-history/recommendations
+
   - name: favorite-service
     url: http://product-service.default.svc.cluster.local:50052
     routes:
@@ -395,4 +449,13 @@ services:
             config:
               replace:
                 uri: /model/status
+      - name: get-also-bought
+        paths: [ /api/recommendation/also-bought ]
+        methods: [ GET ]
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /also-bought
 

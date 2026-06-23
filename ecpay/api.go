@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -20,8 +21,30 @@ import (
 	"github.com/stripe/stripe-go/v74/paymentmethod"
 )
 
-var (
-)
+// Global DB connection pool — opened once at startup, reused across all handlers
+var ecpayDB *sql.DB
+
+func initDB() {
+	dsn := fmt.Sprintf(MySQLHost, os.Getenv("MysqlUser"), os.Getenv("MysqlPassword"), os.Getenv("DbHost"), os.Getenv("MysqlDB"))
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		log.Fatalf("ecpay: db open error: %v", err)
+	}
+	db.SetMaxOpenConns(15)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	for i := 0; i < 30; i++ {
+		if err = db.Ping(); err == nil {
+			break
+		}
+		log.Printf("ecpay: waiting for db (%d/30)...", i+1)
+		time.Sleep(2 * time.Second)
+	}
+	if err != nil {
+		log.Fatalf("ecpay: db ping failed: %v", err)
+	}
+	ecpayDB = db
+}
 
 type PaymentMethodRequest struct {
 	PaymentMethodID string `json:"payment_method_id"`
@@ -89,6 +112,8 @@ func getUser(c *gin.Context) UserContext {
 }
 
 func startHttpServer() {
+	initDB()
+
 	r := gin.Default()
 
 	// CORS config
@@ -124,13 +149,8 @@ func handleAddPaymentMethod(c *gin.Context) {
 
 	user := getUser(c)
 
-	mySqlHost := fmt.Sprintf(MySQLHost, os.Getenv("MysqlUser"), os.Getenv("MysqlPassword"), os.Getenv("DbHost"), os.Getenv("MysqlDB"))
-	db, err := sql.Open("mysql", mySqlHost)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
-		return
-	}
-	defer db.Close()
+	db := ecpayDB
+	var err error
 
 	// 1. Get or create Customer
 	var stripeCustomerID string
@@ -195,13 +215,8 @@ func handleAddPaymentMethod(c *gin.Context) {
 func handleGetPaymentMethods(c *gin.Context) {
 	user := getUser(c)
 
-	mySqlHost := fmt.Sprintf(MySQLHost, os.Getenv("MysqlUser"), os.Getenv("MysqlPassword"), os.Getenv("DbHost"), os.Getenv("MysqlDB"))
-	db, err := sql.Open("mysql", mySqlHost)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
-		return
-	}
-	defer db.Close()
+	db := ecpayDB
+	var err error
 
 	rows, err := db.Query(`
 		SELECT payment_method_id, stripe_payment_method_id, brand, last4, exp_month, exp_year, is_default 
@@ -249,13 +264,8 @@ func handleSetDefaultPaymentMethod(c *gin.Context) {
 
 	user := getUser(c)
 
-	mySqlHost := fmt.Sprintf(MySQLHost, os.Getenv("MysqlUser"), os.Getenv("MysqlPassword"), os.Getenv("DbHost"), os.Getenv("MysqlDB"))
-	db, err := sql.Open("mysql", mySqlHost)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
-		return
-	}
-	defer db.Close()
+	db := ecpayDB
+	var err error
 
 	// Update all methods for this user to is_default = 0
 	_, err = db.Exec("UPDATE PaymentMethod SET is_default = 0 WHERE user_id = ?", user.UserID)
@@ -293,13 +303,8 @@ func handleDeletePaymentMethod(c *gin.Context) {
 
 	user := getUser(c)
 
-	mySqlHost := fmt.Sprintf(MySQLHost, os.Getenv("MysqlUser"), os.Getenv("MysqlPassword"), os.Getenv("DbHost"), os.Getenv("MysqlDB"))
-	db, err := sql.Open("mysql", mySqlHost)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
-		return
-	}
-	defer db.Close()
+	db := ecpayDB
+	var err error
 
 	// Soft delete by updating status
 	_, err = db.Exec(`
@@ -327,13 +332,8 @@ func handleCreatePayment(c *gin.Context) {
 
 	user := getUser(c)
 
-	mySqlHost := fmt.Sprintf(MySQLHost, os.Getenv("MysqlUser"), os.Getenv("MysqlPassword"), os.Getenv("DbHost"), os.Getenv("MysqlDB"))
-	db, err := sql.Open("mysql", mySqlHost)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
-		return
-	}
-	defer db.Close()
+	db := ecpayDB
+	var err error
 
 	// Get specific payment method details
 	var spmID, stripeCustomerID string

@@ -4,7 +4,7 @@ import { execSync } from 'child_process';
 test.beforeAll(() => {
   try {
     // Reset Lemongrass stock to 50 in MySQL
-    execSync(`docker exec -i mysql-service.default.svc.cluster.local mysql -umocktenusr -pmocktenpassword mocktendb -e "UPDATE Stock SET stocks = 50 WHERE product_id = '580414f1-e962-4f6c-a461-d88d168e7cb1';"`);
+    execSync(`docker exec -i mysql-service.default.svc.cluster.local mysql --ssl-mode=DISABLED -umocktenusr -pmocktenpassword mocktendb -e "UPDATE Stock SET stocks = 50 WHERE product_id = '580414f1-e962-4f6c-a461-d88d168e7cb1';"`);
     // Force Meilisearch sync
     execSync(`docker exec -i mockten-sync /sync_script.sh`);
   } catch (e) {

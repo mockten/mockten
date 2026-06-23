@@ -4,8 +4,8 @@ tasks:
     cmds:
       - (touch ecfront2.log)
       - (docker compose up -d || docker-compose up -d)
-      - (for i in {1..30}; do docker exec -i mysql-service.default.svc.cluster.local mysql -umocktenusr -pmocktenpassword mocktendb -e "SELECT 1" >/dev/null 2>&1 && break || sleep 1; done)
-      - (for i in {1..30}; do docker exec -i mysql-service.default.svc.cluster.local mysql -umocktenusr -pmocktenpassword mocktendb < mysql/test_insert.sql 2>/dev/null && break || sleep 1; done)
+      - (for i in {1..30}; do docker exec -i mysql-service.default.svc.cluster.local mysql --ssl-mode=DISABLED -umocktenusr -pmocktenpassword mocktendb -e "SELECT 1" >/dev/null 2>&1 && break || sleep 1; done)
+      - (for i in {1..30}; do docker exec -i mysql-service.default.svc.cluster.local mysql --ssl-mode=DISABLED -umocktenusr -pmocktenpassword mocktendb < mysql/test_insert.sql 2>/dev/null && break || sleep 1; done)
       - (python3 mysql/seeder/behavior_seeder.py)
       - |
         for i in {1..30}; do
@@ -66,6 +66,23 @@ tasks:
         fi
         echo "Frontend is listening on port 5173."
         echo "Health check passed: All services are running correctly!"
+  start-frontend:
+    desc: Start (or restart) only the Vite dev server on port 5173
+    cmds:
+      - |
+        (lsof -t -i :5173 | xargs kill -9 || true)
+        rm -f ecfront2.pid
+        cd ecfront2
+        TEST_MODE=true npm run dev -- --host 0.0.0.0 --port 5173 > ../ecfront2.log 2>&1 < /dev/null &
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+          VITE_PID=$(lsof -t -i :5173 | head -n 1)
+          if [ -n "$VITE_PID" ]; then
+            echo "$VITE_PID" > ../ecfront2.pid
+            echo "Frontend started (PID $VITE_PID) on port 5173"
+            break
+          fi
+          sleep 0.5
+        done
   recommendation-train:
     desc: Run the recommendation model training job as a standalone container using docker-compose
     cmds:
@@ -160,6 +177,59 @@ tasks:
           -r zap-report.html \
           -I || true
         echo "DAST scan completed. Report saved to zap-report.html (if containers are running)."
+
+  latency:
+    desc: Check API response times against SLA targets defined in ApiSLA table
+    cmds:
+      - |
+        echo "=== [Latency Check] Fetching slow API stats from /api/stats?type=slow ==="
+        SLOW_JSON=$(curl -s http://localhost/api/stats?type=slow)
+        if [ -z "$SLOW_JSON" ] || [ "$SLOW_JSON" = "null" ]; then
+          echo "WARN: Could not reach /api/stats — skipping latency check."
+          exit 0
+        fi
+
+        echo "=== [Latency Check] Fetching SLA definitions from MySQL ==="
+        SLA_JSON=$(docker exec -i mysql-service.default.svc.cluster.local \
+          mysql --ssl-mode=DISABLED -umocktenusr -pmocktenpassword mocktendb -sN \
+          -e "SELECT CONCAT(method,'|',path,'|',sla_ms) FROM ApiSLA;" 2>/dev/null)
+
+        if [ -z "$SLA_JSON" ]; then
+          echo "WARN: ApiSLA table empty or unreachable — skipping SLA check."
+          exit 0
+        fi
+
+        FAILED=0
+        while IFS='|' read -r method path sla_ms; do
+          # Normalize path patterns: replace :id with regex-like match for lookup
+          norm_path=$(echo "$path" | sed 's|:[^/]*|:[^/]*|g')
+          avg=$(echo "$SLOW_JSON" | python3 -c "
+        import sys, json, re
+        data = json.load(sys.stdin)
+        apis = data.get('slowApis', [])
+        pattern = sys.argv[1]
+        method = sys.argv[2]
+        for a in apis:
+            if a['method'] == method and re.fullmatch(pattern.replace(':[^/]*', '[^/]+'), a['path']):
+                print(a['avgMs'])
+                sys.exit(0)
+        print(0)
+        " "$norm_path" "$method" 2>/dev/null || echo 0)
+          if [ "$avg" -gt "$sla_ms" ] 2>/dev/null; then
+            echo "FAIL  $method $path — avg ${avg}ms > SLA ${sla_ms}ms"
+            FAILED=1
+          elif [ "$avg" -gt 0 ]; then
+            echo "PASS  $method $path — avg ${avg}ms <= SLA ${sla_ms}ms"
+          fi
+        done <<< "$SLA_JSON"
+
+        if [ $FAILED -ne 0 ]; then
+          echo ""
+          echo "Latency check FAILED: one or more endpoints exceeded their SLA."
+          exit 1
+        fi
+        echo ""
+        echo "Latency check PASSED: all measured endpoints within SLA."
 
   infosec:
     desc: Run all security scans (trivy, sca, sast, dast)

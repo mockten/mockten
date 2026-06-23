@@ -17,10 +17,10 @@ jobs:
       run:
         working-directory: adder
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v1
   
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: 1.23
 
@@ -58,7 +58,7 @@ jobs:
         working-directory: ecfront2
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v1
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -106,10 +106,10 @@ jobs:
       run:
         working-directory: ecpay
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v1
 
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.23
 
@@ -147,10 +147,10 @@ jobs:
       run:
         working-directory: notification
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v1
 
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.23
 
@@ -187,10 +187,10 @@ jobs:
       run:
         working-directory: payexecution
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v1
 
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.23
 
@@ -230,10 +230,10 @@ jobs:
       run:
         working-directory: ranking
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v1
 
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.23
 
@@ -270,10 +270,10 @@ jobs:
       run:
         working-directory: sale
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v1
 
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.23
 
@@ -309,10 +309,10 @@ jobs:
       run:
         working-directory: shipment
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v1
 
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.23
 
@@ -351,10 +351,10 @@ jobs:
       run:
         working-directory: searchitem
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v1
 
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.23
 
@@ -391,10 +391,10 @@ jobs:
       run:
         working-directory: product
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v1
 
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version: 1.23
 
@@ -605,7 +605,7 @@ jobs:
       run:
         working-directory: geocoding
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v1
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -651,7 +651,7 @@ jobs:
       run:
         working-directory: monitoring/dashboard
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v1
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -688,7 +688,7 @@ jobs:
     if: ${{ github.actor != 'nektos/act' }}
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v1
 
       - name: Set up Go
         uses: actions/setup-go@v4

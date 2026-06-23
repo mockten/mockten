@@ -1,6 +1,6 @@
 module github.com/mockten/mockten/searchitem
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/gin-gonic/gin v1.9.0
@@ -8,7 +8,7 @@ require (
 	github.com/meilisearch/meilisearch-go v0.26.0
 	github.com/prometheus/client_golang v1.14.0
 	go.uber.org/zap v1.26.0
-	golang.org/x/net v0.48.0
+	golang.org/x/net v0.56.0
 	google.golang.org/grpc v1.79.3
 )
 
@@ -46,9 +46,9 @@ require (
 	github.com/valyala/fasthttp v1.37.1-0.20220607072126-8a320890c08d // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
-	golang.org/x/crypto v0.46.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

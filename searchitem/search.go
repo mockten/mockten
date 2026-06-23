@@ -14,6 +14,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	meilisearch "github.com/meilisearch/meilisearch-go"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/valyala/fasthttp"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
@@ -195,6 +196,7 @@ func searchHandler(c *gin.Context) {
 
 	searchResCount.Inc()
 
+	c.Header("Cache-Control", "public, max-age=30")
 	c.JSON(http.StatusOK, gin.H{
 		"items": items,
 		"total": searchRes.EstimatedTotalHits,
@@ -323,9 +325,25 @@ func main() {
 		meiliBackend = "meilisearch-service.default.svc.cluster.local"
 	}
 
-	meiliclient = meilisearch.NewClient(meilisearch.ClientConfig{
-		Host: "http://" + meiliBackend + ":7700",
-	})
+	fasthttpClient := &fasthttp.Client{
+		MaxIdleConnDuration: 300 * time.Second,
+		ReadTimeout:         10 * time.Second,
+		WriteTimeout:        10 * time.Second,
+	}
+	meiliclient = meilisearch.NewFastHTTPCustomClient(meilisearch.ClientConfig{
+		Host:    "http://" + meiliBackend + ":7700",
+		Timeout: 10 * time.Second,
+	}, fasthttpClient)
+
+	// Warm up MeiliSearch connection on startup to avoid slow first request
+	go func() {
+		time.Sleep(2 * time.Second)
+		if _, err := meiliclient.Index("products").Search("", &meilisearch.SearchRequest{Limit: 1}); err != nil {
+			log.Printf("MeiliSearch warmup failed (non-fatal): %v", err)
+		} else {
+			log.Println("MeiliSearch connection warmed up")
+		}
+	}()
 
 	dsn := "mocktenusr:mocktenpassword@tcp(mysql-service.default.svc.cluster.local:3306)/mocktendb?parseTime=true"
 

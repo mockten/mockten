@@ -1,12 +1,18 @@
 FROM apache/airflow:2.9.3-python3.11
 
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc g++ libpq-dev build-essential \
+RUN rm -f /etc/apt/sources.list.d/docker.list \
+          /etc/apt/sources.list.d/mariadb.list \
+          /etc/apt/sources.list.d/mssql-release.list \
+          /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+       gcc g++ build-essential default-libmysqlclient-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
 USER airflow
 
 RUN pip install --no-cache-dir \
+    "apache-airflow[mysql]==2.9.3" \
     pandas \
     pyarrow \
     pymysql \

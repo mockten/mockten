@@ -10,6 +10,7 @@ import {
   CardContent,
   LinearProgress,
   Select,
+  IconButton,
   MenuItem,
   Pagination,
   FormControl,
@@ -23,6 +24,8 @@ import {
   Star,
   StarHalf,
   StarBorder,
+  Favorite,
+  FavoriteBorder,
 } from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
@@ -47,34 +50,38 @@ const OrderHistoryNew: React.FC = () => {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
-  const getUserIdFromToken = () => {
-    const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken') || localStorage.getItem('mockten_access_token');
-    if (!token) return '';
+
+  useEffect(() => {
+    apiClient.get('/api/fav').then(res => {
+      if (res.data && Array.isArray(res.data)) {
+        setFavorites(new Set(res.data.map((f: any) => String(f.productId))));
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleToggleFavorite = async (e: React.MouseEvent, productId: string) => {
+    e.stopPropagation();
+    const isFav = favorites.has(productId);
+    setFavorites(prev => { const s = new Set(prev); isFav ? s.delete(productId) : s.add(productId); return s; });
     try {
-      const base64Url = token.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
-        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-      }).join(''));
-      const decoded = JSON.parse(jsonPayload);
-      return decoded.email || decoded.preferred_username || decoded.sub || '';
-    } catch (e) {
-      console.error('Failed to decode JWT token', e);
-      return '';
+      if (isFav) await apiClient.delete(`/api/fav/${productId}`);
+      else await apiClient.post(`/api/fav/${productId}`);
+    } catch {
+      setFavorites(prev => { const s = new Set(prev); isFav ? s.add(productId) : s.delete(productId); return s; });
     }
   };
 
   useEffect(() => {
     const fetchRecommendations = async () => {
       try {
-        const userId = getUserIdFromToken();
-        const res = await apiClient.get(`/api/recommendation?user_id=${userId}&limit=4`);
+        const res = await apiClient.get('/api/browsing-history/recommendations?limit=4');
         if (res.data && Array.isArray(res.data.recommendations)) {
           setRecommendedProducts(res.data.recommendations);
         }
       } catch (err) {
-        console.error('Failed to fetch recommendations', err);
+        console.error('Failed to fetch browsing history recommendations', err);
       }
     };
     fetchRecommendations();
@@ -83,8 +90,20 @@ const OrderHistoryNew: React.FC = () => {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const userinfoRes = await apiClient.get('/api/uam/userinfo');
-        const userId = userinfoRes.data.email || userinfoRes.data.preferred_username;
+        // Decode userId from JWT locally to avoid Keycloak roundtrip
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken') || localStorage.getItem('mockten_access_token');
+        let userId = '';
+        if (token) {
+          try {
+            const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+            const payload = JSON.parse(decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')));
+            userId = payload.email || payload.preferred_username || payload.sub || '';
+          } catch { /* fall through to API */ }
+        }
+        if (!userId) {
+          const userinfoRes = await apiClient.get('/api/uam/userinfo');
+          userId = userinfoRes.data.email || userinfoRes.data.preferred_username;
+        }
         if (!userId) {
           setLoading(false);
           return;
@@ -99,7 +118,7 @@ const OrderHistoryNew: React.FC = () => {
           purchaseDate: item.purchase_date,
           status: item.status === 'booked' ? 'Order Confirming' : 
                   (item.status === 'picked_up' || item.status === 'in_transit') ? 'Shipping' : 'Delivered',
-          quantity: 1,
+          quantity: item.quantity || 1,
           image: `/api/storage/${item.product_id}.png`,
         }));
         setOrders(mappedOrders);
@@ -381,60 +400,25 @@ const OrderHistoryNew: React.FC = () => {
               recommendedProducts.map((product) => (
                 <Grid item xs={12} sm={6} md={3} key={product.product_id}>
                   <Card
-                    sx={{
-                      cursor: 'pointer',
-                      '&:hover': {
-                        boxShadow: 3,
-                      },
-                    }}
+                    sx={{ cursor: 'pointer', position: 'relative', '&:hover': { boxShadow: 3, transform: 'translateY(-4px)', transition: 'transform 0.2s' } }}
                     onClick={() => navigate(`/item/${product.product_id}`)}
                   >
-                    <Box
-                      sx={{
-                        height: '100px',
-                        backgroundColor: '#f5f5f5',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
+                    <Box sx={{ width: '100%', aspectRatio: '1/1', backgroundColor: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
                       <img
                         src={`/api/storage/${product.product_id}.png`}
                         alt={product.product_name}
-                        style={{ width: '64px', height: '64px', objectFit: 'contain' }}
-                        onError={(e) => {
-                          e.currentTarget.src = photoSvg;
-                        }}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '12px' }}
+                        onError={(e) => { e.currentTarget.src = photoSvg; }}
                       />
+                      <IconButton sx={{ position: 'absolute', top: 4, right: 4 }} onClick={(e) => handleToggleFavorite(e, product.product_id)}>
+                        {favorites.has(product.product_id) ? <Favorite sx={{ color: 'red', fontSize: '20px' }} /> : <FavoriteBorder sx={{ fontSize: '20px' }} />}
+                      </IconButton>
                     </Box>
                     <CardContent sx={{ padding: '8px' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '8px' }}>
-                        {renderStars(4.5)}
-                      </Box>
-                      <Typography
-                        variant="h6"
-                        sx={{
-                          fontFamily: 'Noto Sans',
-                          fontWeight: 'bold',
-                          fontSize: '16px',
-                          color: 'black',
-                          marginBottom: '8px',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}
-                      >
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '14px', color: 'black', marginBottom: '4px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', height: '40px' }}>
                         {product.product_name}
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontFamily: 'Noto Sans',
-                          fontSize: '14px',
-                          fontWeight: 'bold',
-                          color: 'black',
-                        }}
-                      >
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', fontWeight: 'bold', color: 'black' }}>
                         ${product.price}
                       </Typography>
                     </CardContent>

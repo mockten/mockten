@@ -304,7 +304,7 @@ async function fetchFrontendStatus() {
       el.style.color = 'var(--red)';
       icon.style.background = 'var(--red-bg)';
       icon.style.color = 'var(--red)';
-      btn.textContent = '▶ Start (task build)';
+      btn.textContent = '▶ Start (task start-frontend)';
       btn.style.display = 'inline-flex';
     }
   } catch {
@@ -314,7 +314,7 @@ async function fetchFrontendStatus() {
 }
 
 function frontendAction() {
-  showToast('Run "task build" from the project root to start the Vite frontend', 'info');
+  showToast('Run "task start-frontend" from the project root to start the Vite dev server', 'info');
 }
 
 // ── Summary ────────────────────────────────────────────────────────────────
@@ -1763,6 +1763,19 @@ const API_DESCRIPTIONS = {
   'GET /api/recommendation/model/status':
     'Returns the current status of the recommendation model: whether it is trained, currently training, the timestamp of the last successful train, and the number of users/items in the training data.',
 
+  'GET /api/recommendation/also-bought':
+    'Returns products frequently co-purchased with the given product, based on <code>Order</code> transaction history. Joins orders to transactions twice to find other items in the same order as the target product, ranked by co-purchase frequency. Falls back to highest-rated products in the same category when order history is insufficient. Does not require authentication.',
+
+  'GET /api/co-purchase':
+    'Returns up to <code>limit</code> products frequently bought by the same users who bought the specified product (<code>product_id</code>). Two-step fallback: (1) co-purchase signal — other products ordered by users who also ordered the target product, ranked by co-buy frequency then average review score; (2) same-category popular products by average review to fill any remaining slots when co-purchase data is sparse. Does not require authentication.',
+
+  // ── Browsing History ────────────────────────────────────────────────────────
+  'POST /api/browsing-history/([^/]+)':
+    'Records a product page view in the <code>BrowsingHistory</code> MySQL table for the authenticated user. The <code>:productId</code> path segment identifies the viewed product. Called automatically by the frontend when a user visits a product detail page. Requires a valid Bearer token.',
+
+  'GET /api/browsing-history/recommendations':
+    'Returns product recommendations derived from the authenticated user\'s browsing history. Looks up the categories of the five most recently viewed product types, then returns the highest-rated products in those categories that the user has not already viewed. Falls back to an empty list if no history exists. Requires a valid Bearer token.',
+
   'GET /api/stats':
     'Returns API gateway telemetry derived from Kong\'s access log. By default returns both <code>topApis</code> (most requested endpoints) and <code>slowApis</code> (highest average latency, min 3 samples). Pass <code>type=top</code> or <code>type=slow</code> to get a single array. Served by the monitoring dashboard service.',
 };
@@ -1811,6 +1824,12 @@ const API_DESCRIPTIONS_JA = {
   'POST /api/recommendation/train': 'MySQLの最新購買履歴を使用してレコメンデーションモデルを非同期で再学習します。行列因子分解モデルを再フィットしてMinIOに保存します。',
   'GET /api/recommendation/model/status': 'レコメンデーションモデルの現在の状態（学習済み/学習中、最終学習時刻、ユーザー数/アイテム数）を返します。',
 
+  'GET /api/recommendation/also-bought': '指定商品と同じ注文に含まれた他商品を<code>Order</code>の取引履歴から返します。同一注文内の共同購買頻度順にランキングします。注文履歴が不足する場合は同カテゴリの高評価商品にフォールバックします。認証不要。',
+
+  'GET /api/co-purchase': '指定商品（<code>product_id</code>）を購入したユーザーが他に購入した商品を最大<code>limit</code>件返します。2段階フォールバック: (1) 同一ユーザーの共同購買実績から頻度順・評価順でランキング; (2) 共同購買データが少ない場合は同カテゴリの高評価商品で補完。認証不要。',
+
+  'POST /api/browsing-history/([^/]+)': '認証済みユーザーの商品閲覧履歴をMySQLの<code>BrowsingHistory</code>テーブルに記録します。パスセグメント<code>:productId</code>が閲覧商品を識別します。フロントエンドが商品詳細ページ訪問時に自動的に呼び出します。有効なJWTが必要です。',
+  'GET /api/browsing-history/recommendations': '認証済みユーザーの閲覧履歴に基づく商品レコメンドを返します。直近5種類の閲覧商品のカテゴリを特定し、そのカテゴリ内で未閲覧かつ評価の高い商品を返します。履歴がない場合は空リストを返します。有効なJWTが必要です。',
   'GET /api/stats': 'Kongのアクセスログを集計したAPIゲートウェイテレメトリを返します。デフォルトでは<code>topApis</code>（リクエスト数上位）と<code>slowApis</code>（平均レイテンシ上位、最低3サンプル）の両方を返します。<code>type=top</code>または<code>type=slow</code>で絞り込み可能です。',
 };
 
@@ -1858,6 +1877,12 @@ const API_DESCRIPTIONS_ZH = {
   'POST /api/recommendation/train': '使用MySQL最新购买历史异步重新训练推荐模型，重新拟合矩阵分解模型并持久化到MinIO。',
   'GET /api/recommendation/model/status': '返回推荐模型的当前状态：是否已训练、正在训练、最后成功训练时间戳及训练数据中的用户数/商品数。',
 
+  'GET /api/recommendation/also-bought': '基于<code>Order</code>交易历史，返回与指定商品经常一起购买的商品。通过两次连接订单与事务找到同一订单中的其他商品，按共同购买频次排序。当订单历史不足时，回退到同分类高评分商品。无需身份验证。',
+
+  'GET /api/co-purchase': '返回购买了指定商品（<code>product_id</code>）的用户还购买了哪些商品，最多返回<code>limit</code>件。两步降级策略：(1) 基于同一用户的共同购买记录，按共同购买频次和平均评分排序；(2) 当共同购买数据不足时，用同分类高评分商品补充剩余名额。无需身份验证。',
+
+  'POST /api/browsing-history/([^/]+)': '将已认证用户的商品浏览记录写入MySQL的<code>BrowsingHistory</code>表。路径段<code>:productId</code>标识被浏览的商品。前端在用户访问商品详情页时自动调用。需要有效的JWT。',
+  'GET /api/browsing-history/recommendations': '根据已认证用户的浏览历史返回商品推荐。提取最近5种浏览商品所属分类，返回这些分类中评分最高且未曾浏览的商品。若无历史记录则返回空列表。需要有效的JWT。',
   'GET /api/stats': '返回基于Kong访问日志聚合的API网关遥测数据。默认同时返回<code>topApis</code>（请求量最高的端点）和<code>slowApis</code>（平均延迟最高，至少3个样本）。可通过<code>type=top</code>或<code>type=slow</code>筛选。',
 };
 
@@ -1902,8 +1927,9 @@ const API_SCHEMAS = {
   ],
   'POST /api/cart/items': [
     '__auth__',
-    { name: 'itemId',   location: 'body', type: 'string',  desc: 'ID of the product to add to cart', desc_ja: 'カートに追加する商品ID', desc_zh: '要添加到购物车的商品ID', required: true, default: '__first_product_id__' },
-    { name: 'quantity', location: 'body', type: 'integer', desc: 'Quantity to add',                   desc_ja: '追加する数量',           desc_zh: '添加数量',               required: true, default: 1 }
+    { name: 'product_id',    location: 'body', type: 'string',  desc: 'ID of the product to add to cart', desc_ja: 'カートに追加する商品ID', desc_zh: '要添加到购物车的商品ID', required: true, default: '__first_product_id__' },
+    { name: 'quantity',      location: 'body', type: 'integer', desc: 'Quantity to add',                   desc_ja: '追加する数量',           desc_zh: '添加数量',               required: true, default: 1 },
+    { name: 'shipping_type', location: 'body', type: 'string',  desc: 'Shipping method (road/air/sea)',    desc_ja: '配送方法（road/air/sea）', desc_zh: '配送方式（road/air/sea）', required: true, default: 'road' }
   ],
   'PUT /api/cart/items/:id': [
     '__auth__',
@@ -1939,10 +1965,10 @@ const API_SCHEMAS = {
     { name: 'address',    location: 'body', type: 'string', desc: 'Shipping address details',    desc_ja: '配送先住所の詳細',   desc_zh: '配送地址详情',   required: true, default: '1-1 Chiyoda, Tokyo' }
   ],
   'GET /api/recommendation': [
-    { name: 'userId', location: 'query', type: 'string', desc: 'User ID for personalized recommendations', desc_ja: 'パーソナライズ推薦用ユーザーID', desc_zh: '个性化推荐用用户ID', required: true, default: 'dev_user_001' }
+    { name: 'user_id', location: 'query', type: 'string', desc: 'User email or ID for personalized recommendations', desc_ja: 'パーソナライズ推薦用ユーザーメールまたはID', desc_zh: '个性化推荐用用户邮箱或ID', required: true, default: 'dev_user_001@example.com' }
   ],
   'GET /api/recommendation/similar': [
-    { name: 'itemId', location: 'query', type: 'string', desc: 'Item ID for similar item recommendations', desc_ja: '類似商品推薦用商品ID', desc_zh: '相似商品推荐用商品ID', required: true, default: '__first_product_id__' }
+    { name: 'product_id', location: 'query', type: 'string', desc: 'Product ID for similar item recommendations', desc_ja: '類似商品推薦用商品ID', desc_zh: '相似商品推荐用商品ID', required: true, default: '__first_product_id__' }
   ],
 
   // ── Search ──────────────────────────────────────────────────────────────────
@@ -2027,8 +2053,27 @@ const API_SCHEMAS = {
 
   // ── Recommendation ──────────────────────────────────────────────────────────
   'GET /api/recommendation/model/status': [],
+  'GET /api/recommendation/also-bought': [
+    { name: 'product_id', location: 'query', type: 'string',  desc: 'Target product ID to find co-purchased items for', desc_ja: '共同購買商品を検索する対象商品ID', desc_zh: '目标商品ID，用于查找共同购买商品', required: true,  default: '__first_product_id__' },
+    { name: 'limit',      location: 'query', type: 'integer', desc: 'Max number of products to return (default 5)',     desc_ja: '返す商品数の上限（デフォルト5）',  desc_zh: '返回商品数量上限（默认5）',         required: false, default: 5 }
+  ],
   'POST /api/recommendation/train': [
     { name: 'force', location: 'body', type: 'boolean', desc: 'Force retrain even if model is current', desc_ja: 'モデルが最新でも強制再学習する', desc_zh: '即使模型是最新的也强制重新训练', required: false, default: true }
+  ],
+
+  'GET /api/co-purchase': [
+    { name: 'product_id', location: 'query', type: 'string',  desc: 'Target product ID to find co-purchased items for', desc_ja: '共同購買レコメンドを取得する対象商品ID', desc_zh: '目标商品ID，用于查找共同购买商品', required: true,  default: '__first_product_id__' },
+    { name: 'limit',      location: 'query', type: 'integer', desc: 'Max number of products to return (default 4, max 20)',  desc_ja: '返す商品数の上限（デフォルト4、最大20）',            desc_zh: '返回商品数量上限（默认4，最多20）',            required: false, default: 4 }
+  ],
+
+  // ── Browsing History ────────────────────────────────────────────────────────
+  'POST /api/browsing-history/([^/]+)': [
+    '__auth__',
+    { name: 'productId', location: 'path', type: 'string', desc: 'Product ID to record as viewed', desc_ja: '閲覧記録する商品ID', desc_zh: '要记录为已浏览的商品ID', required: true, default: '__first_product_id__' }
+  ],
+  'GET /api/browsing-history/recommendations': [
+    '__auth__',
+    { name: 'limit', location: 'query', type: 'integer', desc: 'Max number of recommendations to return (default 8, max 50)', desc_ja: '返すレコメンド数の上限（デフォルト8、最大50）', desc_zh: '返回推荐数量上限（默认8，最多50）', required: false, default: 8 }
   ],
 
   // ── Stats ───────────────────────────────────────────────────────────────────
@@ -2199,6 +2244,16 @@ const API_RESPONSE_SCHEMAS = {
     { field: '[].score',        type: 'number', desc: 'Recommendation confidence score',       desc_ja: 'レコメンド信頼スコア',              desc_zh: '推荐置信度得分' },
     { field: '[].image_url',    type: 'string', desc: 'Product image URL',                     desc_ja: '商品画像URL',                      desc_zh: '商品图片URL' },
   ],
+  'GET /api/recommendation/also-bought': [
+    { field: 'product_id',              type: 'string',  desc: 'The queried product ID',                                                         desc_ja: '検索対象の商品ID',                                             desc_zh: '查询的商品ID' },
+    { field: 'also_bought',             type: 'array',   desc: 'Ordered list of co-purchased products (order history first, same-category fallback)', desc_ja: '共同購買商品リスト（注文履歴優先、同カテゴリフォールバック）', desc_zh: '共同购买商品列表（订单历史优先，同分类补充）' },
+    { field: 'also_bought[].product_id',   type: 'string',  desc: 'Unique product identifier',          desc_ja: '商品の一意識別子',      desc_zh: '商品唯一标识符' },
+    { field: 'also_bought[].product_name', type: 'string',  desc: 'Display name of the product',        desc_ja: '商品の表示名',          desc_zh: '商品显示名称' },
+    { field: 'also_bought[].category_id',  type: 'string',  desc: 'Category identifier',                desc_ja: 'カテゴリID',            desc_zh: '分类标识符' },
+    { field: 'also_bought[].price',        type: 'number',  desc: 'Price in USD',                       desc_ja: '価格（USD）',           desc_zh: '价格（美元）' },
+    { field: 'also_bought[].image_url',    type: 'string',  desc: 'Product image URL (/api/storage/<id>.png)', desc_ja: '商品画像URL', desc_zh: '商品图片URL' },
+    { field: 'count',                      type: 'integer', desc: 'Total number of products returned',  desc_ja: '返却された商品数',      desc_zh: '返回的商品总数' },
+  ],
   'GET /api/recommendation/similar': [
     { field: '[].product_id',   type: 'string', desc: 'Similar product identifier',            desc_ja: '類似商品ID',                       desc_zh: '相似商品标识符' },
     { field: '[].product_name', type: 'string', desc: 'Product display name',                  desc_ja: '商品表示名',                       desc_zh: '商品显示名称' },
@@ -2239,6 +2294,32 @@ const API_RESPONSE_SCHEMAS = {
   'DELETE /api/cart': [
     { field: '(204)', type: 'No Content', desc: 'Empty response on success — all cart items cleared', desc_ja: '成功時は空レスポンス — カート内全商品が削除される', desc_zh: '成功时返回空响应 — 购物车所有商品已清空' },
   ],
+  'GET /api/co-purchase': [
+    { field: 'products',                  type: 'array',   desc: 'Ordered list of co-purchased products (co-buy first, same-category fallback after)',  desc_ja: '共同購買商品リスト（共同購買優先、同カテゴリフォールバック後続）', desc_zh: '共同购买商品列表（共同购买优先，同分类补充在后）' },
+    { field: 'products[].product_id',     type: 'string',  desc: 'Unique product identifier',                                                            desc_ja: '商品の一意識別子',                                                desc_zh: '商品唯一标识符' },
+    { field: 'products[].product_name',   type: 'string',  desc: 'Display name of the product',                                                          desc_ja: '商品の表示名',                                                    desc_zh: '商品显示名称' },
+    { field: 'products[].category_id',    type: 'string',  desc: 'Category identifier',                                                                   desc_ja: 'カテゴリID',                                                      desc_zh: '分类标识符' },
+    { field: 'products[].price',          type: 'integer', desc: 'Price in USD',                                                                          desc_ja: '価格（USD）',                                                     desc_zh: '价格（美元）' },
+    { field: 'products[].avg_review',     type: 'number',  desc: 'Average review rating (0–5)',                                                           desc_ja: 'レビュー平均評価（0〜5）',                                         desc_zh: '平均评分（0–5）' },
+    { field: 'products[].image_url',      type: 'string',  desc: 'URL of the product image (/api/storage/<id>.png)',                                      desc_ja: '商品画像URL（/api/storage/<id>.png）',                             desc_zh: '商品图片URL（/api/storage/<id>.png）' },
+    { field: 'count',                     type: 'integer', desc: 'Total number of products returned',                                                     desc_ja: '返却された商品数',                                                desc_zh: '返回的商品总数' },
+  ],
+
+  // ── Browsing History ──────────────────────────────────────────────────────
+  'POST /api/browsing-history/([^/]+)': [
+    { field: 'status', type: 'string', desc: '"recorded" on success', desc_ja: '成功時は"recorded"', desc_zh: '成功时返回"recorded"' },
+  ],
+  'GET /api/browsing-history/recommendations': [
+    { field: 'recommendations',               type: 'array',   desc: 'List of recommended products based on browsing history',              desc_ja: '閲覧履歴に基づくレコメンド商品リスト',          desc_zh: '基于浏览历史的推荐商品列表' },
+    { field: 'recommendations[].product_id',  type: 'string',  desc: 'Unique product identifier',                                          desc_ja: '商品の一意識別子',                               desc_zh: '商品唯一标识符' },
+    { field: 'recommendations[].product_name',type: 'string',  desc: 'Display name of the product',                                        desc_ja: '商品の表示名',                                   desc_zh: '商品显示名称' },
+    { field: 'recommendations[].category_id', type: 'string',  desc: 'Category identifier',                                                desc_ja: 'カテゴリID',                                     desc_zh: '分类标识符' },
+    { field: 'recommendations[].price',       type: 'integer', desc: 'Price in JPY',                                                       desc_ja: '価格（円）',                                     desc_zh: '价格（日元）' },
+    { field: 'recommendations[].avg_review',  type: 'number',  desc: 'Average review rating (0–5)',                                        desc_ja: 'レビュー平均評価（0〜5）',                        desc_zh: '平均评分（0–5）' },
+    { field: 'recommendations[].image_url',   type: 'string',  desc: 'URL of the product image (/api/storage/<id>.png)',                   desc_ja: '商品画像URL（/api/storage/<id>.png）',            desc_zh: '商品图片URL（/api/storage/<id>.png）' },
+    { field: 'count',                         type: 'integer', desc: 'Number of recommendations returned',                                 desc_ja: '返却されたレコメンド数',                          desc_zh: '返回的推荐数量' },
+  ],
+
   'GET /api/stats': [
     { field: 'topApis',                    type: 'array',   desc: 'Most requested endpoints (present when type omitted or type=top)',    desc_ja: 'リクエスト数上位エンドポイント（type省略またはtype=topの場合）',     desc_zh: '请求量最高的端点（type省略或type=top时返回）' },
     { field: 'topApis[].method',           type: 'string',  desc: 'HTTP method (GET, POST, …)',                                          desc_ja: 'HTTPメソッド（GET, POSTなど）',                                     desc_zh: 'HTTP方法（GET、POST等）' },
@@ -3468,7 +3549,7 @@ function renderTestScenarioList() {
   const icons = { success:'<span style="color:var(--green)">✓</span>', failed:'<span style="color:var(--red)">✗</span>', running:'<div class="dot-streaming" style="display:inline-block;width:8px;height:8px;margin-right:2px;"></div>', pending:'<span style="color:var(--text-muted)">○</span>' };
   el.innerHTML = [...testScenarios.entries()].map(([file, sc]) => {
     const active = file === testSelectedSpec ? 'background:var(--bg-elevated); border-color:var(--blue);' : '';
-    const dur = sc.endMs ? fmtDuration(sc.startMs, sc.endMs) : (sc.startMs ? fmtDuration(sc.startMs, Date.now()) : '');
+    const dur = sc.endMs ? fmtDuration(sc.endMs - sc.startMs) : (sc.startMs ? fmtDuration(Date.now() - sc.startMs) : '');
     const passed = sc.tests.filter(t => t.status === 'success').length;
     const total = sc.tests.length;
     return `<div onclick="selectTestSpec('${file}')" style="padding:10px 12px; border-radius:6px; border:1px solid var(--border); margin-bottom:6px; cursor:pointer; ${active}">
@@ -3491,7 +3572,7 @@ function renderTestStepList() {
     return;
   }
   const sc = testScenarios.get(testSelectedSpec);
-  const dur = sc.endMs ? fmtDuration(sc.startMs, sc.endMs) : (sc.startMs ? fmtDuration(sc.startMs, Date.now()) : '');
+  const dur = sc.endMs ? fmtDuration(sc.endMs - sc.startMs) : (sc.startMs ? fmtDuration(Date.now() - sc.startMs) : '');
   const statusColor = sc.status === 'success' ? 'var(--green)' : sc.status === 'failed' ? 'var(--red)' : 'var(--blue)';
   header.innerHTML = `<span style="font-weight:600;">${sc.displayName}</span>
     <span style="margin-left:8px;font-size:11px;color:var(--text-muted);font-family:monospace;">${sc.tests.length} tests${dur ? ' · ' + dur : ''}</span>`;
@@ -3873,7 +3954,7 @@ function renderVulnReport() {
       if (!st) return '';
       const entries = [...displayImages.entries()].filter(([, v]) => v.scanType === phase);
       const hasIssues = entries.some(([, v]) => (v.severity.CRITICAL||0)+(v.severity.HIGH||0) > 0);
-      const isFail = st === 'fail' || hasIssues;
+      const isFail = hasIssues || (st === 'fail' && entries.length === 0);
       const color = st === 'running' ? 'var(--blue)' : isFail ? 'var(--red)' : 'var(--green)';
       const icon = st === 'running'
         ? `<div class="dot-streaming" style="width:8px;height:8px;"></div>`

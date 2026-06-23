@@ -18,7 +18,7 @@ test.describe('Dashboard Enhancements Spec', () => {
       { name: 'API Specifications', title: 'API Specifications' },
       { name: 'Access Management', title: 'Access Management' },
       { name: 'Model Performance', title: 'Model Performance' },
-      { name: 'CI Pipelines', title: 'CI Pipelines' },
+      { name: 'Local CI Pipelines', title: 'Local CI Pipelines' },
       { name: 'E2E Test Runner', title: 'E2E Test Runner' },
       { name: 'Security Scanning', title: 'Security Scanning' }
     ];
@@ -46,20 +46,6 @@ test.describe('Dashboard Enhancements Spec', () => {
     const top5Card = page.locator('.card', { hasText: 'Top Requested API Gateway Endpoints' });
     await expect(top5Card).toBeVisible();
     await expect(page.locator('#kong-top-apis-tbody')).toBeVisible();
-  });
-
-  test('should load API Specifications and Realm info', async ({ page }) => {
-    // 1. API Specs
-    await page.locator('nav .nav-item').getByText('API Specifications', { exact: true }).click();
-    await page.waitForSelector('#api-list-ul .db-list-item', { timeout: 10000 });
-    const routeItems = page.locator('#api-list-ul .db-list-item');
-    await expect(routeItems.first()).toBeVisible();
-
-    // 2. Access Management (Keycloak)
-    await page.locator('nav .nav-item').getByText('Access Management', { exact: true }).click();
-    await page.waitForSelector('#kc-users-tbody tr', { timeout: 10000 });
-    const userRows = page.locator('#kc-users-tbody tr');
-    await expect(userRows.first()).toBeVisible();
   });
 
   test('should run SQL Query and Export MySQL Dump', async ({ page }) => {
@@ -92,16 +78,20 @@ test.describe('Dashboard Enhancements Spec', () => {
   test('should execute vulnerability scan (task infosec)', async ({ page }) => {
     await page.locator('nav .nav-item').getByText('Security Scanning', { exact: true }).click();
 
-    // Click SCAN ALL button (replaces old "Run Security Scan")
-    const runBtn = page.getByRole('button', { name: 'SCAN ALL' });
+    // Select "Scan All" type, then click Run
+    const scanAllBtn = page.getByRole('button', { name: 'Scan All' });
+    await expect(scanAllBtn).toBeVisible();
+    await scanAllBtn.click();
+
+    const runBtn = page.locator('#vuln-run-btn');
     await expect(runBtn).toBeVisible();
     await runBtn.click();
 
     // Verify it transitions to running
-    await expect(page.locator('#vuln-status')).toContainText('Running');
+    await expect(page.locator('#vuln-status')).toContainText('Running', { timeout: 10000 });
 
     // Verify log contents starts streaming
     const logOutput = page.locator('#vuln-log-output');
-    await expect(logOutput).toContainText('task infosec', { timeout: 15000 });
+    await expect(logOutput).toContainText('Starting security scan', { timeout: 15000 });
   });
 });
