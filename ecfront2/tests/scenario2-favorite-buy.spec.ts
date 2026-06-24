@@ -1,12 +1,19 @@
 import { test, expect } from '@playwright/test';
 import { execSync } from 'child_process';
 
-test.beforeEach(() => {
+test.beforeEach(async () => {
+  // Prefer HTTP endpoint (works inside Docker ie2e where docker exec is unavailable)
+  const baseUrl = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost';
   try {
-    // Reset Blueberry Jam stock to 10 and clear Wishlist in MySQL (runs before each attempt/retry)
-    execSync(`docker exec -i mysql-service.default.svc.cluster.local mysql --ssl-mode=DISABLED -umocktenusr -pmocktenpassword mocktendb -e "UPDATE Stock SET stocks = 10 WHERE product_id = 'b91a5d68-6acb-48e7-8e5d-3d85b7e76af2'; DELETE FROM Wishlist;"`, { timeout: 10000 });
-  } catch (e) {
-    console.warn('Failed to reset stock via docker exec. Continuing test...', e);
+    const res = await fetch(`${baseUrl}/api/test/reset-stock`, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error(`reset-stock returned ${res.status}`);
+  } catch {
+    // Fallback: direct docker exec (host-only)
+    try {
+      execSync(`docker exec -i mysql-service.default.svc.cluster.local mysql --ssl-mode=DISABLED -umocktenusr -pmocktenpassword mocktendb -e "UPDATE Stock SET stocks = 10 WHERE product_id = 'b91a5d68-6acb-48e7-8e5d-3d85b7e76af2'; DELETE FROM Wishlist;"`, { timeout: 10000 });
+    } catch (e) {
+      console.warn('Failed to reset stock (both HTTP and docker exec failed). Continuing...', e);
+    }
   }
 });
 
@@ -33,6 +40,8 @@ test.describe('Scenario 2: Favorite and Buy Blueberry Jam', () => {
     await page.getByPlaceholder('ex: TARO YAMADA').fill('Hanako Tanaka');
     
     // Stripe Element is in an iframe — use autocomplete attributes (stable across locales/versions)
+    // Wait for Stripe iframe to appear before interacting
+    await expect(page.locator('iframe[name^="__privateStripeFrame"]').first()).toBeAttached({ timeout: 15000 });
     const stripeIframe = page.frameLocator('iframe[name^="__privateStripeFrame"]').first();
 
     // Enter Card Details in Stripe iframe

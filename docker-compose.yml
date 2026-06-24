@@ -4,6 +4,21 @@ services:
   mysql:
     container_name: mysql-service.default.svc.cluster.local
     image: mockten-mysql
+    build:
+      context: ./mysql
+    mem_limit: 350m
+    command:
+      - --innodb-buffer-pool-size=64M
+      - --innodb-log-buffer-size=8M
+      - --performance-schema=OFF
+      - --max-connections=60
+      - --table-open-cache=64
+      - --thread-cache-size=4
+      - --innodb-read-io-threads=1
+      - --innodb-write-io-threads=1
+      - --innodb-purge-threads=1
+      - --tmp-table-size=16M
+      - --max-heap-table-size=16M
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: mocktendb
@@ -22,6 +37,9 @@ services:
   redis:
     container_name: redis-service.default.svc.cluster.local
     image: mockten-redis
+    build:
+      context: ./redis
+    mem_limit: 25m
     networks:
       - mockten_nw
     ports:
@@ -30,10 +48,15 @@ services:
   uam:
     container_name: uam-service.default.svc.cluster.local
     image: uam
+    build:
+      context: ./uam
     platform: linux/amd64
+    mem_limit: 800m
     environment:
       KC_HOSTNAME: localhost
       DEV_MODE: "true"
+      JAVA_OPTS_APPEND: "-Xms128m -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+DisableExplicitGC"
+      KC_LOG_LEVEL: "WARN"
     networks:
       - mockten_nw
     tty: true
@@ -42,6 +65,14 @@ services:
   minio:
     container_name: minio-service.default.svc.cluster.local
     image: minio
+    build:
+      context: ./minIO
+    mem_limit: 190m
+    environment:
+      MINIO_GOMAXPROCS: "1"
+      MINIO_API_REQUESTS_MAX: "100"
+    volumes:
+      - ./minIO/photos:/photos:ro
     networks:
       - mockten_nw
     ports:
@@ -53,6 +84,9 @@ services:
   apigw:
     container_name: apigw
     image: apigw
+    build:
+      context: ./apigw
+    mem_limit: 200m
     networks:
       - mockten_nw
     ports:
@@ -64,10 +98,19 @@ services:
     environment:
       KONG_NGINX_HTTP_LOG_FORMAT: "with_rt '$$remote_addr - $$remote_user [$$time_local] \"$$request\" $$status $$body_bytes_sent rt=$$upstream_response_time kong_request_id: \"$$kong_request_id\"'"
       KONG_PROXY_ACCESS_LOG: "/tmp/access.log with_rt"
+      KONG_MEM_CACHE_SIZE: "32m"
+      KONG_LOG_LEVEL: "warn"
+      KONG_NGINX_WORKER_PROCESSES: "1"
 
   meilisearch:
     container_name: meilisearch-service.default.svc.cluster.local
     image: meilisearch
+    build:
+      context: ./meilisearch
+    mem_limit: 60m
+    environment:
+      MEILI_MAX_INDEXING_MEMORY: "32Mb"
+      MEILI_MAX_INDEXING_THREADS: "1"
     networks:
       - mockten_nw
     ports:
@@ -77,7 +120,13 @@ services:
 
   searchitem:
     container_name: searchitem-service.default.svc.cluster.local
-    image: searchitem
+    image: mockten-searchitem
+    build:
+      context: ./searchitem
+    mem_limit: 30m
+    environment:
+      GOGC: "50"
+      GOMEMLIMIT: "22MiB"
     networks:
       - mockten_nw
     ports:
@@ -87,7 +136,13 @@ services:
 
   product:
     container_name: product-service.default.svc.cluster.local
-    image: product
+    image: mockten-product
+    build:
+      context: ./product
+    mem_limit: 30m
+    environment:
+      GOGC: "50"
+      GOMEMLIMIT: "22MiB"
     networks:
       - mockten_nw
     ports:
@@ -97,7 +152,14 @@ services:
 
   cart:
     container_name: cart-service.default.svc.cluster.local
-    image: cart
+    image: mockten-cart
+    build:
+      context: .
+      dockerfile: cart/Dockerfile
+    mem_limit: 30m
+    environment:
+      GOGC: "50"
+      GOMEMLIMIT: "22MiB"
     networks:
       - mockten_nw
     ports:
@@ -108,6 +170,9 @@ services:
   sync:
     container_name: mockten-sync
     image: mockten-sync
+    build:
+      context: ./sync
+    mem_limit: 10m
     networks:
       - mockten_nw
     tty: true
@@ -116,6 +181,13 @@ services:
   geocoding:
     container_name: geocoding-service.default.svc.cluster.local
     image: mockten-geocoding
+    build:
+      context: ./geocoding
+    mem_limit: 20m
+    environment:
+      GOGC: "30"
+      GOMEMLIMIT: "14MiB"
+      GOMAXPROCS: "1"
     volumes:
       - ./geocoding/config.json:/app/config.json:ro
     networks:
@@ -124,6 +196,9 @@ services:
   ecpay:
     container_name: ecpay-service.default.svc.cluster.local
     image: mockten-ecpay
+    build:
+      context: ./ecpay
+    mem_limit: 40m
     environment:
       SecretKeyString: ${STRIPE_SECRET_KEY}
       MysqlUser: mocktenusr
@@ -131,50 +206,77 @@ services:
       DbHost: mysql-service.default.svc.cluster.local:3306
       MysqlDB: mocktendb
       RANKING_SERVICE_URL: http://ranking-service.default.svc.cluster.local:8080
+      GOGC: "50"
+      GOMEMLIMIT: "30MiB"
     networks:
       - mockten_nw
 
   ranking:
     container_name: ranking-service.default.svc.cluster.local
     image: mockten-ranking
+    build:
+      context: ./ranking
+    mem_limit: 30m
     environment:
       REDIS_HOST: redis-service.default.svc.cluster.local:6379
       MYSQL_DSN: mocktenusr:mocktenpassword@tcp(mysql-service.default.svc.cluster.local:3306)/mocktendb?parseTime=true
+      GOGC: "50"
+      GOMEMLIMIT: "22MiB"
     networks:
       - mockten_nw
 
   sale:
     container_name: sale-service.default.svc.cluster.local
     image: mockten-sale
+    build:
+      context: ./sale
+    mem_limit: 30m
     environment:
       MYSQL_DSN: mocktenusr:mocktenpassword@tcp(mysql-service.default.svc.cluster.local:3306)/mocktendb?parseTime=true
       MEILI_SVC: meilisearch-service.default.svc.cluster.local
+      GOGC: "50"
+      GOMEMLIMIT: "22MiB"
     networks:
       - mockten_nw
 
   shipment:
     container_name: shipment-service.default.svc.cluster.local
     image: mockten-shipment
+    build:
+      context: ./shipment
+    mem_limit: 20m
     environment:
       TEST_MODE: "true"
       TICK_INTERVAL_SECONDS: 200
       MYSQL_DSN: mocktenusr:mocktenpassword@tcp(mysql-service.default.svc.cluster.local:3306)/mocktendb?parseTime=true
+      GOGC: "30"
+      GOMEMLIMIT: "14MiB"
+      GOMAXPROCS: "1"
     networks:
       - mockten_nw
 
   recommendation:
     container_name: recommendation-service.default.svc.cluster.local
     image: mockten-recommendation
+    build:
+      context: ./recommendation
+    mem_limit: 150m
     environment:
       MYSQL_HOST: mysql-service.default.svc.cluster.local
       MINIO_ENDPOINT: minio-service.default.svc.cluster.local:9000
       RANKING_SERVICE_URL: http://ranking-service.default.svc.cluster.local:8080
+      WEB_CONCURRENCY: "1"
+      UVICORN_WORKERS: "1"
+      MALLOC_ARENA_MAX: "2"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONOPTIMIZE: "1"
     networks:
       - mockten_nw
 
   nginx:
     container_name: nginx
     image: nginx
+    mem_limit: 30m
     volumes:
       - ./dev_nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
@@ -189,6 +291,9 @@ services:
     image: mockten-mongodb
     build:
       context: ./mongodb
+    command: ["mongod", "--wiredTigerCacheSizeGB", "0.25", "--bind_ip_all", "--setParameter", "diagnosticDataCollectionEnabled=false", "--wiredTigerEngineConfigString", "checkpoint=(wait=300)"]
+    mem_limit: 200m
+    restart: on-failure:5
     environment:
       MONGO_INITDB_ROOT_USERNAME: bar
       MONGO_INITDB_ROOT_PASSWORD: bar
@@ -201,8 +306,12 @@ services:
   dashboard:
     container_name: mockten-dashboard
     image: mockten-dashboard
+    mem_limit: 300m
     build:
       context: ./monitoring/dashboard
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=150
+      - HOST_WORKSPACE_PATH=${HOST_WORKSPACE_PATH:-${PWD}}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./ecfront2.log:/app/ecfront2.log:ro
@@ -213,8 +322,6 @@ services:
       - ./Taskfile.yaml:/app/Taskfile.yaml:ro
       - ./.github/workflows/ci.yml:/app/.github/workflows/ci.yml:ro
       - ./:${HOST_WORKSPACE_PATH:-${PWD}}
-    environment:
-      - HOST_WORKSPACE_PATH=${HOST_WORKSPACE_PATH:-${PWD}}
     networks:
       - mockten_nw
 
@@ -222,6 +329,9 @@ services:
   airflow-webserver:
     container_name: airflow-webserver
     image: mockten-airflow
+    build:
+      context: ./airflow
+    mem_limit: 820m
     entrypoint: ["/bin/bash", "/entrypoint.sh"]
     command: ["airflow", "webserver"]
     ports:
@@ -232,14 +342,22 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "mysql+mysqldb://mocktenusr:mocktenpassword@mysql-service.default.svc.cluster.local/airflow?charset=utf8mb4"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE: "3"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW: "2"
       AIRFLOW__CORE__FERNET_KEY: "j7zLQ3S9kBh2vXpNqWcYeRaFmTuGdIoK8sE4wPlZnJy0="
       AIRFLOW__WEBSERVER__SECRET_KEY: "mockten-airflow-secret"
       AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+      AIRFLOW__WEBSERVER__WORKERS: "1"
+      AIRFLOW__WEBSERVER__WORKER_TIMEOUT: "120"
+      AIRFLOW__WEBSERVER__WORKER_REFRESH_BATCH_SIZE: "1"
+      AIRFLOW__WEBSERVER__WORKER_REFRESH_INTERVAL: "1800"
       MYSQL_HOST: mysql-service.default.svc.cluster.local
       MINIO_ENDPOINT: minio-service.default.svc.cluster.local:9000
+      MALLOC_ARENA_MAX: "2"
+      PYTHONDONTWRITEBYTECODE: "1"
     volumes:
       - ./airflow/dags:/opt/airflow/dags
     networks:
@@ -248,6 +366,7 @@ services:
   airflow-scheduler:
     container_name: airflow-scheduler
     image: mockten-airflow
+    mem_limit: 500m
     entrypoint: ["/bin/bash", "/entrypoint.sh"]
     command: ["airflow", "scheduler"]
     depends_on:
@@ -256,12 +375,19 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "mysql+mysqldb://mocktenusr:mocktenpassword@mysql-service.default.svc.cluster.local/airflow?charset=utf8mb4"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE: "3"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW: "2"
       AIRFLOW__CORE__FERNET_KEY: "j7zLQ3S9kBh2vXpNqWcYeRaFmTuGdIoK8sE4wPlZnJy0="
       AIRFLOW__WEBSERVER__SECRET_KEY: "mockten-airflow-secret"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+      AIRFLOW__SCHEDULER__MAX_DAGRUNS_PER_LOOP_TO_SCHEDULE: "5"
+      AIRFLOW__SCHEDULER__PARSING_PROCESSES: "1"
+      AIRFLOW__CORE__MAX_ACTIVE_RUNS_PER_DAG: "1"
       MYSQL_HOST: mysql-service.default.svc.cluster.local
       MINIO_ENDPOINT: minio-service.default.svc.cluster.local:9000
+      MALLOC_ARENA_MAX: "2"
+      PYTHONDONTWRITEBYTECODE: "1"
     volumes:
       - ./airflow/dags:/opt/airflow/dags
     networks:
@@ -270,4 +396,3 @@ services:
 networks:
   mockten_nw:
     name: mockten_nw
-

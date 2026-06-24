@@ -75,6 +75,73 @@ test.describe('Dashboard Enhancements Spec', () => {
     expect(download.suggestedFilename()).toContain('.sql');
   });
 
+  test('should show Data Pipeline Run History', async ({ page, request }) => {
+    await page.locator('nav .nav-item').getByText('Data Pipeline', { exact: true }).click();
+
+    // Verify pipeline page loaded
+    await expect(page.locator('#view-title')).toContainText('Data Pipeline', { timeout: 10000 });
+
+    // The Run History section should be visible
+    const runHistorySection = page.locator('text=Run History');
+    await expect(runHistorySection).toBeVisible({ timeout: 10000 });
+
+    // API should return run data (not empty / not "Loading...")
+    const resp = await request.get('/dashboard/api/pipeline/runs?limit=5');
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+    expect(body).toHaveProperty('dag_runs');
+    expect(Array.isArray(body.dag_runs)).toBe(true);
+    // At least one run should exist (from task build's pipeline trigger)
+    expect(body.dag_runs.length).toBeGreaterThan(0);
+
+    // The UI should not show "Loading..." after data loads
+    await page.waitForFunction(() => {
+      const el = document.getElementById('pipeline-runs-table');
+      return el && !el.textContent?.includes('Loading...');
+    }, { timeout: 15000 });
+  });
+
+  test('should show MongoDB collections in DB Viewer (proves MongoDB is used)', async ({ page, request }) => {
+    // First verify the API directly — if it fails, the UI will always be empty
+    const apiRes = await request.get('/dashboard/api/db/mongo/collections');
+    expect(apiRes.status()).toBe(200);
+    const collections = await apiRes.json();
+    expect(Array.isArray(collections)).toBe(true);
+    expect(collections.length).toBeGreaterThan(0);
+    // product_info collections should include at least one collection
+    const names = collections.map((c: any) => c.name);
+    expect(names.length).toBeGreaterThan(0);
+
+    // Then verify the UI shows them
+    await page.locator('nav .nav-item').getByText('DB Viewer', { exact: true }).click();
+    // Wait for MySQL tables to finish loading (DB Viewer init)
+    await page.waitForSelector('#mysql-tables-ul', { timeout: 15000 });
+
+    // Switch to MongoDB tab
+    await page.locator('#db-tab-mongodb').click();
+
+    // Wait for collection list — uses div.db-list-item children
+    await page.waitForFunction(() => {
+      const ul = document.getElementById('mongo-tables-ul');
+      return ul && ul.children.length > 0 && !ul.children[0].classList.contains('db-error');
+    }, { timeout: 15000 });
+  });
+
+  test('should respond 200 to reset-stock endpoint (critical for ie2e)', async ({ request }) => {
+    // This endpoint is the linchpin for ie2e stock reset — if it's broken, Buy Now is disabled
+    const res = await request.post('/api/test/reset-stock');
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+  });
+
+  test('dashboard should be reachable and not 502 (memory regression guard)', async ({ page }) => {
+    // 502 means dashboard OOM-killed — this test catches mem_limit regressions
+    const res = await page.goto('/dashboard/');
+    expect(res?.status()).toBeLessThan(500);
+    await expect(page.locator('.logo')).toContainText('mockten', { timeout: 10000 });
+  });
+
   test('should execute vulnerability scan (task infosec)', async ({ page }) => {
     await page.locator('nav .nav-item').getByText('Security Scanning', { exact: true }).click();
 

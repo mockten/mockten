@@ -44,7 +44,7 @@ function getRedis() {
 }
 
 const MONGO_CONFIG = {
-  url: 'mongodb://bar:bar@mongo-service.default.svc.cluster.local:27017',
+  url: 'mongodb://bar:bar@mongo-service.default.svc.cluster.local:27017/?authSource=admin',
   dbName: 'product_info',
 };
 
@@ -116,13 +116,19 @@ app.get('/api/db/mysql/table/:table', async (req, res) => {
   let conn;
   try {
     conn = await mysqlPool.getConnection();
-    // Get column names first
+    // Get column names and metadata
     const [cols] = await conn.query(
-      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      `SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, EXTRA
+       FROM information_schema.COLUMNS
        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`,
       [MYSQL_CONFIG.database, table]
     );
     const columns = cols.map(c => c.COLUMN_NAME);
+    const columnMeta = Object.fromEntries(cols.map(c => [c.COLUMN_NAME, {
+      dataType: c.DATA_TYPE,
+      nullable: c.IS_NULLABLE === 'YES',
+      hasDefault: c.COLUMN_DEFAULT !== null || (c.EXTRA || '').includes('auto_increment'),
+    }]));
 
     const [pkRows] = await conn.query(
       `SELECT COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE
@@ -149,7 +155,7 @@ app.get('/api/db/mysql/table/:table', async (req, res) => {
 
     const [[{ total }]] = await conn.query(countSql, params);
     const [rows] = await conn.query(dataSql, [...params, limit, offset]);
-    res.json({ columns, primaryKeys, rows, total, limit, offset });
+    res.json({ columns, columnMeta, primaryKeys, rows, total, limit, offset });
   } catch (e) {
     res.status(500).json({ error: e.message });
   } finally {
@@ -1184,6 +1190,53 @@ app.get('/api/telemetry', async (req, res) => {
 const MAX_HISTORY = 8640; // 12h × 5s interval
 const metricsHistory = { timestamps: [], cpu: [], mem: [], memMB: [], telemetry: { mysql: [], redis: [], mongo: [], kong: [] } };
 
+// Persist one snapshot to MongoDB dashboard_metrics collection (writes every ~60s)
+let _mongoMetricsTick = 0;
+async function persistMetricToMongo(snapshot) {
+  try {
+    const client = new MongoClient(MONGO_CONFIG.url, { connectTimeoutMS: 3000, serverSelectionTimeoutMS: 3000 });
+    await client.connect();
+    const col = client.db('product_info').collection('dashboard_metrics');
+    await col.insertOne({ ...snapshot, createdAt: new Date() });
+    // Keep only last 1440 records (24h at 60s)
+    const count = await col.countDocuments();
+    if (count > 1440) {
+      const oldest = await col.find().sort({ createdAt: 1 }).limit(count - 1440).toArray();
+      if (oldest.length > 0) {
+        const ids = oldest.map(d => d._id);
+        await col.deleteMany({ _id: { $in: ids } });
+      }
+    }
+    await client.close().catch(() => {});
+  } catch {
+    // MongoDB unavailable — silently skip persistence
+  }
+}
+
+// On startup: restore in-memory history from MongoDB (last 200 records for quick boot)
+async function loadMetricsFromMongo() {
+  try {
+    const client = new MongoClient(MONGO_CONFIG.url, { connectTimeoutMS: 5000, serverSelectionTimeoutMS: 5000 });
+    await client.connect();
+    const col = client.db('product_info').collection('dashboard_metrics');
+    const docs = await col.find().sort({ createdAt: -1 }).limit(200).toArray();
+    docs.reverse().forEach(d => {
+      metricsHistory.timestamps.push(d.ts);
+      metricsHistory.cpu.push(d.cpu);
+      metricsHistory.mem.push(d.mem);
+      metricsHistory.memMB.push(d.memMB);
+      metricsHistory.telemetry.mysql.push(d.mysql);
+      metricsHistory.telemetry.redis.push(d.redis);
+      metricsHistory.telemetry.mongo.push(d.mongo);
+      metricsHistory.telemetry.kong.push(d.kong);
+    });
+    await client.close().catch(() => {});
+    if (docs.length > 0) console.log(`Loaded ${docs.length} metrics snapshots from MongoDB.`);
+  } catch {
+    // No MongoDB yet — start fresh
+  }
+}
+
 async function collectMetricsSnapshot() {
   try {
     const containers = await docker.listContainers({ all: false });
@@ -1221,7 +1274,7 @@ async function collectMetricsSnapshot() {
       await r.quit().catch(() => {});
     } catch {}
     try {
-      const mc = new (require('mongodb').MongoClient)('mongodb://bar:bar@mongo-service.default.svc.cluster.local:27017', { connectTimeoutMS:3000 });
+      const mc = new (require('mongodb').MongoClient)('mongodb://bar:bar@mongo-service.default.svc.cluster.local:27017/?authSource=admin', { connectTimeoutMS:3000 });
       await mc.connect();
       const si = await mc.db('admin').command({ serverStatus: 1 });
       mongoConn = si.connections?.current || 0;
@@ -1255,13 +1308,24 @@ async function collectMetricsSnapshot() {
       metricsHistory.telemetry.mongo.shift();
       metricsHistory.telemetry.kong.shift();
     }
+
+    // Persist to MongoDB every 12 ticks (60 seconds) to prove MongoDB is used by dashboard
+    _mongoMetricsTick++;
+    if (_mongoMetricsTick % 12 === 0) {
+      persistMetricToMongo({
+        ts, cpu: parseFloat(aggCpu.toFixed(2)), mem: parseFloat(aggMemPct.toFixed(2)),
+        memMB: parseFloat(aggMemMB.toFixed(1)),
+        mysql: mysqlConn, redis: redisClients, mongo: mongoConn, kong: kongTotal,
+      });
+    }
   } catch (e) {
     console.error('metrics snapshot error:', e.message);
   }
 }
 
 setInterval(collectMetricsSnapshot, 5000);
-collectMetricsSnapshot();
+// Load historical metrics from MongoDB before starting collection
+loadMetricsFromMongo().then(() => collectMetricsSnapshot());
 
 app.get('/api/metrics/history', (req, res) => {
   res.json(metricsHistory);
@@ -1529,12 +1593,11 @@ wssCI.on('connection', ws => {
   // Ensure actrc exists so act doesn't show interactive image-select prompt
   const actrcDir = '/root/.config/act';
   const actrcPath = `${actrcDir}/actrc`;
-  if (!fs.existsSync(actrcPath)) {
-    try {
-      fs.mkdirSync(actrcDir, { recursive: true });
-      fs.writeFileSync(actrcPath, '-P ubuntu-latest=catthehacker/ubuntu:act-22.04\n');
-    } catch {}
-  }
+  try {
+    fs.mkdirSync(actrcDir, { recursive: true });
+    // Map both ubuntu-latest and ubuntu-22.04 (used in ci.yml) to the same runner image
+    fs.writeFileSync(actrcPath, '-P ubuntu-latest=catthehacker/ubuntu:act-22.04\n-P ubuntu-22.04=catthehacker/ubuntu:act-22.04\n');
+  } catch {}
 
   ws.send('Starting CI workflow simulation (act)...\r\n');
 
@@ -1542,7 +1605,8 @@ wssCI.on('connection', ws => {
     'pull_request',
     '-W', '/app/.github/workflows/ci.yml',
     '-C', HOST_WORKSPACE_PATH,
-    '--concurrent-jobs', '1',
+    '--concurrent-jobs', '2',
+    '--pull=false',
   ], { cwd: '/app' });
 
   child.stdout.on('data', data => ws.send(data.toString()));

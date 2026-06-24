@@ -10,47 +10,6 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  build_adder:
-    runs-on: ubuntu-22.04
-    # if: contains(github.event.head_commit.modified, 'adder/')
-    defaults:
-      run:
-        working-directory: adder
-    steps:
-      - uses: actions/checkout@v1
-  
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.23
-
-      - name: Build
-        run: go build -v .
-
-  push_snapshot_container_adder:
-    needs: [build_adder]
-    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: adder
-    env:
-      MAJOR_VERSION: 0
-      MINOR_VERSION: 0
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v1
-    
-    - name: Log in to GitHub Container Registry
-      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-    - name: Build and push container
-      run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository }}/adder:latest"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
-
-
   build_ecfront:
     runs-on: ubuntu-22.04
     defaults:
@@ -60,12 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: ecfront2/package-lock.json
 
       - name: Update npm
         run: npm install -g npm@latest
@@ -107,12 +60,10 @@ jobs:
         working-directory: ecpay
     steps:
     - uses: actions/checkout@v1
-
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.23
-
+        go-version: '1.23'
     - name: Build
       run: go build -v .
 
@@ -140,89 +91,6 @@ jobs:
         docker push $IMAGE_TAG
 
 
-  build_notification:
-    runs-on: ubuntu-22.04
-    # if: contains(github.event.head_commit.modified, 'notification/')
-    defaults:
-      run:
-        working-directory: notification
-    steps:
-    - uses: actions/checkout@v1
-
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: 1.23
-
-    - name: Build
-      run: go build -v .
-
-  push_snapshot_container_notification:
-    needs: [build_notification]
-    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: notification
-    env:
-      MAJOR_VERSION: 0
-      MINOR_VERSION: 0
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v1
-    
-    - name: Log in to GitHub Container Registry
-      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-    - name: Build and push container
-      run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository }}/notification:latest"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
-
-  build_payexecution:
-    runs-on: ubuntu-22.04
-    # if: contains(github.event.head_commit.modified, 'payexecution/')
-    defaults:
-      run:
-        working-directory: payexecution
-    steps:
-    - uses: actions/checkout@v1
-
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: 1.23
-
-    - name: Build
-      run: go build -v .
-
-    - name: Test
-      run: go test -v .
-
-  push_snapshot_container_payexecution:
-    needs: [build_payexecution]
-    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: payexecution
-    env:
-      MAJOR_VERSION: 0
-      MINOR_VERSION: 0
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v1
-    
-    - name: Log in to GitHub Container Registry
-      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-    - name: Build and push container
-      run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository }}/payexecution:latest"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
-
   build_ranking:
     runs-on: ubuntu-22.04
     # if: contains(github.event.head_commit.modified, 'ranking/')
@@ -231,12 +99,10 @@ jobs:
         working-directory: ranking
     steps:
     - uses: actions/checkout@v1
-
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.23
-
+        go-version: '1.23'
     - name: Build
       run: go build -v .
 
@@ -271,12 +137,10 @@ jobs:
         working-directory: sale
     steps:
     - uses: actions/checkout@v1
-
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.23
-
+        go-version: '1.23'
     - name: Build
       run: go build -v .
 
@@ -310,12 +174,10 @@ jobs:
         working-directory: shipment
     steps:
     - uses: actions/checkout@v1
-
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.23
-
+        go-version: '1.23'
     - name: Build
       run: go build -v .
 
@@ -352,12 +214,10 @@ jobs:
         working-directory: searchitem
     steps:
     - uses: actions/checkout@v1
-
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.23
-
+        go-version: '1.23'
     - name: Build
       run: go build -v .
 
@@ -392,12 +252,10 @@ jobs:
         working-directory: product
     steps:
     - uses: actions/checkout@v1
-
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.23
-
+        go-version: '1.23'
     - name: Build
       run: go build -v .
 
@@ -609,7 +467,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: '1.23'
       - name: Init module (only on CI)
         run: |
           if [ ! -f go.mod ]; then
@@ -653,10 +511,6 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
 
       - name: Clean install dependencies
         run: npm ci || npm install
@@ -690,15 +544,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.23
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
 
       - name: Set up Python
         uses: actions/setup-python@v4
