@@ -6,11 +6,10 @@ COPY main.go .
 COPY config.json .
 
 # Init fresh module in container (stdlib only)
-RUN go mod init nominatim-geocode-svc
-RUN go mod tidy
+RUN go mod init nominatim-geocode-svc && go mod tidy
 
 # Build static binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /app/geocode-service main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/geocode-service main.go
 
 FROM alpine:3
 WORKDIR /app

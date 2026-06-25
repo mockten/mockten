@@ -53,8 +53,8 @@ func initDB() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(5)
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(2)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	// Auto-migrate: add scheduled_start column if not exists using information_schema

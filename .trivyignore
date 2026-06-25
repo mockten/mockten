@@ -1,4 +1,7 @@
 # Keycloak (uam) unfixable upstream library vulnerabilities
+# jackson-databind bundled inside Keycloak — fix requires Keycloak upstream release
+CVE-2026-54512
+CVE-2026-54513
 CVE-2025-59250
 CVE-2026-44893
 CVE-2026-48059
@@ -62,3 +65,12 @@ CVE-2026-45447
 
 # task CLI binary - upstream go-git dependency (fix available in go-git v5.19.0, wait for task to upgrade)
 CVE-2026-45022
+
+# picomatch bundled inside npm itself (/usr/local/lib/node_modules/npm/node_modules/picomatch)
+# Not in our application code — unfixable without upgrading Node.js base image
+CVE-2026-33671
+
+# jaraco.context 5.3.0 and wheel 0.45.1 vendored inside setuptools/_vendor
+# setuptools 79.0.1 (latest) still ships these versions — unfixable by us
+CVE-2026-23949
+CVE-2026-24049

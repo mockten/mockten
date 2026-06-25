@@ -57,8 +57,10 @@ func main() {
 		redisPassword = "mocktenpass"
 	}
 	rdb = redis.NewClient(&redis.Options{
-		Addr:     redisHost,
-		Password: redisPassword,
+		Addr:         redisHost,
+		Password:     redisPassword,
+		PoolSize:     3,
+		MinIdleConns: 1,
 	})
 
 	// MySQL setup
@@ -71,8 +73,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to MySQL: %v", err)
 	}
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(5)
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(2)
 	db.SetConnMaxLifetime(5 * time.Minute)
 	defer db.Close()
 

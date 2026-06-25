@@ -3,7 +3,8 @@ import asyncio
 import logging
 import random
 from typing import Optional
-import requests
+import urllib.request
+import json as _json
 from fastapi import FastAPI, Query, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -146,9 +147,9 @@ def get_recommendations(user_id: str = Query(..., description="Email or Username
     # Cold Start fallback: fetch from popular ranking
     logger.info(f"Cold Start/Fallback triggered for user {user_id}. Fetching popular items from Ranking Service...")
     try:
-        resp = requests.get(f"{RANKING_SERVICE_URL}/api/ranking?category=all", timeout=3)
-        if resp.status_code == 200:
-            ranking_data = resp.json()
+        with urllib.request.urlopen(f"{RANKING_SERVICE_URL}/api/ranking?category=all", timeout=3) as resp:
+            ranking_data = _json.loads(resp.read().decode())
+        if ranking_data is not None:
             ranking_list = ranking_data.get("ranking", [])
             
             # Apply offset (rotation) and shuffle to make recommendations look different from the popular ranking

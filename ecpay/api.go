@@ -30,8 +30,8 @@ func initDB() {
 	if err != nil {
 		log.Fatalf("ecpay: db open error: %v", err)
 	}
-	db.SetMaxOpenConns(15)
-	db.SetMaxIdleConns(5)
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(2)
 	db.SetConnMaxLifetime(5 * time.Minute)
 	for i := 0; i < 30; i++ {
 		if err = db.Ping(); err == nil {

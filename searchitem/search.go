@@ -351,6 +351,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("DB open error: %v", err)
 	}
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(2)
 	waitForMySQL(db, logger)
 	defer db.Close()
 

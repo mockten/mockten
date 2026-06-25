@@ -22,6 +22,12 @@ RUN pip install --no-cache-dir \
 # lightfm requires Cython; best-effort
 RUN pip install --no-cache-dir lightfm || echo "WARNING: lightfm unavailable"
 
+# Remove compiler toolchain after pip builds to shrink the image
+USER root
+RUN apt-get purge -y --auto-remove gcc g++ build-essential pkg-config \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+USER airflow
+
 COPY scripts/entrypoint.sh /entrypoint.sh
 COPY dags/ /opt/airflow/dags/
 

@@ -1,17 +1,10 @@
-# multi stage build
-FROM golang:1.26 as builder
+FROM golang:1.26-alpine AS builder
 WORKDIR /go/setenv
 ENV CGO_ENABLED=0
-RUN mkdir setenv && \
-    apt-get update && \
-    apt-get -y install vim && \
-    apt-get -y install unzip
 COPY . .
-RUN go build .
+RUN go build -ldflags="-s -w" .
 
-# As runner
 FROM alpine:3
-RUN apk --no-cache add ca-certificates &&\
-    apk add gcompat
-COPY --from=builder  /go/setenv/product .
+RUN apk --no-cache add ca-certificates
+COPY --from=builder /go/setenv/product .
 CMD ["./product"]

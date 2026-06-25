@@ -146,8 +146,8 @@ func initDBWait() {
 	}
 
 	db.SetConnMaxLifetime(10 * time.Minute)
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(5)
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(2)
 
 	rand.Seed(time.Now().UnixNano())
 	delay := time.Second

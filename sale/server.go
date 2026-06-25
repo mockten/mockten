@@ -56,8 +56,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to MySQL: %v", err)
 	}
-	db.SetMaxOpenConns(15)
-	db.SetMaxIdleConns(5)
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(2)
 	db.SetConnMaxLifetime(5 * time.Minute)
 	defer db.Close()
 
