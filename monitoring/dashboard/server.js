@@ -884,7 +884,7 @@ const getKongApiStats = () => {
         .sort((a, b) => b.count - a.count);
 
       const slowApis = Object.entries(rtSums)
-        .filter(([key]) => (rtCounts[key] || 0) >= 3)
+        .filter(([key]) => (rtCounts[key] || 0) >= 1)
         .map(([key, sum]) => {
           const [method, ...rest] = key.split(' ');
           const avgMs = Math.round((sum / rtCounts[key]) * 1000);

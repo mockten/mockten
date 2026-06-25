@@ -290,11 +290,11 @@ services:
   dashboard:
     container_name: mockten-dashboard
     image: mockten-dashboard
-    mem_limit: 300m
+    mem_limit: 500m
     build:
       context: ./monitoring/dashboard
     environment:
-      - NODE_OPTIONS=--max-old-space-size=150
+      - NODE_OPTIONS=--max-old-space-size=350
       - HOST_WORKSPACE_PATH=${HOST_WORKSPACE_PATH:-${PWD}}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

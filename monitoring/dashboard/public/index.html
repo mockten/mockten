@@ -213,7 +213,7 @@
           </div>
         </div>
         <!-- System Aggregate Telemetry Metrics (Kong, MySQL, Redis, MongoDB) -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 24px; text-align: left;">
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px; text-align: left;">
           <!-- Kong Card -->
           <div class="card" style="padding: 20px;">
             <h2 style="font-size: 15px; margin-bottom: 12px; color:var(--accent); font-weight:600;" data-i18n="dash.kong">API Gateway (Kong)</h2>
@@ -241,15 +241,6 @@
               <div style="display:flex; justify-content:space-between;"><span data-i18n="dash.clientsConn">Clients Connected</span><strong id="tel-redis-clients">-</strong></div>
               <div style="display:flex; justify-content:space-between;"><span data-i18n="dash.memUsed">Memory Used</span><strong id="tel-redis-memory">-</strong></div>
               <div style="display:flex; justify-content:space-between;"><span data-i18n="dash.keyspaceHit">Keyspace Hit Rate</span><strong id="tel-redis-hitrate">-</strong></div>
-            </div>
-          </div>
-
-          <!-- MongoDB Card -->
-          <div class="card" style="padding: 20px;">
-            <h2 style="font-size: 15px; margin-bottom: 12px; color:var(--blue); font-weight:600;" data-i18n="dash.mongo">MongoDB Document DB</h2>
-            <div style="display:flex; flex-direction:column; gap:8px;">
-              <div style="display:flex; justify-content:space-between;"><span data-i18n="dash.connCurrent">Connections Current</span><strong id="tel-mongo-conn">-</strong></div>
-              <div style="display:flex; justify-content:space-between;"><span data-i18n="dash.opCount">Operation Count</span><strong id="tel-mongo-ops">-</strong></div>
             </div>
           </div>
         </div>
