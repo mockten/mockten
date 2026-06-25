@@ -343,7 +343,7 @@ tasks:
             echo "Downloading $part ..."
             curl -L --fail --retry 3 "$RELEASE_BASE/$part" -o "/tmp/$part"
             echo "Extracting $part ..."
-            unzip -o "/tmp/$part" -d minIO/
+            unzip -o "/tmp/$part" -d minIO/photos/
             rm "/tmp/$part"
           done
           touch "$PHOTOS_COMPLETE"
