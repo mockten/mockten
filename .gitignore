@@ -47,3 +47,9 @@ minIO/.photos_downloaded
 ecfront2.log
 ecfront2.pid
 zap-report.html
+
+**/__pycache__/
+*.pyc
+ecpay/ecpay
+product/product
+searchitem/searchitem
