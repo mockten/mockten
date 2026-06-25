@@ -255,6 +255,15 @@ async function loadMetricsHistory() {
     if (cpuChart) cpuChart.update('none');
     if (memChart) memChart.update('none');
 
+    // Sync header values with the latest historical point
+    const lastMem = h.mem[h.mem.length - 1] ?? 0;
+    const lastMemMB = h.memMB[h.memMB.length - 1] ?? 0;
+    const lastCpu = h.cpu[h.cpu.length - 1] ?? 0;
+    const cpuValEl = document.getElementById('cpu-total-value');
+    const memValEl = document.getElementById('mem-total-value');
+    if (cpuValEl) cpuValEl.textContent = `${lastCpu.toFixed(1)}%`;
+    if (memValEl) memValEl.textContent = `${Math.round(lastMemMB)} MB (${lastMem.toFixed(1)}%)`;
+
     // Populate telemetry chart history
     telemetryHistory.timestamps.push(...h.timestamps);
     telemetryHistory.mysql.push(...h.telemetry.mysql);
