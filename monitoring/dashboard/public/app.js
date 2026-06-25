@@ -114,7 +114,7 @@ async function fetchContainers() {
 async function fetchAllStats(containers) {
   let totalCpuSum = 0;
   let totalMemUsageSum = 0;
-  let maxMemLimit = 0;
+  let totalMemLimitSum = 0;
   let numCpus = 1;
 
   await Promise.all(containers.map(async c => {
@@ -127,9 +127,7 @@ async function fetchAllStats(containers) {
 
       totalCpuSum += parseFloat(stats.cpu) || 0;
       totalMemUsageSum += parseFloat(stats.memUsage) || 0;
-      if (stats.memLimit > maxMemLimit) {
-        maxMemLimit = stats.memLimit;
-      }
+      totalMemLimitSum += parseFloat(stats.memLimit) || 0;
       if (stats.numCpus) {
         numCpus = stats.numCpus;
       }
@@ -137,7 +135,7 @@ async function fetchAllStats(containers) {
   }));
 
   const aggCpu = numCpus > 0 ? (totalCpuSum / numCpus) : 0;
-  const aggMemPercent = maxMemLimit > 0 ? ((totalMemUsageSum / maxMemLimit) * 100) : 0;
+  const aggMemPercent = totalMemLimitSum > 0 ? ((totalMemUsageSum / totalMemLimitSum) * 100) : 0;
   const aggMemMB = totalMemUsageSum / 1024 / 1024;
 
   updateCharts(aggCpu, aggMemPercent, aggMemMB);
@@ -261,7 +259,6 @@ async function loadMetricsHistory() {
     telemetryHistory.timestamps.push(...h.timestamps);
     telemetryHistory.mysql.push(...h.telemetry.mysql);
     telemetryHistory.redis.push(...h.telemetry.redis);
-    telemetryHistory.mongo.push(...h.telemetry.mongo);
     telemetryHistory.kong.push(...h.telemetry.kong);
   } catch (e) {
     console.error('Failed to load metrics history:', e);
@@ -883,6 +880,7 @@ let mysqlOffset = 0;
 let mysqlLimit = 50;
 let mysqlTotal = 0;
 let mysqlColumns = [];
+let mysqlColumnMeta = {};
 let mysqlPrimaryKeys = [];
 let mysqlCurrentRows = [];
 let mysqlSearchTimer = null;
@@ -890,7 +888,7 @@ let mysqlSearchTimer = null;
 async function initDbView() {
   if (!dbInitialized) {
     dbInitialized = true;
-    await Promise.all([loadMysqlTables(), loadRedisKeys(), loadMongoCollections()]);
+    await Promise.all([loadMysqlTables(), loadRedisKeys()]);
   }
 }
 
@@ -933,6 +931,7 @@ async function loadMysqlTable(table, offset = 0) {
 
     mysqlTotal = data.total;
     mysqlColumns = data.columns;
+    mysqlColumnMeta = data.columnMeta || {};
     mysqlPrimaryKeys = data.primaryKeys || [];
     mysqlCurrentRows = data.rows;
     document.getElementById('mysql-data-header').style.display = 'flex';
@@ -1057,104 +1056,6 @@ async function loadRedisKey(key) {
   }
 }
 
-// ─── MongoDB ──────────────────────────────────────────────────────────────────
-let mongoCurrentCollection = null;
-let mongoOffset = 0;
-let mongoLimit = 50;
-let mongoTotal = 0;
-let mongoColumns = [];
-let mongoCurrentRows = [];
-let mongoSearchTimer = null;
-
-async function loadMongoCollections() {
-  const ul = document.getElementById('mongo-tables-ul');
-  try {
-    const res = await fetch('/dashboard/api/db/mongo/collections');
-    const cols = await res.json();
-    if (cols.error) throw new Error(cols.error);
-    ul.innerHTML = cols.map(c => `
-      <div class="db-list-item" id="dbc-${c.name}" onclick="loadMongoCollection('${c.name}')">
-        <span class="db-item-name">${c.name}</span>
-        <span class="db-item-count">${c.approxRows ?? '?'}</span>
-      </div>
-    `).join('');
-  } catch (e) {
-    ul.innerHTML = `<div class="db-error">MongoDB error: ${e.message}</div>`;
-  }
-}
-
-async function loadMongoCollection(colName, offset = 0) {
-  mongoCurrentCollection = colName;
-  mongoOffset = offset;
-  const search = document.getElementById('mongo-search').value;
-
-  // Highlight selected
-  document.querySelectorAll('#mongo-table-list .db-list-item').forEach(el => el.classList.remove('active'));
-  const el = document.getElementById('dbc-' + colName);
-  if (el) el.classList.add('active');
-
-  const wrap = document.getElementById('mongo-table-wrap');
-  wrap.innerHTML = '<div class="loading-row"><div class="spinner"></div>Loading...</div>';
-
-  const params = new URLSearchParams({ limit: mongoLimit, offset, search });
-  try {
-    const res = await fetch(`/dashboard/api/db/mongo/collection/${colName}?${params}`);
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-
-    mongoTotal = data.total;
-    mongoColumns = data.columns;
-    mongoCurrentRows = data.rows;
-    document.getElementById('mongo-data-header').style.display = 'flex';
-    const mongoAdd = document.getElementById('btn-mongo-add-doc');
-    if (mongoAdd) mongoAdd.style.display = 'inline-flex';
-    document.getElementById('mongo-table-title').textContent = colName;
-    document.getElementById('mongo-row-count').textContent = `${data.total.toLocaleString()} documents`;
-    document.getElementById('mongo-page-info').textContent =
-      `${offset + 1}–${Math.min(offset + data.rows.length, data.total)} / ${data.total}`;
-    document.getElementById('mongo-prev').disabled = offset === 0;
-    document.getElementById('mongo-next').disabled = offset + data.rows.length >= data.total;
-
-    if (data.rows.length === 0) {
-      wrap.innerHTML = '<div class="log-placeholder"><p>No documents found</p></div>';
-      return;
-    }
-
-    const cols = data.columns;
-    wrap.innerHTML = `
-      <table class="db-data-table">
-        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}<th>Actions</th></tr></thead>
-        <tbody>${data.rows.map((row, idx) => `
-          <tr>${cols.map(c => {
-            const v = row[c];
-            const str = v === undefined ? '<span class="db-null">undefined</span>'
-                      : v === null ? '<span class="db-null">NULL</span>'
-                      : typeof v === 'object' ? `<span class="db-json" title="${JSON.stringify(v).replace(/"/g,'&quot;')}">{…}</span>`
-                      : String(v).length > 60 ? `<span title="${String(v).replace(/"/g,'&quot;')}">${String(v).slice(0,60)}…</span>`
-                      : String(v);
-            return `<td>${str}</td>`;
-          }).join('')}
-          <td>
-            <button class="btn-act btn-act-ok" style="padding:2px 8px;font-size:11px" onclick="editMongoRow(${idx})">${(I18N[_currentLang]||I18N.en)['col.edit']||'Edit'}</button>
-            <button class="btn-act btn-act-danger" style="padding:2px 8px;font-size:11px;margin-left:4px" onclick="deleteMongoRow(${idx})">${(I18N[_currentLang]||I18N.en)['col.delete']||'Delete'}</button>
-          </td>
-          </tr>
-        `).join('')}</tbody>
-      </table>`;
-  } catch (e) {
-    wrap.innerHTML = `<div class="db-error">Error: ${e.message}</div>`;
-  }
-}
-
-function mongoSearch() {
-  clearTimeout(mongoSearchTimer);
-  mongoSearchTimer = setTimeout(() => {
-    if (mongoCurrentCollection) loadMongoCollection(mongoCurrentCollection, 0);
-  }, 400);
-}
-function mongoPrev() { if (mongoOffset > 0) loadMongoCollection(mongoCurrentCollection, Math.max(0, mongoOffset - mongoLimit)); }
-function mongoNext() { if (mongoOffset + mongoLimit < mongoTotal) loadMongoCollection(mongoCurrentCollection, mongoOffset + mongoLimit); }
-
 // ─── Tab Switching ────────────────────────────────────────────────────────────
 let currentDbTab = 'mysql';
 function switchDbTab(tabName) {
@@ -1171,8 +1072,6 @@ function switchDbTab(tabName) {
   // Hide add buttons until a table/collection is loaded
   const mysqlAdd = document.getElementById('btn-mysql-add-row');
   if (mysqlAdd) mysqlAdd.style.display = 'none';
-  const mongoAdd = document.getElementById('btn-mongo-add-doc');
-  if (mongoAdd) mongoAdd.style.display = 'none';
 }
 
 // ─── Add Row Modal & Submissions ──────────────────────────────────────────────
@@ -1198,6 +1097,60 @@ function getMysqlPKs(rowData) {
   return { pkNames: pks, pkValues: pks.map(k => rowData[k]) };
 }
 
+function _fieldInputHtml(col, defaultValue, dbType) {
+  // Prefer server-provided MySQL column type; fall back to name heuristics for MongoDB
+  const meta = (dbType === 'mysql' || dbType === undefined) ? (mysqlColumnMeta[col] || {}) : {};
+  const sqlType = (meta.dataType || '').toLowerCase();
+  const lower = col.toLowerCase();
+
+  let val = defaultValue !== undefined && defaultValue !== null ? defaultValue : '';
+
+  // Determine input type from SQL type first, then name heuristics
+  const isJson = sqlType === 'json' || /category|tags|roles|image_path|reputation/.test(lower);
+  const isDate = sqlType === 'date' || (!sqlType && /(?:^|_)date(?:$|_)|_day$|^date/.test(lower));
+  const isDatetime = sqlType === 'datetime' || sqlType === 'timestamp' || (!sqlType && /time(?:$|stamp)|datetime|updated|created/.test(lower));
+  const isInt = sqlType === 'int' || sqlType === 'bigint' || sqlType === 'smallint' || sqlType === 'tinyint';
+  const isFloat = sqlType === 'float' || sqlType === 'double' || sqlType === 'decimal';
+  const isNumber = isInt || isFloat || (!sqlType && /^(stocks|price|rank|quantity|count|amount|score|age|weight|height|lat|lon|latitude|longitude)$/.test(lower));
+  const isEnum = sqlType === 'enum';
+  const isEmail = /email|mail/.test(lower);
+  const isUrl = sqlType === 'text' ? false : /url|link/.test(lower);
+
+  const safeVal = (v) => String(v === null || v === undefined ? '' : v).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+
+  if (isJson) {
+    const display = val !== '' ? (typeof val === 'object' ? JSON.stringify(val) : val) : '';
+    return `<textarea id="db-field-${col}" name="${col}" class="form-control" rows="3" style="font-family:var(--font-mono);resize:vertical;" placeholder='e.g. ["id1","id2"] or {...}'>${safeVal(display)}</textarea>`;
+  }
+  if (isDate) {
+    let dateVal = '';
+    if (val !== '') {
+      const d = new Date(val);
+      if (!isNaN(d)) dateVal = d.toISOString().slice(0, 10);
+      else dateVal = String(val).slice(0, 10);
+    }
+    return `<input type="date" id="db-field-${col}" name="${col}" class="form-control" value="${dateVal}" />`;
+  }
+  if (isDatetime) {
+    let dtVal = '';
+    if (val !== '') {
+      const d = new Date(val);
+      if (!isNaN(d)) dtVal = d.toISOString().slice(0, 16);
+    }
+    return `<input type="datetime-local" id="db-field-${col}" name="${col}" class="form-control" value="${dtVal}" />`;
+  }
+  if (isNumber) {
+    return `<input type="number" id="db-field-${col}" name="${col}" class="form-control" value="${safeVal(val)}" step="${isFloat ? 'any' : '1'}" />`;
+  }
+  if (isEmail) {
+    return `<input type="email" id="db-field-${col}" name="${col}" class="form-control" value="${safeVal(val)}" placeholder="user@example.com" />`;
+  }
+  if (isUrl) {
+    return `<input type="url" id="db-field-${col}" name="${col}" class="form-control" value="${safeVal(val)}" placeholder="https://..." />`;
+  }
+  return `<input type="text" id="db-field-${col}" name="${col}" class="form-control" value="${safeVal(val)}" placeholder="Enter value..." />`;
+}
+
 function openAddRowModal(dbType) {
   modalDbType = dbType;
   modalMode = 'add';
@@ -1214,41 +1167,17 @@ function openAddRowModal(dbType) {
     title.textContent = `${dict['modal.insertMySQL'] || 'Insert into MySQL'}: ${mysqlCurrentTable}`;
 
     mysqlColumns.forEach(col => {
-      const isOptional = col === 'id' || col === 'regist_day' || col === 'last_update';
+      const meta = mysqlColumnMeta[col] || {};
+      const isPk = mysqlPrimaryKeys.includes(col);
+      const isOptional = !isPk && (meta.nullable || meta.hasDefault);
       const optLabel = (I18N[_currentLang] || I18N.en)['modal.optional'] || 'optional';
       fieldsContainer.innerHTML += `
         <div class="form-group">
           <label for="db-field-${col}">${col} ${isOptional ? `<span style="color:var(--text-muted);font-weight:normal;">(${optLabel})</span>` : ''}</label>
-          <input type="text" id="db-field-${col}" name="${col}" class="form-control" placeholder="Enter value..." />
+          ${_fieldInputHtml(col, undefined, 'mysql')}
         </div>
       `;
     });
-  } else if (dbType === 'mongodb') {
-    modalTableOrCollection = mongoCurrentCollection;
-    const dict2 = I18N[_currentLang] || I18N.en;
-    title.textContent = `${dict2['modal.insertMongo'] || 'Insert into MongoDB'}: ${mongoCurrentCollection}`;
-
-    const fields = mongoColumns.filter(c => c !== '_id');
-
-    if (fields.length === 0) {
-      fieldsContainer.innerHTML = `
-        <div class="form-group">
-          <label for="db-field-json">Raw Document JSON</label>
-          <textarea id="db-field-json" name="raw_json" class="form-control" rows="8" placeholder='{ "product_id": "p1001", ... }' style="font-family:var(--font-mono);resize:vertical;"></textarea>
-        </div>
-      `;
-    } else {
-      fields.forEach(col => {
-        const isArrayOrObject = col === 'category' || col === 'image_path' || col === 'reputation';
-        const placeholder = isArrayOrObject ? 'e.g. [1, 3] or { ... }' : 'Enter value...';
-        fieldsContainer.innerHTML += `
-          <div class="form-group">
-            <label for="db-field-${col}">${col}</label>
-            <input type="text" id="db-field-${col}" name="${col}" class="form-control" placeholder="${placeholder}" />
-          </div>
-        `;
-      });
-    }
   }
 
   overlay.classList.add('active');
@@ -1261,35 +1190,40 @@ function openEditRowModal(dbType, rowData) {
 
   const title = document.getElementById('db-modal-title');
   const dictE = I18N[_currentLang] || I18N.en;
-  title.textContent = dbType === 'mysql'
-    ? `${dictE['modal.editMySQL'] || 'Edit Row in MySQL'}: ${mysqlCurrentTable}`
-    : `${dictE['modal.editMongo'] || 'Edit Document in MongoDB'}: ${mongoCurrentCollection}`;
+  title.textContent = `${dictE['modal.editMySQL'] || 'Edit Row in MySQL'}: ${mysqlCurrentTable}`;
 
+  // Re-render fields with row values so typed inputs (date, number, etc.) get correct formats
   const form = document.getElementById('db-modal-form');
-
+  const fieldsContainer2 = document.getElementById('db-modal-fields');
   const textarea = form.querySelector('textarea[name="raw_json"]');
   if (textarea) {
     textarea.value = JSON.stringify(rowData, null, 2);
   } else {
-    const inputs = form.querySelectorAll('.form-control');
-    inputs.forEach(input => {
-      const name = input.name;
-      const val = rowData[name];
-      if (val === null || val === undefined) {
-        input.value = '';
-      } else if (typeof val === 'object') {
-        input.value = JSON.stringify(val);
-      } else {
-        input.value = val;
-      }
-
-      if (dbType === 'mysql') {
-        const pks = mysqlPrimaryKeys.length > 0 ? mysqlPrimaryKeys : [getPrimaryKeyColumn(mysqlCurrentTable, mysqlColumns)];
-        if (pks.includes(name)) {
-          input.disabled = true;
-        }
-      }
+    const pks = dbType === 'mysql'
+      ? (mysqlPrimaryKeys.length > 0 ? mysqlPrimaryKeys : [getPrimaryKeyColumn(mysqlCurrentTable, mysqlColumns)])
+      : [];
+    const cols = mysqlColumns;
+    fieldsContainer2.innerHTML = '';
+    cols.forEach(col => {
+      const val = rowData[col];
+      const meta = dbType === 'mysql' ? (mysqlColumnMeta[col] || {}) : {};
+      const isPk = pks.includes(col);
+      const isOptional = dbType === 'mysql' && !isPk && (meta.nullable || meta.hasDefault);
+      const optLabel = (I18N[_currentLang] || I18N.en)['modal.optional'] || 'optional';
+      const labelSuffix = isOptional ? ` <span style="color:var(--text-muted);font-weight:normal;">(${optLabel})</span>` : '';
+      fieldsContainer2.innerHTML += `
+        <div class="form-group">
+          <label for="db-field-${col}">${col}${labelSuffix}</label>
+          ${_fieldInputHtml(col, val !== undefined ? val : '', dbType)}
+        </div>
+      `;
     });
+    if (pks.length) {
+      pks.forEach(pk => {
+        const inp = form.querySelector(`[name="${pk}"]`);
+        if (inp) inp.disabled = true;
+      });
+    }
   }
 }
 
@@ -1309,63 +1243,35 @@ async function submitAddRow(event) {
   const formData = new FormData(form);
   const payload = {};
 
-  if (modalDbType === 'mongodb' && formData.has('raw_json')) {
-    const rawJson = formData.get('raw_json');
-    try {
-      Object.assign(payload, JSON.parse(rawJson));
-    } catch (e) {
-      showToast('Invalid JSON format: ' + e.message, 'error');
-      return;
+  const inputs = form.querySelectorAll('.form-control');
+  inputs.forEach(input => {
+    const name = input.name;
+    const val = input.value.trim();
+
+    const meta = mysqlColumnMeta[name] || {};
+    const isPk = mysqlPrimaryKeys.includes(name);
+    const isOptional = !isPk && (meta.nullable || meta.hasDefault);
+    if (isOptional && val === '') return;
+
+    const sqlType = (meta.dataType || '').toLowerCase();
+    if (sqlType === 'json') {
+      try { payload[name] = val === '' ? null : JSON.parse(val); } catch { payload[name] = val; }
+    } else if (val !== '' && !isNaN(val) && val !== '') {
+      payload[name] = val.includes('.') ? parseFloat(val) : parseInt(val);
+    } else {
+      payload[name] = val === '' ? null : val;
     }
-  } else {
-    const inputs = form.querySelectorAll('.form-control');
-    inputs.forEach(input => {
-      const name = input.name;
-      const val = input.value.trim();
+  });
 
-      if (modalDbType === 'mysql') {
-        const isOptional = name === 'id' || name === 'regist_day' || name === 'last_update';
-        if (isOptional && val === '') return;
-
-        if (val !== '' && !isNaN(val)) {
-          payload[name] = val.includes('.') ? parseFloat(val) : parseInt(val);
-        } else {
-          payload[name] = val === '' ? null : val;
-        }
-      } else {
-        if (val === '') return;
-
-        if (!isNaN(val)) {
-          payload[name] = val.includes('.') ? parseFloat(val) : parseInt(val);
-        } else if (val.startsWith('[') || val.startsWith('{')) {
-          try {
-            payload[name] = JSON.parse(val);
-          } catch (e) {
-            payload[name] = val;
-          }
-        } else {
-          payload[name] = val;
-        }
-      }
-    });
-  }
-
-  let endpoint = modalDbType === 'mysql'
-    ? `/dashboard/api/db/mysql/table/${modalTableOrCollection}`
-    : `/dashboard/api/db/mongo/collection/${modalTableOrCollection}`;
+  let endpoint = `/dashboard/api/db/mysql/table/${modalTableOrCollection}`;
 
   let method = 'POST';
   let bodyPayload = payload;
 
   if (modalMode === 'edit') {
     method = 'PUT';
-    if (modalDbType === 'mysql') {
-      const { pkNames, pkValues } = getMysqlPKs(editingRowData);
-      bodyPayload = { row: payload, pkNames, pkValues };
-    } else {
-      const id = editingRowData['_id'];
-      bodyPayload = { id, doc: payload };
-    }
+    const { pkNames, pkValues } = getMysqlPKs(editingRowData);
+    bodyPayload = { row: payload, pkNames, pkValues };
   }
 
   try {
@@ -1379,12 +1285,7 @@ async function submitAddRow(event) {
 
     showToast(modalMode === 'edit' ? 'Record updated successfully' : 'Record added successfully', 'success');
     closeDbModal();
-
-    if (modalDbType === 'mysql') {
-      loadMysqlTable(modalTableOrCollection, mysqlOffset);
-    } else {
-      loadMongoCollection(modalTableOrCollection, mongoOffset);
-    }
+    loadMysqlTable(modalTableOrCollection, mysqlOffset);
   } catch (e) {
     showToast('Failed: ' + e.message, 'error');
   }
@@ -1418,35 +1319,6 @@ async function deleteMysqlRow(idx) {
 
     showToast('Record deleted successfully', 'success');
     loadMysqlTable(mysqlCurrentTable, mysqlOffset);
-  } catch (e) {
-    showToast('Delete failed: ' + e.message, 'error');
-  }
-}
-
-function editMongoRow(idx) {
-  const docData = mongoCurrentRows[idx];
-  openEditRowModal('mongodb', docData);
-}
-
-async function deleteMongoRow(idx) {
-  const docData = mongoCurrentRows[idx];
-  const id = docData['_id'];
-  if (!id) {
-    showToast('Cannot delete: _id not found', 'error');
-    return;
-  }
-
-  if (!confirm(`Are you sure you want to delete this document?`)) return;
-
-  try {
-    const res = await fetch(`/dashboard/api/db/mongo/collection/${mongoCurrentCollection}?id=${id}`, {
-      method: 'DELETE'
-    });
-    const result = await res.json();
-    if (result.error) throw new Error(result.error);
-
-    showToast('Document deleted successfully', 'success');
-    loadMongoCollection(mongoCurrentCollection, mongoOffset);
   } catch (e) {
     showToast('Delete failed: ' + e.message, 'error');
   }
@@ -3148,13 +3020,12 @@ let ciSelectedJob = null;
 let ciProgressTimer = null;
 let ciRawLogOpen = false;
 const CI_JOB_ORDER = [
-  'build_adder','build_ecfront','build_ecpay','build_notification','build_payexecution',
+  'build_ecfront','build_ecpay',
   'build_ranking','build_sale','build_shipment','build_searchitem','build_product','build_geocoding','build_dashboard',
-  'push_snapshot_container_adder','push_snapshot_container_ecfront','push_snapshot_container_ecpay',
-  'push_snapshot_container_notification','push_snapshot_container_payexecution',
+  'push_snapshot_container_ecfront','push_snapshot_container_ecpay',
   'push_snapshot_container_ranking','push_snapshot_container_sale','push_snapshot_container_shipment',
   'push_snapshot_container_searchitem','push_snapshot_container_product',
-  'push_snapshot_container_mongodb','push_snapshot_container_uam','push_snapshot_container_apigw',
+  'push_snapshot_container_uam','push_snapshot_container_apigw',
   'push_snapshot_container_minio','push_snapshot_container_meilisearch','push_snapshot_container_mysql',
   'push_snapshot_container_sync','push_snapshot_container_redis','push_snapshot_container_geocoding','push_snapshot_container_dashboard',
 ];
@@ -4093,11 +3964,17 @@ function parseTrivyLine(raw) {
   const hdrM = clean.match(/^([^\s(]+)\s+\(([^)]+)\)\s*$/);
   if (hdrM) {
     const name = hdrM[1].trim().replace(/:latest$/, '');
-    if (!vulnImages.has(name)) {
-      vulnImages.set(name, { os: hdrM[2].trim(), severity: { CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0 }, findings: [], expanded: false, scanType: _vulnScanPhase, runContext: _vulnAllRunning ? 'all' : _vulnScanPhase });
+    // Only treat as a new top-level image if it matches the image set by "Scanning image:" OR no image is active yet.
+    // Sub-targets like "Java (jar)" inside a container scan must stay under the parent image.
+    const isMainImage = !_vulnCurrentImage || name === _vulnCurrentImage;
+    if (isMainImage) {
+      if (!vulnImages.has(name)) {
+        vulnImages.set(name, { os: hdrM[2].trim(), severity: { CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0 }, findings: [], expanded: false, scanType: _vulnScanPhase, runContext: _vulnAllRunning ? 'all' : _vulnScanPhase });
+      }
+      _vulnCurrentImage = name;
+      _vulnParseState = 'header';
     }
-    _vulnCurrentImage = name;
-    _vulnParseState = 'header';
+    // else: sub-target (e.g. "Java (jar)") — keep _vulnCurrentImage pointing to the parent image
     return;
   }
 
@@ -4408,7 +4285,7 @@ function exportLogs(containerId, filenameBase) {
 
 // ── System Telemetry ────────────────────────────────────────────────────────────
 let telemetryChart = null;
-const telemetryHistory = { mysql: [], redis: [], mongo: [], kong: [], timestamps: [] };
+const telemetryHistory = { mysql: [], redis: [], kong: [], timestamps: [] };
 // Telemetry is initialized and polled inside DOMContentLoaded / showView
 
 async function fetchTelemetry() {
@@ -4432,9 +4309,6 @@ async function fetchTelemetry() {
     document.getElementById('tel-redis-memory').textContent = `${(data.redis.memory / 1024 / 1024).toFixed(1)} MB`;
     document.getElementById('tel-redis-hitrate').textContent = `${data.redis.hitRate}%`;
 
-    document.getElementById('tel-mongo-conn').textContent = data.mongodb.connections;
-    document.getElementById('tel-mongo-ops').textContent = data.mongodb.ops.toLocaleString();
-
     // Store and render Kong API stats
     _kongTopApis = data.kong.topApis || [];
     _kongSlowApis = data.kong.slowApis || [];
@@ -4444,14 +4318,12 @@ async function fetchTelemetry() {
     telemetryHistory.timestamps.push(now);
     telemetryHistory.mysql.push(data.mysql.connections);
     telemetryHistory.redis.push(data.redis.clients);
-    telemetryHistory.mongo.push(data.mongodb.connections);
     telemetryHistory.kong.push(data.kong.total);
 
     if (telemetryHistory.timestamps.length > 8640) {
       telemetryHistory.timestamps.shift();
       telemetryHistory.mysql.shift();
       telemetryHistory.redis.shift();
-      telemetryHistory.mongo.shift();
       telemetryHistory.kong.shift();
     }
 
@@ -4488,16 +4360,6 @@ function updateTelemetryChart() {
           label: 'Redis Connected Clients',
           data: telemetryHistory.redis,
           borderColor: '#f59e0b',
-          backgroundColor: 'transparent',
-          borderWidth: 2,
-          tension: 0.3,
-          pointRadius: 0,
-          yAxisID: 'y'
-        },
-        {
-          label: 'MongoDB Connections',
-          data: telemetryHistory.mongo,
-          borderColor: '#3b82f6',
           backgroundColor: 'transparent',
           borderWidth: 2,
           tension: 0.3,
@@ -4635,9 +4497,31 @@ function applyLogFilter() {
 const TASK_ORDER = ['bronze_ingest', 'silver_transform', 'gold_features', 'model_train'];
 const TASK_STAGE_ID = { bronze_ingest: 'bronze', silver_transform: 'silver', gold_features: 'gold', model_train: 'model_train' };
 
+let _pipelinePollerTimer = null;
+
+function startPipelinePoller() {
+  if (_pipelinePollerTimer) return;
+  _pipelinePollerTimer = setInterval(async () => {
+    const isPipelineActive = document.getElementById('view-pipeline') && document.getElementById('view-pipeline').classList.contains('active');
+    if (!isPipelineActive) { stopPipelinePoller(); return; }
+    await loadPipelineRuns();
+    // Stop polling once no runs are in running state
+    const rows = document.querySelectorAll('#pipeline-runs-table .run-state.running');
+    if (rows.length === 0) stopPipelinePoller();
+  }, 3000);
+}
+
+function stopPipelinePoller() {
+  if (_pipelinePollerTimer) { clearInterval(_pipelinePollerTimer); _pipelinePollerTimer = null; }
+}
+
 function initPipelineView() {
+  stopPipelinePoller();
   loadPipelineStatus();
-  loadPipelineRuns();
+  loadPipelineRuns().then(() => {
+    const rows = document.querySelectorAll('#pipeline-runs-table .run-state.running');
+    if (rows.length > 0) startPipelinePoller();
+  });
   // Lineage stage boxes: click → data viewer (model_train has no Parquet data)
   ['bronze','silver','gold'].forEach(layer => {
     const el = document.getElementById('stage-' + layer);
@@ -4838,7 +4722,7 @@ async function triggerPipeline() {
     const data = await r.json();
     if (r.ok) {
       showToast('Pipeline triggered: ' + (data.dag_run_id || ''), 'success');
-      setTimeout(loadPipelineRuns, 1500);
+      setTimeout(() => { loadPipelineRuns(); startPipelinePoller(); }, 1500);
     } else {
       showToast('Trigger failed: ' + (data.detail || data.title || JSON.stringify(data)), 'error');
     }

@@ -101,29 +101,26 @@ test.describe('Dashboard Enhancements Spec', () => {
     }, { timeout: 15000 });
   });
 
-  test('should show MongoDB collections in DB Viewer (proves MongoDB is used)', async ({ page, request }) => {
-    // First verify the API directly — if it fails, the UI will always be empty
-    const apiRes = await request.get('/dashboard/api/db/mongo/collections');
+  test('should show DashboardMetrics table in DB Viewer (MySQL persistence)', async ({ page, request }) => {
+    // Verify DashboardMetrics exists in the MySQL tables API
+    const apiRes = await request.get('/dashboard/api/db/mysql/tables');
     expect(apiRes.status()).toBe(200);
-    const collections = await apiRes.json();
-    expect(Array.isArray(collections)).toBe(true);
-    expect(collections.length).toBeGreaterThan(0);
-    // product_info collections should include at least one collection
-    const names = collections.map((c: any) => c.name);
-    expect(names.length).toBeGreaterThan(0);
+    const tables = await apiRes.json();
+    expect(Array.isArray(tables)).toBe(true);
+    const names = tables.map((t: any) => t.name);
+    expect(names).toContain('DashboardMetrics');
 
-    // Then verify the UI shows them
+    // Then verify the UI shows DashboardMetrics in the table list
     await page.locator('nav .nav-item').getByText('DB Viewer', { exact: true }).click();
-    // Wait for MySQL tables to finish loading (DB Viewer init)
     await page.waitForSelector('#mysql-tables-ul', { timeout: 15000 });
 
-    // Switch to MongoDB tab
-    await page.locator('#db-tab-mongodb').click();
-
-    // Wait for collection list — uses div.db-list-item children
+    // Wait for DashboardMetrics to appear in the list
     await page.waitForFunction(() => {
-      const ul = document.getElementById('mongo-tables-ul');
-      return ul && ul.children.length > 0 && !ul.children[0].classList.contains('db-error');
+      const ul = document.getElementById('mysql-tables-ul');
+      if (!ul) return false;
+      return Array.from(ul.querySelectorAll('.db-list-item')).some(
+        el => el.textContent?.includes('DashboardMetrics')
+      );
     }, { timeout: 15000 });
   });
 

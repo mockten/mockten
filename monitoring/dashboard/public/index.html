@@ -374,10 +374,6 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
             <span>Redis</span>
           </button>
-          <button class="db-tab-btn" id="db-tab-mongodb" onclick="switchDbTab('mongodb')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-            <span>MongoDB</span>
-          </button>
         </div>
 
         <div class="db-panels">
@@ -446,38 +442,6 @@
             </div>
           </div>
 
-          <!-- MongoDB Panel -->
-          <div id="db-panel-mongodb" class="card db-panel db-tab-content">
-            <div class="card-header">
-              <h2><span class="db-badge mongo-badge">MongoDB</span> product_info</h2>
-              <div style="display:flex; gap:10px; align-items:center;">
-                <button class="btn-action" id="btn-mongo-add-doc" style="background:var(--green-bg); border-color:rgba(16,185,129,0.3); color:var(--green); display:none" onclick="openAddRowModal('mongodb')">➕ <span data-i18n="db.addDoc">Add Document</span></button>
-                <input type="text" id="mongo-search" class="search-input" placeholder="Search documents..." style="width:180px" oninput="mongoSearch()" />
-              </div>
-            </div>
-            <div class="db-layout">
-              <!-- Collection list -->
-              <div class="db-table-list" id="mongo-table-list">
-                <div class="db-list-header" data-i18n="db.collections">Collections</div>
-                <div id="mongo-tables-ul"><div class="loading-row"><div class="spinner"></div></div></div>
-              </div>
-              <!-- Collection data -->
-              <div class="db-data-pane">
-                <div class="db-data-header" id="mongo-data-header" style="display:none">
-                  <span id="mongo-table-title"></span>
-                  <span id="mongo-row-count" class="db-count"></span>
-                  <div class="db-pager">
-                    <button class="btn-act btn-act-ok" onclick="mongoPrev()" id="mongo-prev">&#8592;</button>
-                    <span id="mongo-page-info"></span>
-                    <button class="btn-act btn-act-ok" onclick="mongoNext()" id="mongo-next">&#8594;</button>
-                  </div>
-                </div>
-                <div class="db-table-wrap" id="mongo-table-wrap">
-                  <div class="log-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg><p data-i18n="db.selectCollection">Select a collection</p></div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 

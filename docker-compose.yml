@@ -286,22 +286,6 @@ services:
     tty: true
     stdin_open: true
 
-  mongodb:
-    container_name: mongo-service.default.svc.cluster.local
-    image: mockten-mongodb
-    build:
-      context: ./mongodb
-    command: ["mongod", "--wiredTigerCacheSizeGB", "0.25", "--bind_ip_all", "--setParameter", "diagnosticDataCollectionEnabled=false", "--wiredTigerEngineConfigString", "checkpoint=(wait=300)"]
-    mem_limit: 200m
-    restart: on-failure:5
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: bar
-      MONGO_INITDB_ROOT_PASSWORD: bar
-    networks:
-      - mockten_nw
-    ports:
-      - "27017:27017"
-
   # ── Monitoring Stack ──────────────────────────────────────────────────────
   dashboard:
     container_name: mockten-dashboard

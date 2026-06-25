@@ -43,13 +43,13 @@ tasks:
     desc: Verify that all containers and the React frontend process are healthy and running
     cmds:
       - |
-        for container in mysql-service.default.svc.cluster.local redis-service.default.svc.cluster.local uam-service.default.svc.cluster.local minio-service.default.svc.cluster.local apigw meilisearch-service.default.svc.cluster.local searchitem-service.default.svc.cluster.local product-service.default.svc.cluster.local cart-service.default.svc.cluster.local mockten-sync geocoding-service.default.svc.cluster.local ecpay-service.default.svc.cluster.local ranking-service.default.svc.cluster.local sale-service.default.svc.cluster.local shipment-service.default.svc.cluster.local recommendation-service.default.svc.cluster.local nginx mockten-dashboard mongo-service.default.svc.cluster.local; do
+        for container in mysql-service.default.svc.cluster.local redis-service.default.svc.cluster.local uam-service.default.svc.cluster.local minio-service.default.svc.cluster.local apigw meilisearch-service.default.svc.cluster.local searchitem-service.default.svc.cluster.local product-service.default.svc.cluster.local cart-service.default.svc.cluster.local mockten-sync geocoding-service.default.svc.cluster.local ecpay-service.default.svc.cluster.local ranking-service.default.svc.cluster.local sale-service.default.svc.cluster.local shipment-service.default.svc.cluster.local recommendation-service.default.svc.cluster.local nginx mockten-dashboard; do
           if [ -z "$(docker ps -q -f name=$container -f status=running)" ]; then
             echo "Error: Container $container is not running!"
             exit 1
           fi
         done
-        echo "All 19 containers are successfully running."
+        echo "All 18 containers are successfully running."
       - |
         if [ ! -f ecfront2.pid ]; then
           echo "Error: ecfront2.pid file does not exist!"
@@ -106,12 +106,6 @@ tasks:
         # MySQL via docker exec
         docker exec -i mysql-service.default.svc.cluster.local mysql --ssl-mode=DISABLED -umocktenusr -pmocktenpassword mocktendb -e "SELECT 1" >/dev/null 2>&1 && \
           echo "PASS  mysql: query OK" || { echo "FAIL  mysql: query failed"; FAILED=1; }
-
-        # MongoDB via docker exec
-        docker exec -i mongo-service.default.svc.cluster.local mongosh --quiet \
-          "mongodb://bar:bar@localhost:27017/?authSource=admin" \
-          --eval "db.adminCommand('ping').ok" 2>/dev/null | grep -q "1" && \
-          echo "PASS  mongodb: ping OK" || { echo "FAIL  mongodb: ping failed"; FAILED=1; }
 
         # Reset-stock endpoint (smoke test)
         STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost/api/test/reset-stock 2>/dev/null || echo "000")
@@ -220,7 +214,7 @@ tasks:
       - |
         FAILED=0
         echo "=== [Container Scan] Trivy Image Scanning ==="
-        for img in mockten-redis mockten-mysql uam apigw minio meilisearch mockten-searchitem mockten-product mockten-cart mockten-sync mockten-geocoding mockten-ecpay mockten-ranking mockten-sale mockten-shipment mockten-recommendation mockten-mongodb mockten-dashboard; do
+        for img in mockten-redis mockten-mysql uam apigw minio meilisearch mockten-searchitem mockten-product mockten-cart mockten-sync mockten-geocoding mockten-ecpay mockten-ranking mockten-sale mockten-shipment mockten-recommendation mockten-dashboard; do
           echo ""
           echo "Scanning image: $img:latest..."
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "${HOST_WORKSPACE_PATH:-$PWD}:/workspace" -v trivy-cache:/root/.cache aquasec/trivy:latest image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /workspace/.trivyignore "$img:latest" || FAILED=1
@@ -353,7 +347,6 @@ tasks:
       - (cd sale && docker build -t mockten-sale .)
       - (cd shipment && docker build -t mockten-shipment .)
       - (cd recommendation && docker build -t mockten-recommendation .)
-      - (cd mongodb && docker build -t mockten-mongodb .)
       - (cd monitoring/dashboard && docker build -t mockten-dashboard .)
       - (cd airflow && docker build -t mockten-airflow .)
       - (pip3 install -r mysql/seeder/requirements.txt || pip install -r mysql/seeder/requirements.txt)

@@ -205,6 +205,19 @@ CREATE TABLE IF NOT EXISTS Review (
   CONSTRAINT chk_review_rating CHECK (rating BETWEEN 1 AND 5)
 );
 
+CREATE TABLE IF NOT EXISTS DashboardMetrics (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ts VARCHAR(8) NOT NULL,
+  cpu DECIMAL(6,2) NOT NULL DEFAULT 0,
+  mem DECIMAL(6,2) NOT NULL DEFAULT 0,
+  mem_mb DECIMAL(8,1) NOT NULL DEFAULT 0,
+  mysql_conn INT NOT NULL DEFAULT 0,
+  redis_conn INT NOT NULL DEFAULT 0,
+  kong_total BIGINT NOT NULL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_dm_created (created_at)
+);
+
 INSERT INTO Category (category_id, category_name, category_image)
 VALUES
 ('01', 'Books', '3cd51e99-b274-4d73-85d9-ccd2f5f1b1b7'),

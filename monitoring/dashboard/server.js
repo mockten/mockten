@@ -7,8 +7,6 @@ const fs = require('fs');
 const net = require('net');
 const mysql = require('mysql2/promise');
 const Redis = require('ioredis');
-const { MongoClient } = require('mongodb');
-
 const app = express();
 app.use(express.json());
 
@@ -43,22 +41,6 @@ function getRedis() {
   });
 }
 
-const MONGO_CONFIG = {
-  url: 'mongodb://bar:bar@mongo-service.default.svc.cluster.local:27017/?authSource=admin',
-  dbName: 'product_info',
-};
-
-async function withMongoClient(fn) {
-  const client = new MongoClient(MONGO_CONFIG.url, { connectTimeoutMS: 5000 });
-  try {
-    await client.connect();
-    const db = client.db(MONGO_CONFIG.dbName);
-    return await fn(db);
-  } finally {
-    await client.close().catch(() => {});
-  }
-}
-
 const docker = new Docker({ socketPath: '/var/run/docker.sock' });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -85,6 +67,7 @@ const ALLOWED_TABLES = [
   'Product','Stock','Category','Seller','Order','Transaction',
   'Payment','PaymentProfile','PaymentMethod','Review',
   'TimeSale','Wishlist','Geo','ShippingRate','DomesticAirCost','SeaCost','AirCost',
+  'DashboardMetrics',
 ];
 
 app.get('/api/db/mysql/tables', async (req, res) => {
@@ -299,179 +282,6 @@ app.get('/api/db/redis/key', async (req, res) => {
   }
 });
 
-// ── MongoDB DB API ────────────────────────────────────────────────────────────
-app.get('/api/db/mongo/collections', async (req, res) => {
-  try {
-    const result = await withMongoClient(async (db) => {
-      const collections = await db.listCollections().toArray();
-      const counts = [];
-      for (const col of collections) {
-        const count = await db.collection(col.name).countDocuments();
-        counts.push({ name: col.name, approxRows: count });
-      }
-      counts.sort((a, b) => a.name.localeCompare(b.name));
-      return counts;
-    });
-    res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.get('/api/db/mongo/collection/:collection', async (req, res) => {
-  const collectionName = req.params.collection;
-  const limit  = Math.min(parseInt(req.query.limit  || 50), 200);
-  const offset = parseInt(req.query.offset || 0);
-  const search = req.query.search || '';
-
-  try {
-    const result = await withMongoClient(async (db) => {
-      const col = db.collection(collectionName);
-      let filter = {};
-      if (search) {
-        filter = {
-          $or: [
-            { product_id: { $regex: search, $options: 'i' } },
-            { product_name: { $regex: search, $options: 'i' } },
-            { seller_name: { $regex: search, $options: 'i' } },
-            { summary: { $regex: search, $options: 'i' } },
-            { detail: { $regex: search, $options: 'i' } }
-          ]
-        };
-      }
-
-      const total = await col.countDocuments(filter);
-      const rows = await col.find(filter).skip(offset).limit(limit).toArray();
-
-      const colSet = new Set();
-      rows.forEach(row => {
-        Object.keys(row).forEach(k => colSet.add(k));
-      });
-      const columns = Array.from(colSet);
-      const idIdx = columns.indexOf('_id');
-      if (idIdx > -1) {
-        columns.splice(idIdx, 1);
-        columns.unshift('_id');
-      }
-
-      return { columns, rows, total, limit, offset };
-    });
-    res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.post('/api/db/mongo/collection/:collection', async (req, res) => {
-  const collectionName = req.params.collection;
-  const doc = req.body;
-  if (!doc || Object.keys(doc).length === 0) return res.status(400).json({ error: 'Document data required' });
-
-  try {
-    const result = await withMongoClient(async (db) => {
-      const cleanedDoc = {};
-      for (const [k, v] of Object.entries(doc)) {
-        if (typeof v === 'string') {
-          const trimmed = v.trim();
-          if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-            try {
-              cleanedDoc[k] = JSON.parse(trimmed);
-              continue;
-            } catch (e) {}
-          }
-          if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
-            const parsedDate = new Date(trimmed);
-            if (!isNaN(parsedDate.getTime())) {
-              cleanedDoc[k] = parsedDate;
-              continue;
-            }
-          }
-        }
-        cleanedDoc[k] = v;
-      }
-
-      const col = db.collection(collectionName);
-      const resVal = await col.insertOne(cleanedDoc);
-      return { ok: true, insertedId: resVal.insertedId };
-    });
-    res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.delete('/api/db/mongo/collection/:collection', async (req, res) => {
-  const collectionName = req.params.collection;
-  const { id } = req.query;
-  if (!id) return res.status(400).json({ error: 'id required' });
-
-  try {
-    const result = await withMongoClient(async (db) => {
-      const { ObjectId } = require('mongodb');
-      let filter = {};
-      try {
-        filter = { _id: new ObjectId(id) };
-      } catch (e) {
-        filter = { _id: id };
-      }
-
-      const col = db.collection(collectionName);
-      const resVal = await col.deleteOne(filter);
-      return { ok: true, deletedCount: resVal.deletedCount };
-    });
-    res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.put('/api/db/mongo/collection/:collection', async (req, res) => {
-  const collectionName = req.params.collection;
-  const { id, doc } = req.body;
-  if (!id || !doc) return res.status(400).json({ error: 'id and doc required' });
-
-  try {
-    const result = await withMongoClient(async (db) => {
-      const { ObjectId } = require('mongodb');
-      let filter = {};
-      try {
-        filter = { _id: new ObjectId(id) };
-      } catch (e) {
-        filter = { _id: id };
-      }
-
-      const cleanedDoc = {};
-      for (const [k, v] of Object.entries(doc)) {
-        if (k === '_id') continue;
-        if (typeof v === 'string') {
-          const trimmed = v.trim();
-          if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-            try {
-              cleanedDoc[k] = JSON.parse(trimmed);
-              continue;
-            } catch (e) {}
-          }
-          if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
-            const parsedDate = new Date(trimmed);
-            if (!isNaN(parsedDate.getTime())) {
-              cleanedDoc[k] = parsedDate;
-              continue;
-            }
-          }
-        }
-        cleanedDoc[k] = v;
-      }
-
-      const col = db.collection(collectionName);
-      const resVal = await col.updateOne(filter, { $set: cleanedDoc });
-      return { ok: true, matchedCount: resVal.matchedCount, modifiedCount: resVal.modifiedCount };
-    });
-    res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 let _topologyCache = null;
 let _topologyCacheAt = 0;
 const TOPOLOGY_CACHE_TTL = 10000; // 10 seconds
@@ -511,7 +321,6 @@ app.get('/api/topology', async (req, res) => {
       { id: 'dashboard',      label: 'dashboard\n(this)',    group: 'meta'     },
       { id: 'airflow-web',    label: 'Airflow\nWebserver',   group: 'pipeline' },
       { id: 'airflow-sch',    label: 'Airflow\nScheduler',   group: 'pipeline' },
-      { id: 'mongodb',        label: 'MongoDB',               group: 'data'     },
     ];
 
     // Container name mapping for state lookup
@@ -536,7 +345,6 @@ app.get('/api/topology', async (req, res) => {
       dashboard:      'mockten-dashboard',
       'airflow-web':  'airflow-webserver',
       'airflow-sch':  'airflow-scheduler',
-      mongodb:        'mongo-service.default.svc.cluster.local',
     };
 
     // Edges derived from environment variables + known architecture
@@ -575,7 +383,6 @@ app.get('/api/topology', async (req, res) => {
       { source: 'product',        target: 'minio' },
       // dashboard monitors everything
       { source: 'dashboard',      target: 'mysql',        dashed: true },
-      { source: 'dashboard',      target: 'mongodb',      dashed: true },
       // Airflow pipeline
       { source: 'dashboard',      target: 'airflow-web',  dashed: true },
       { source: 'airflow-web',    target: 'mysql' },
@@ -1107,7 +914,6 @@ app.get('/api/telemetry', async (req, res) => {
     kong: { active: 0, total: 0, db: 'unknown', topApis: [], slowApis: [] },
     mysql: { connections: 0, queries: 0, uptime: 0 },
     redis: { clients: 0, memory: 0, hitRate: 0 },
-    mongodb: { connections: 0, ops: 0 }
   };
 
   try {
@@ -1170,70 +976,58 @@ app.get('/api/telemetry', async (req, res) => {
     r.disconnect();
   }
 
-  // 4. MongoDB Status
-  try {
-    await withMongoClient(async (db) => {
-      const serverStatus = await db.admin().serverStatus();
-      telemetry.mongodb = {
-        connections: serverStatus.connections?.current || 0,
-        ops: (serverStatus.opcounters?.insert || 0) + (serverStatus.opcounters?.query || 0) + (serverStatus.opcounters?.update || 0) + (serverStatus.opcounters?.delete || 0)
-      };
-    });
-  } catch (e) {
-    console.error('MongoDB telemetry error:', e.message);
-  }
-
   res.json(telemetry);
 });
 
 // ── Metrics History Ring Buffer ────────────────────────────────────────────────
 const MAX_HISTORY = 8640; // 12h × 5s interval
-const metricsHistory = { timestamps: [], cpu: [], mem: [], memMB: [], telemetry: { mysql: [], redis: [], mongo: [], kong: [] } };
+const metricsHistory = { timestamps: [], cpu: [], mem: [], memMB: [], telemetry: { mysql: [], redis: [], kong: [] } };
 
-// Persist one snapshot to MongoDB dashboard_metrics collection (writes every ~60s)
-let _mongoMetricsTick = 0;
-async function persistMetricToMongo(snapshot) {
+let _metricsTick = 0;
+async function persistMetricToMySQL(snapshot) {
+  let conn;
   try {
-    const client = new MongoClient(MONGO_CONFIG.url, { connectTimeoutMS: 3000, serverSelectionTimeoutMS: 3000 });
-    await client.connect();
-    const col = client.db('product_info').collection('dashboard_metrics');
-    await col.insertOne({ ...snapshot, createdAt: new Date() });
-    // Keep only last 1440 records (24h at 60s)
-    const count = await col.countDocuments();
-    if (count > 1440) {
-      const oldest = await col.find().sort({ createdAt: 1 }).limit(count - 1440).toArray();
-      if (oldest.length > 0) {
-        const ids = oldest.map(d => d._id);
-        await col.deleteMany({ _id: { $in: ids } });
-      }
-    }
-    await client.close().catch(() => {});
+    conn = await mysqlPool.getConnection();
+    await conn.query(
+      `INSERT INTO DashboardMetrics (ts, cpu, mem, mem_mb, mysql_conn, redis_conn, kong_total)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [snapshot.ts, snapshot.cpu, snapshot.mem, snapshot.memMB, snapshot.mysql, snapshot.redis, snapshot.kong]
+    );
+    // Keep only last 1440 rows
+    await conn.query(
+      `DELETE FROM DashboardMetrics WHERE id NOT IN (
+         SELECT id FROM (SELECT id FROM DashboardMetrics ORDER BY created_at DESC LIMIT 1440) t
+       )`
+    );
   } catch {
-    // MongoDB unavailable — silently skip persistence
+    // MySQL unavailable — silently skip
+  } finally {
+    if (conn) conn.release();
   }
 }
 
-// On startup: restore in-memory history from MongoDB (last 200 records for quick boot)
-async function loadMetricsFromMongo() {
+async function loadMetricsFromMySQL() {
+  let conn;
   try {
-    const client = new MongoClient(MONGO_CONFIG.url, { connectTimeoutMS: 5000, serverSelectionTimeoutMS: 5000 });
-    await client.connect();
-    const col = client.db('product_info').collection('dashboard_metrics');
-    const docs = await col.find().sort({ createdAt: -1 }).limit(200).toArray();
-    docs.reverse().forEach(d => {
+    conn = await mysqlPool.getConnection();
+    const [rows] = await conn.query(
+      `SELECT ts, cpu, mem, mem_mb, mysql_conn, redis_conn, kong_total
+       FROM DashboardMetrics ORDER BY created_at DESC LIMIT 200`
+    );
+    rows.reverse().forEach(d => {
       metricsHistory.timestamps.push(d.ts);
-      metricsHistory.cpu.push(d.cpu);
-      metricsHistory.mem.push(d.mem);
-      metricsHistory.memMB.push(d.memMB);
-      metricsHistory.telemetry.mysql.push(d.mysql);
-      metricsHistory.telemetry.redis.push(d.redis);
-      metricsHistory.telemetry.mongo.push(d.mongo);
-      metricsHistory.telemetry.kong.push(d.kong);
+      metricsHistory.cpu.push(parseFloat(d.cpu));
+      metricsHistory.mem.push(parseFloat(d.mem));
+      metricsHistory.memMB.push(parseFloat(d.mem_mb));
+      metricsHistory.telemetry.mysql.push(d.mysql_conn);
+      metricsHistory.telemetry.redis.push(d.redis_conn);
+      metricsHistory.telemetry.kong.push(Number(d.kong_total));
     });
-    await client.close().catch(() => {});
-    if (docs.length > 0) console.log(`Loaded ${docs.length} metrics snapshots from MongoDB.`);
+    if (rows.length > 0) console.log(`Loaded ${rows.length} metrics snapshots from MySQL.`);
   } catch {
-    // No MongoDB yet — start fresh
+    // No data yet — start fresh
+  } finally {
+    if (conn) conn.release();
   }
 }
 
@@ -1258,7 +1052,7 @@ async function collectMetricsSnapshot() {
     const aggMemMB = totalMemUsage / 1024 / 1024;
 
     // Collect telemetry
-    let mysqlConn = 0, redisClients = 0, mongoConn = 0, kongTotal = 0;
+    let mysqlConn = 0, redisClients = 0, kongTotal = 0;
     try {
       const conn = await mysqlPool.getConnection();
       const [rows] = await conn.query("SHOW STATUS WHERE Variable_name IN ('Threads_connected')");
@@ -1272,13 +1066,6 @@ async function collectMetricsSnapshot() {
       const m = info.match(/connected_clients:(\d+)/);
       if (m) redisClients = parseInt(m[1]);
       await r.quit().catch(() => {});
-    } catch {}
-    try {
-      const mc = new (require('mongodb').MongoClient)('mongodb://bar:bar@mongo-service.default.svc.cluster.local:27017/?authSource=admin', { connectTimeoutMS:3000 });
-      await mc.connect();
-      const si = await mc.db('admin').command({ serverStatus: 1 });
-      mongoConn = si.connections?.current || 0;
-      await mc.close().catch(() => {});
     } catch {}
     try {
       const ac = new AbortController();
@@ -1295,7 +1082,6 @@ async function collectMetricsSnapshot() {
     metricsHistory.memMB.push(parseFloat(aggMemMB.toFixed(1)));
     metricsHistory.telemetry.mysql.push(mysqlConn);
     metricsHistory.telemetry.redis.push(redisClients);
-    metricsHistory.telemetry.mongo.push(mongoConn);
     metricsHistory.telemetry.kong.push(kongTotal);
 
     if (metricsHistory.timestamps.length > MAX_HISTORY) {
@@ -1305,17 +1091,16 @@ async function collectMetricsSnapshot() {
       metricsHistory.memMB.shift();
       metricsHistory.telemetry.mysql.shift();
       metricsHistory.telemetry.redis.shift();
-      metricsHistory.telemetry.mongo.shift();
       metricsHistory.telemetry.kong.shift();
     }
 
-    // Persist to MongoDB every 12 ticks (60 seconds) to prove MongoDB is used by dashboard
-    _mongoMetricsTick++;
-    if (_mongoMetricsTick % 12 === 0) {
-      persistMetricToMongo({
+    // Persist to MySQL every 12 ticks (60 seconds)
+    _metricsTick++;
+    if (_metricsTick % 12 === 0) {
+      persistMetricToMySQL({
         ts, cpu: parseFloat(aggCpu.toFixed(2)), mem: parseFloat(aggMemPct.toFixed(2)),
         memMB: parseFloat(aggMemMB.toFixed(1)),
-        mysql: mysqlConn, redis: redisClients, mongo: mongoConn, kong: kongTotal,
+        mysql: mysqlConn, redis: redisClients, kong: kongTotal,
       });
     }
   } catch (e) {
@@ -1324,8 +1109,7 @@ async function collectMetricsSnapshot() {
 }
 
 setInterval(collectMetricsSnapshot, 5000);
-// Load historical metrics from MongoDB before starting collection
-loadMetricsFromMongo().then(() => collectMetricsSnapshot());
+loadMetricsFromMySQL().then(() => collectMetricsSnapshot());
 
 app.get('/api/metrics/history', (req, res) => {
   res.json(metricsHistory);
