@@ -42,6 +42,8 @@ minIO/.env
 
 minIO/chrome_profile/*
 minIO/photos/debug*
+minIO/photos/
+minIO/.photos_downloaded
 ecfront2.log
 ecfront2.pid
 zap-report.html
