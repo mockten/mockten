@@ -331,6 +331,24 @@ tasks:
         echo "All security scans PASSED."
   setup:
     cmds:
+      - |
+        PHOTOS_COMPLETE="minIO/.photos_downloaded"
+        if [ -f "$PHOTOS_COMPLETE" ]; then
+          echo "Photos already downloaded (minIO/.photos_downloaded exists), skipping."
+        else
+          echo "=== Downloading product photos from GitHub Releases ==="
+          RELEASE_BASE="https://github.com/mockten/mockten/releases/download/photos-v1"
+          mkdir -p minIO/photos
+          for part in photos_part1.zip photos_part2.zip; do
+            echo "Downloading $part ..."
+            curl -L --fail --retry 3 "$RELEASE_BASE/$part" -o "/tmp/$part"
+            echo "Extracting $part ..."
+            unzip -o "/tmp/$part" -d minIO/
+            rm "/tmp/$part"
+          done
+          touch "$PHOTOS_COMPLETE"
+          echo "Photos download complete."
+        fi
       - (cd redis && docker build -t mockten-redis .)
       - (cd mysql && docker build --platform linux/amd64 -t mockten-mysql .)
       - (cd uam && docker build --platform linux/amd64 -t uam .)
