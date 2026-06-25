@@ -44,3 +44,4 @@ minIO/chrome_profile/*
 minIO/photos/debug*
 ecfront2.log
 ecfront2.pid
+zap-report.html
