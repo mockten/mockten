@@ -217,7 +217,8 @@ tasks:
         for img in mockten-redis mockten-mysql uam apigw minio meilisearch mockten-searchitem mockten-product mockten-cart mockten-sync mockten-geocoding mockten-ecpay mockten-ranking mockten-sale mockten-shipment mockten-recommendation mockten-dashboard; do
           echo ""
           echo "Scanning image: $img:latest..."
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "${HOST_WORKSPACE_PATH:-$PWD}:/workspace" -v trivy-cache:/root/.cache aquasec/trivy:latest image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /workspace/.trivyignore "$img:latest" || FAILED=1
+          WORKSPACE="${HOST_WORKSPACE_PATH:-{{.ROOT_DIR}}}"
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "${WORKSPACE}:/workspace" -v trivy-cache:/root/.cache aquasec/trivy:latest image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /workspace/.trivyignore "$img:latest" || FAILED=1
         done
         if [ $FAILED -ne 0 ]; then
           echo "Container image scan FAILED: HIGH or CRITICAL vulnerabilities found!"
