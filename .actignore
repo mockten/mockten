@@ -1,0 +1,8 @@
+# Exclude large binary/data directories from act's docker cp during local CI
+minIO/photos/
+minIO/chrome_profile/
+ecfront2/node_modules/
+ecfront2/playwright-report/
+ecfront2/test-results/
+node_modules/
+.git/

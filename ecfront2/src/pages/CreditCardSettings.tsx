@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Box,
   Container,
@@ -18,6 +18,7 @@ import {
   DialogActions,
   Snackbar,
   Alert,
+  Skeleton,
 } from '@mui/material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
@@ -25,7 +26,14 @@ import apiClient from '../module/apiClient';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
+// stripePromise is created lazily — only when the add-card form is first shown
+let _stripePromise: ReturnType<typeof loadStripe> | null = null;
+const getStripePromise = () => {
+  if (!_stripePromise) {
+    _stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
+  }
+  return _stripePromise;
+};
 
 
 
@@ -48,7 +56,7 @@ type SavedCard = {
 };
 
 const CreditCardSettings: React.FC = () => {
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(true);
   const [manageMenuAnchorEl, setManageMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -57,7 +65,14 @@ const CreditCardSettings: React.FC = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const stripePromiseRef = useRef<ReturnType<typeof loadStripe> | null>(null);
+  const getStripe = () => {
+    if (!stripePromiseRef.current) {
+      stripePromiseRef.current = getStripePromise();
+    }
+    return stripePromiseRef.current;
+  };
 
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
@@ -87,13 +102,13 @@ const CreditCardSettings: React.FC = () => {
 
 
   const fetchMethods = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
       const res = await apiClient.get('/api/payment-method');
       if (res.data && res.data.length > 0) {
         const cards: SavedCard[] = res.data.map((m: any) => ({
           id: m.id,
-          brand: (m.brand || 'VISA') as any, // keep original casing or lowercase from stripe
+          brand: (m.brand || 'VISA') as any,
           last4: m.last4,
           expMonth: String(m.exp_month).padStart(2, '0'),
           expYear: String(m.exp_year).slice(-2),
@@ -101,15 +116,12 @@ const CreditCardSettings: React.FC = () => {
           isDefault: m.is_default,
         }));
         setSavedCards(cards);
-        setIsEditing(cards.length === 0);
-      } else {
-        setSavedCards([]);
-        setIsEditing(true);
+        setIsEditing(false);
       }
+      // if no cards: keep isEditing=true (already set by default)
     } catch (e) {
       console.error('Failed to fetch payment methods', e);
-      setSavedCards([]);
-      setIsEditing(true);
+      // keep isEditing=true (form already visible)
     } finally {
       setIsLoading(false);
     }
@@ -382,8 +394,10 @@ const CreditCardSettings: React.FC = () => {
         </Box>
 
         {isLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-            <Typography>Loading...</Typography>
+          <Box sx={{ maxWidth: '680px', margin: '0 auto 24px' }}>
+            <Skeleton variant="text" width={160} height={28} sx={{ mb: 2 }} />
+            <Skeleton variant="rounded" width="100%" height={90} sx={{ mb: 2 }} />
+            <Skeleton variant="rounded" width={200} height={40} />
           </Box>
         ) : (
           <>
@@ -544,7 +558,7 @@ const CreditCardSettings: React.FC = () => {
                   </Typography>
                 </Box>
 
-                <Elements stripe={stripePromise}>
+                <Elements stripe={getStripe()}>
                   <CardForm
                     formData={formData}
                     handleInputChange={handleInputChange}
@@ -606,11 +620,21 @@ const textFieldSx = {
 const CardForm: React.FC<any> = ({ formData, handleInputChange, handleSubmit, setIsEditing }) => {
   const stripe = useStripe();
   const elements = useElements();
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  const handleSubmitWithLoading = async (e: React.FormEvent) => {
+    setIsSaving(true);
+    try {
+      await handleSubmit(e, stripe, elements);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <Box
       component="form"
-      onSubmit={(e) => handleSubmit(e, stripe, elements)}
+      onSubmit={handleSubmitWithLoading}
       sx={{ maxWidth: '680px', margin: '0 auto' }}
     >
       <Box sx={{ marginBottom: '32px' }}>
@@ -681,7 +705,7 @@ const CardForm: React.FC<any> = ({ formData, handleInputChange, handleSubmit, se
         <Button
           type="submit"
           variant="contained"
-          disabled={!stripe}
+          disabled={!stripe || isSaving}
           sx={{
             backgroundColor: 'black',
             color: 'white',
@@ -695,7 +719,7 @@ const CardForm: React.FC<any> = ({ formData, handleInputChange, handleSubmit, se
             '&:hover': { backgroundColor: '#333' },
           }}
         >
-          Save
+          {isSaving ? 'Saving...' : 'Save'}
         </Button>
       </Box>
     </Box>

@@ -244,7 +244,8 @@ const SearchResultNew: React.FC = () => {
           return;
         }
         const data = await response.json();
-        const saleItems = data.items || [];
+        let saleItems = data.items || [];
+        if (f.stock) saleItems = saleItems.filter((item: any) => item.stocks > 0);
         const total = saleItems.length;
         const start = (page - 1) * itemsPerPage;
         const end = start + itemsPerPage;
@@ -408,7 +409,7 @@ const SearchResultNew: React.FC = () => {
       setSortOrder(s);
     }
 
-    if (query && page !== currentPage) {
+    if (page !== currentPage) {
       setCurrentPage(page);
     }
 
@@ -900,18 +901,26 @@ const SearchResultNew: React.FC = () => {
                 >
                   <Box
                     sx={{
-                      height: '100px',
+                      width: '100%',
+                      aspectRatio: '1/1',
                       backgroundColor: '#f5f5f5',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       position: 'relative',
+                      overflow: 'hidden',
                     }}
                   >
                     <img
                       src={`/api/storage/${product.product_id}.png`}
                       alt="Product"
-                      style={{ width: '64px', height: '64px', filter: product.stocks === 0 ? 'grayscale(100%)' : 'none', objectFit: 'contain' }}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        filter: product.stocks === 0 ? 'grayscale(100%)' : 'none',
+                        objectFit: 'contain',
+                        padding: '12px'
+                      }}
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = photoSvg;
                       }}

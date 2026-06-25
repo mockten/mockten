@@ -18,6 +18,7 @@ var db *sql.DB
 type ShipmentRequest struct {
 	ProductID      string `json:"product_id"`
 	GeoID          string `json:"geo_id"`
+	Quantity       int    `json:"quantity"`
 	ScheduledStart string `json:"scheduled_start"` // "YYYY-MM-DD HH:MM:SS", optional
 }
 
@@ -27,6 +28,7 @@ type ShipmentResponse struct {
 	ProductName   string `json:"product_name"`
 	Status        string `json:"status"`
 	PurchaseDate  string `json:"purchase_date"`
+	Quantity      int    `json:"quantity"`
 }
 
 func initDB() {
@@ -51,6 +53,9 @@ func initDB() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(2)
+	db.SetConnMaxLifetime(5 * time.Minute)
 
 	// Auto-migrate: add scheduled_start column if not exists using information_schema
 	var exists bool
@@ -158,8 +163,12 @@ func handleShipment(w http.ResponseWriter, r *http.Request) {
 		}
 		// In TEST_MODE, leave scheduledStart as nil → no restriction, worker runs immediately
 
-		query := "INSERT INTO Transaction (transaction_id, product_id, geo_id, status, leg_type, scheduled_start) VALUES (?, ?, ?, ?, ?, ?)"
-		_, err := db.Exec(query, transactionID, req.ProductID, req.GeoID, status, legType, scheduledStart)
+		quantity := req.Quantity
+		if quantity < 1 {
+			quantity = 1
+		}
+		query := "INSERT INTO Transaction (transaction_id, product_id, geo_id, status, leg_type, scheduled_start, quantity) VALUES (?, ?, ?, ?, ?, ?, ?)"
+		_, err := db.Exec(query, transactionID, req.ProductID, req.GeoID, status, legType, scheduledStart, quantity)
 		if err != nil {
 			log.Printf("Error inserting transaction: %v", err)
 			http.Error(w, "Failed to create shipment", http.StatusInternalServerError)
@@ -180,7 +189,7 @@ func handleShipment(w http.ResponseWriter, r *http.Request) {
 		}
 
 		query := `
-			SELECT t.transaction_id, t.product_id, p.product_name, t.status, DATE_FORMAT(t.created_at, '%M %e') as purchase_date
+			SELECT t.transaction_id, t.product_id, p.product_name, t.status, DATE_FORMAT(t.created_at, '%M %e') as purchase_date, COALESCE(t.quantity, 1) as quantity
 			FROM Transaction t
 			JOIN Geo g ON t.geo_id = g.geo_id
 			JOIN Product p ON t.product_id = p.product_id
@@ -199,7 +208,7 @@ func handleShipment(w http.ResponseWriter, r *http.Request) {
 		var shipments []ShipmentResponse
 		for rows.Next() {
 			var s ShipmentResponse
-			if err := rows.Scan(&s.TransactionID, &s.ProductID, &s.ProductName, &s.Status, &s.PurchaseDate); err != nil {
+			if err := rows.Scan(&s.TransactionID, &s.ProductID, &s.ProductName, &s.Status, &s.PurchaseDate, &s.Quantity); err != nil {
 				log.Printf("Error scanning row: %v", err)
 				continue
 			}

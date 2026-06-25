@@ -14,9 +14,9 @@ if [ ! -f "$LAST_SYNC_FILE" ]; then
 fi
 
 LAST_SYNC=$(cat "$LAST_SYNC_FILE")
-WATERMARK=$(mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" -D "$MYSQL_DB" --batch --raw --silent -e "SELECT DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s');" | head -n 1)
+WATERMARK=$(mysql --skip-ssl -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" -D "$MYSQL_DB" --batch --raw --silent -e "SELECT DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s');" | head -n 1)
 
-mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" -D "$MYSQL_DB" --batch --raw --silent -e "
+mysql --skip-ssl -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" -D "$MYSQL_DB" --batch --raw --silent -e "
 SELECT
   p.product_id,
   p.product_name,

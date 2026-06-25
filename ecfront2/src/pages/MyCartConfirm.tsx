@@ -73,6 +73,7 @@ const MyCartConfirm: React.FC = () => {
             const shipPayload: any = {
               product_id: item.productId || item.id,
               geo_id: shippingAddress.geo_id || '40e1eeca-7db5-4df3-8ab0-8addd3ec9103',
+              quantity: item.quantity || 1,
             };
             if (scheduledStart) {
               shipPayload.scheduled_start = scheduledStart;
@@ -90,7 +91,8 @@ const MyCartConfirm: React.FC = () => {
         } catch (e) {
           console.error('Failed to clear cart after payment', e);
         }
-        navigate('/cart/complete', { state: { paymentId: res.data.payment_id } });
+        const firstProductId = cartItems[0]?.productId || cartItems[0]?.id;
+        navigate('/cart/complete', { state: { paymentId: res.data.payment_id, productId: firstProductId } });
       }
     } catch (e) {
       console.error('Payment failed', e);
