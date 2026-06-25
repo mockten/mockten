@@ -73,15 +73,32 @@ const OrderHistoryNew: React.FC = () => {
     }
   };
 
+  const getUserIdFromToken = () => {
+    const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken') || localStorage.getItem('mockten_access_token');
+    if (!token) return '';
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      const decoded = JSON.parse(jsonPayload);
+      return decoded.email || decoded.preferred_username || decoded.sub || '';
+    } catch (e) {
+      return '';
+    }
+  };
+
   useEffect(() => {
     const fetchRecommendations = async () => {
       try {
-        const res = await apiClient.get('/api/browsing-history/recommendations?limit=4');
+        const userId = getUserIdFromToken();
+        const res = await apiClient.get(`/api/recommendation?user_id=${encodeURIComponent(userId)}&limit=4`);
         if (res.data && Array.isArray(res.data.recommendations)) {
           setRecommendedProducts(res.data.recommendations);
         }
       } catch (err) {
-        console.error('Failed to fetch browsing history recommendations', err);
+        console.error('Failed to fetch recommendations', err);
       }
     };
     fetchRecommendations();
