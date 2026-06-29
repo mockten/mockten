@@ -206,4 +206,44 @@ test.describe.serial('Seller Portal', () => {
     // Table should still be visible (filtered)
     await expect(page.getByRole('columnheader', { name: 'Product Name' })).toBeVisible({ timeout: 3000 });
   });
+
+  test('9. Add Product: create a new product', async ({ page }) => {
+    // Login as existing seller
+    await page.goto(SELLER_LOGIN_URL);
+    await page.getByPlaceholder('seller@example.com').fill(EXISTING_SELLER.email);
+    await page.getByPlaceholder('••••••••').fill(EXISTING_SELLER.password);
+    await page.getByRole('button', { name: 'Sign In' }).click();
+    await expect(page).toHaveURL(SELLER_PORTAL_URL, { timeout: 15000 });
+
+    // Go to Products tab then Add Product
+    await page.getByRole('button', { name: 'Products' }).click();
+    await page.getByRole('button', { name: 'Add Product' }).click();
+    await expect(page.getByText('Add New Product')).toBeVisible({ timeout: 10000 });
+
+    // Fill basic info
+    await page.getByPlaceholder('e.g. Wireless Headphones').fill('Test Protein Powder');
+    await page.getByPlaceholder('Describe your product...').fill('A great protein supplement for athletes.');
+
+    // Fill price
+    await page.locator('#price').fill('29.99');
+
+    // Fill stock
+    await page.locator('#stock').fill('50');
+
+    // Select category (pick first available option)
+    await page.locator('button[role="combobox"]').first().click();
+    await page.locator('[role="option"]').first().click();
+
+    // Select condition
+    await page.locator('button[role="combobox"]').nth(1).click();
+    await page.locator('[role="option"]').first().click();
+
+    // Submit
+    await page.getByRole('button', { name: 'Add Product' }).click();
+
+    // Should show success toast or navigate back to products list
+    await expect(
+      page.getByText('Product added successfully!').or(page.getByText('Manage your product inventory'))
+    ).toBeVisible({ timeout: 15000 });
+  });
 });

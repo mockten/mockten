@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS Product (
   last_update DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   sale_flag TINYINT(1) NOT NULL DEFAULT 0,
   sale_id VARCHAR(36) NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
   KEY idx_product_category (category_id),
   KEY idx_product_geo (geo_id),
   KEY idx_product_last_update (last_update)

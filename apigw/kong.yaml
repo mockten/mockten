@@ -498,6 +498,57 @@ services:
             headers:
               - Authorization:$http_authorization
 
+  - name: seller-categories
+    url: http://sale-service.default.svc.cluster.local:8080/v1/seller/categories
+    routes:
+      - name: seller-categories-route
+        paths: [/api/seller/categories]
+        methods: [GET, OPTIONS]
+        strip_path: true
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - Authorization:$http_authorization
+
+  - name: seller-create-product
+    url: http://sale-service.default.svc.cluster.local:8080/v1/seller/products/create
+    routes:
+      - name: seller-create-product-route
+        paths: [/api/seller/products/create]
+        methods: [POST, OPTIONS]
+        strip_path: true
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - Authorization:$http_authorization
+          remove:
+            headers:
+              - host
+
+  - name: seller-product-images
+    url: http://sale-service.default.svc.cluster.local:8080/v1/seller/products
+    routes:
+      - name: seller-product-images-route
+        paths:
+          - ~/api/seller/products/(?<productId>[^/]+)/images
+        strip_path: false
+        methods: [POST, OPTIONS]
+    plugins:
+      - name: request-transformer
+        config:
+          replace:
+            uri: "/v1/seller/products/$(uri_captures['productId'])/images"
+          add:
+            headers:
+              - Authorization:$http_authorization
+          remove:
+            headers:
+              - host
+
   - name: seller-products-service
     url: http://sale-service.default.svc.cluster.local:8080
     routes:

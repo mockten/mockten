@@ -16,7 +16,10 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 	meilisearch "github.com/meilisearch/meilisearch-go"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 var (
@@ -95,6 +98,9 @@ func main() {
 	r.GET("/api/sale/products/random", handleGetRandomProducts)
 
 	// Seller Portal API
+	r.GET("/v1/seller/categories", handleSellerCategories)
+	r.POST("/v1/seller/products/create", handleCreateProduct)
+	r.POST("/v1/seller/products/:id/images", handleUploadProductImages)
 	r.GET("/v1/seller/stats", handleSellerStats)
 	r.GET("/v1/seller/orders", handleSellerOrders)
 	r.GET("/v1/seller/products", handleSellerProducts)
@@ -510,6 +516,151 @@ func handleUpdateProfile(c *gin.Context) {
 		log.Printf("failed to update profile: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
 		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func handleSellerCategories(c *gin.Context) {
+	rows, err := db.Query("SELECT category_id, category_name FROM Category ORDER BY category_name")
+	if err != nil {
+		log.Printf("failed to query categories: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+	defer rows.Close()
+
+	type CategoryRow struct {
+		CategoryID   string `json:"category_id"`
+		CategoryName string `json:"category_name"`
+	}
+	var cats []CategoryRow
+	for rows.Next() {
+		var cat CategoryRow
+		if err := rows.Scan(&cat.CategoryID, &cat.CategoryName); err != nil {
+			continue
+		}
+		cats = append(cats, cat)
+	}
+	if cats == nil {
+		cats = []CategoryRow{}
+	}
+	c.JSON(http.StatusOK, cats)
+}
+
+func handleCreateProduct(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	var body struct {
+		Name             string  `json:"name"`
+		Description      string  `json:"description"`
+		Price            float64 `json:"price"`
+		ComparePrice     float64 `json:"comparePrice"`
+		CategoryID       string  `json:"category_id"`
+		ProductCondition string  `json:"product_condition"`
+		Stock            int     `json:"stock"`
+		Status           bool    `json:"status"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	productID := uuid.New().String()
+
+	// Get geo_id for seller
+	var geoID string
+	err = db.QueryRow("SELECT geo_id FROM Geo WHERE user_id = ? LIMIT 1", sellerID).Scan(&geoID)
+	if err != nil {
+		geoID = "40e1eeca-7db5-4df3-8ab0-8addd3ec9103"
+	}
+
+	// Determine sale_flag and sale_id
+	saleFlag := 0
+	var saleID interface{} = nil
+	if body.ComparePrice > 0 && body.ComparePrice > body.Price {
+		saleFlag = 1
+		saleID = "f1234567-abcd-1234-abcd-1234567890ab"
+	}
+
+	// Default condition
+	condition := body.ProductCondition
+	if condition == "" {
+		condition = "new"
+	}
+
+	_, err = db.Exec(
+		`INSERT INTO Product (product_id, product_name, seller_id, price, category_id, summary, product_condition, geo_id, sale_flag, sale_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		productID, body.Name, sellerID, int(body.Price), body.CategoryID, body.Description, condition, geoID, saleFlag, saleID,
+	)
+	if err != nil {
+		log.Printf("failed to insert product: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	_, err = db.Exec("INSERT INTO Stock (product_id, stocks) VALUES (?, ?)", productID, body.Stock)
+	if err != nil {
+		log.Printf("failed to insert stock: %v", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"product_id": productID})
+}
+
+func handleUploadProductImages(c *gin.Context) {
+	productID := c.Param("id")
+
+	minioEndpoint := "minio-service.default.svc.cluster.local:9000"
+	minioClient, err := minio.New(minioEndpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4("minioadmin", "minioadmin", ""),
+		Secure: false,
+	})
+	if err != nil {
+		log.Printf("failed to create minio client: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "storage error"})
+		return
+	}
+
+	form, err := c.MultipartForm()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid multipart form"})
+		return
+	}
+
+	files := form.File["images[]"]
+	paths := []string{
+		productID + ".png",
+		productID + "/1.png",
+		productID + "/2.png",
+	}
+
+	for i, fileHeader := range files {
+		if i >= 3 {
+			break
+		}
+		file, err := fileHeader.Open()
+		if err != nil {
+			log.Printf("failed to open file: %v", err)
+			continue
+		}
+		defer file.Close()
+
+		_, err = minioClient.PutObject(
+			c.Request.Context(),
+			"photos",
+			paths[i],
+			file,
+			fileHeader.Size,
+			minio.PutObjectOptions{ContentType: "image/png"},
+		)
+		if err != nil {
+			log.Printf("failed to upload image %d: %v", i, err)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
