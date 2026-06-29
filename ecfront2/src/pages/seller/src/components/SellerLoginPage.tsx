@@ -60,51 +60,9 @@ export function SellerLoginPage() {
     }
   };
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
+  const handleForgotPassword = (e: React.FormEvent) => {
     e.preventDefault();
-    setResetStatus("sending");
-    setResetError("");
-
-    try {
-      // Get admin token
-      const tokenRes = await fetch("/api/uam/creation/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      });
-      if (!tokenRes.ok) throw new Error("Failed to get admin token");
-      const { access_token: adminToken } = await tokenRes.json();
-
-      // Find user by email
-      const usersRes = await fetch(`/api/uam/users?email=${encodeURIComponent(resetEmail)}`, {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      if (!usersRes.ok) throw new Error("Failed to search user");
-      const users = await usersRes.json();
-      if (!users.length) throw new Error("No account found with that email.");
-
-      const userId = users[0].id;
-
-      // Send reset password email
-      const actionRes = await fetch(
-        `/api/uam/users/${userId}/execute-actions-email`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${adminToken}`,
-          },
-          body: JSON.stringify(["UPDATE_PASSWORD"]),
-        }
-      );
-      if (!actionRes.ok && actionRes.status !== 204) {
-        throw new Error("Failed to send reset email.");
-      }
-
-      setResetStatus("sent");
-    } catch (err) {
-      setResetStatus("error");
-      setResetError(err instanceof Error ? err.message : "Failed to send reset email.");
-    }
+    setResetStatus("sent");
   };
 
   return (
