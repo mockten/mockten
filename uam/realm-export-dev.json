@@ -159,7 +159,10 @@
   },
   "groups": [
     {
-      "name": "Seller"
+      "name": "Seller",
+      "realmRoles": [
+        "seller"
+      ]
     },
     {
       "name": "Customer"
