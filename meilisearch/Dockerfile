@@ -5,8 +5,15 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install MeiliSearch
-RUN curl -L https://install.meilisearch.com | sh
+# Install MeiliSearch (arch-aware)
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+      MSARCH="meilisearch-linux-aarch64"; \
+    else \
+      MSARCH="meilisearch-linux-amd64"; \
+    fi && \
+    curl -L "https://github.com/meilisearch/meilisearch/releases/latest/download/${MSARCH}" -o /usr/local/bin/meilisearch && \
+    chmod +x /usr/local/bin/meilisearch
 
 # Make sure init.sh is copied
 COPY *.sh /

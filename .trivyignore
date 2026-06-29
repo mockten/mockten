@@ -107,3 +107,7 @@ CVE-2026-5260
 CVE-2026-5419
 CVE-2026-7383
 CVE-2026-9076
+
+# cryptography Python package GHSA-537c-gmf6-5ccf — vulnerable OpenSSL in wheels
+# Fixed in cryptography 48.0.1; waiting for Airflow to upgrade its pinned version
+GHSA-537c-gmf6-5ccf

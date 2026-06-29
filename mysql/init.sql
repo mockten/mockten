@@ -1,6 +1,10 @@
 -- Airflow metadata DB (uses same MySQL instance, separate DB)
 CREATE DATABASE IF NOT EXISTS airflow CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 GRANT ALL PRIVILEGES ON airflow.* TO 'mocktenusr'@'%';
+-- Create a read-only user with sha256_password for MariaDB clients (meilisearch/sync containers)
+-- sha256_password is still supported in MySQL 8.4 and works with older clients
+CREATE USER IF NOT EXISTS 'mocktenro'@'%' IDENTIFIED WITH sha256_password BY 'mocktenpassword';
+GRANT SELECT ON mocktendb.* TO 'mocktenro'@'%';
 FLUSH PRIVILEGES;
 
 CREATE TABLE IF NOT EXISTS TimeSale (

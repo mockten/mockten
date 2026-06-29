@@ -4913,7 +4913,7 @@ const I18N = {
     'nav.keycloak': 'Access Management', 'nav.model': 'Model Performance',
     'nav.ci': 'Local CI Pipelines', 'nav.tests': 'E2E Test Runner',
     'nav.pipeline': 'Data Pipeline', 'nav.vulnerability': 'Security Scanning',
-    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(Backdoor)',
+    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(Backdoor)', 'nav.seller': 'Seller page',
     // Header
     'header.autoRefresh': 'AUTO REFRESH', 'header.systemRestart': 'System Restart',
     // Page titles
@@ -5015,7 +5015,7 @@ const I18N = {
     'nav.keycloak': 'アクセス管理', 'nav.model': 'モデル性能',
     'nav.ci': 'ローカルCIパイプライン', 'nav.tests': 'E2Eテスト',
     'nav.pipeline': 'データパイプライン', 'nav.vulnerability': 'セキュリティスキャン',
-    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(裏口)',
+    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(裏口)', 'nav.seller': 'Sellerページ',
     'header.autoRefresh': '自動更新', 'header.systemRestart': 'システム再起動',
     'title.dashboard': 'ダッシュボード', 'title.containers': 'コンテナ一覧',
     'title.logs': 'ログビューア', 'title.topology': 'サービストポロジー',
@@ -5100,7 +5100,7 @@ const I18N = {
     'nav.keycloak': '访问管理', 'nav.model': '模型性能',
     'nav.ci': '本地CI流水线', 'nav.tests': 'E2E测试',
     'nav.pipeline': '数据管道', 'nav.vulnerability': '安全扫描',
-    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(后门)',
+    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(后门)', 'nav.seller': 'Seller页面',
     'header.autoRefresh': '自动刷新', 'header.systemRestart': '重启系统',
     'title.dashboard': '仪表盘', 'title.containers': '容器列表',
     'title.logs': '日志查看器', 'title.topology': '服务拓扑',
@@ -5374,6 +5374,8 @@ function initSidebar() {
     const items = [...nav.querySelectorAll('.nav-item[data-key]')];
     const map = Object.fromEntries(items.map(el => [el.dataset.key, el]));
     _navOrder.forEach(key => { if (map[key]) nav.appendChild(map[key]); });
+    // Append new items not in stored order to the end
+    items.forEach(el => { if (!_navOrder.includes(el.dataset.key)) nav.appendChild(el); });
   }
 
   // Restore pins (visual + reorder pinned to top)

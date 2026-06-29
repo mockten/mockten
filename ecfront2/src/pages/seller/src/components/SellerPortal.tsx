@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -39,61 +39,56 @@ import {
 import { AddProductPage } from "./AddProductPage";
 import { useNavigate } from "react-router-dom";
 
-// Mock data
-const dashboardStats = [
-  {
-    title: "Total Revenue",
-    value: "$45,231",
-    change: "+20.1%",
-    trend: "up" as const,
-    icon: DollarSign,
-  },
-  {
-    title: "Orders",
-    value: "156",
-    change: "+12.5%",
-    trend: "up" as const,
-    icon: ShoppingCart,
-  },
-  {
-    title: "Products",
-    value: "48",
-    change: "-2.4%",
-    trend: "down" as const,
-    icon: Package,
-  },
-  {
-    title: "Customers",
-    value: "1,234",
-    change: "+8.2%",
-    trend: "up" as const,
-    icon: Users,
-  },
-];
+const API_BASE = "/api/seller";
 
-const recentOrders = [
-  { id: "#3210", customer: "John Smith", product: "Wireless Headphones", amount: "$129.99", status: "completed" },
-  { id: "#3209", customer: "Emma Wilson", product: "Smart Watch", amount: "$299.99", status: "processing" },
-  { id: "#3208", customer: "Michael Brown", product: "Laptop Stand", amount: "$49.99", status: "completed" },
-  { id: "#3207", customer: "Sarah Davis", product: "USB-C Cable", amount: "$19.99", status: "pending" },
-  { id: "#3206", customer: "James Miller", product: "Keyboard", amount: "$89.99", status: "completed" },
-];
-
-const products = [
-  { id: 1, name: "Wireless Headphones", price: "$129.99", stock: 45, status: "active" },
-  { id: 2, name: "Smart Watch", price: "$299.99", stock: 23, status: "active" },
-  { id: 3, name: "Laptop Stand", price: "$49.99", stock: 67, status: "active" },
-  { id: 4, name: "USB-C Cable", price: "$19.99", stock: 156, status: "active" },
-  { id: 5, name: "Keyboard", price: "$89.99", stock: 12, status: "low stock" },
-  { id: 6, name: "Mouse Pad", price: "$24.99", stock: 89, status: "active" },
-];
+function getAuthHeaders() {
+  const token = localStorage.getItem("seller_access_token");
+  return { Authorization: `Bearer ${token}` };
+}
 
 export function SellerPortal() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
   const [showAddProduct, setShowAddProduct] = useState(false);
-  const [sellerName, setSellerName] = useState("Seller");
+  const [sellerEmail, setSellerEmail] = useState("Seller");
+  const [searchQuery, setSearchQuery] = useState("");
 
+  // Stats
+  const [stats, setStats] = useState<{
+    current: { revenue: number; orders: number; products: number; customers: number };
+    previous: { revenue: number; orders: number; products: number; customers: number };
+    change: { revenue: number | null; orders: number | null; products: number | null; customers: number | null };
+  } | null>(null);
+
+  // Orders
+  const [orders, setOrders] = useState<Array<{
+    order_id: string; user_id: string; amount: number; status: string; created_at: string;
+  }>>([]);
+  const [ordersTotal, setOrdersTotal] = useState(0);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersLimit, setOrdersLimit] = useState(10);
+  const [ordersStatusFilter, setOrdersStatusFilter] = useState("All");
+
+  // Products
+  const [products, setProducts] = useState<Array<{
+    product_id: string; product_name: string; price: number; condition: string; stocks: number; status: string;
+  }>>([]);
+  const [productsTotal, setProductsTotal] = useState(0);
+  const [productsPage, setProductsPage] = useState(1);
+  const [productsLimit, setProductsLimit] = useState(10);
+
+  // Edit product modal
+  const [editProduct, setEditProduct] = useState<{
+    product_id: string; product_name: string; price: number; condition: string; stocks: number; status: string;
+  } | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPrice, setEditPrice] = useState(0);
+
+  // Settings / Profile
+  const [profileName, setProfileName] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+
+  // Load profile once
   useEffect(() => {
     const token = localStorage.getItem("seller_access_token");
     if (!token) {
@@ -102,11 +97,72 @@ export function SellerPortal() {
     }
     try {
       const payload = JSON.parse(atob(token.split(".")[1]));
-      setSellerName(payload.preferred_username || payload.email || "Seller");
+      const email = payload.email || payload.preferred_username || "Seller";
+      setSellerEmail(email);
+      setProfileEmail(email);
     } catch {
       navigate("/seller/login");
     }
+
+    // Load profile name
+    fetch(`${API_BASE}/profile`, { headers: getAuthHeaders() })
+      .then(r => r.json())
+      .then(data => {
+        if (data.seller_name) setProfileName(data.seller_name);
+      })
+      .catch(() => {});
   }, [navigate]);
+
+  // Load stats
+  const loadStats = useCallback(() => {
+    fetch(`${API_BASE}/stats`, { headers: getAuthHeaders() })
+      .then(r => r.json())
+      .then(data => setStats(data))
+      .catch(() => {});
+  }, []);
+
+  // Load orders
+  const loadOrders = useCallback(() => {
+    const params = new URLSearchParams({
+      page: String(ordersPage),
+      limit: String(ordersLimit),
+      status: ordersStatusFilter,
+    });
+    fetch(`${API_BASE}/orders?${params}`, { headers: getAuthHeaders() })
+      .then(r => r.json())
+      .then(data => {
+        setOrders(data.orders || []);
+        setOrdersTotal(data.total || 0);
+      })
+      .catch(() => {});
+  }, [ordersPage, ordersLimit, ordersStatusFilter]);
+
+  // Load products
+  const loadProducts = useCallback(() => {
+    const params = new URLSearchParams({
+      page: String(productsPage),
+      limit: String(productsLimit),
+    });
+    fetch(`${API_BASE}/products?${params}`, { headers: getAuthHeaders() })
+      .then(r => r.json())
+      .then(data => {
+        setProducts(data.products || []);
+        setProductsTotal(data.total || 0);
+      })
+      .catch(() => {});
+  }, [productsPage, productsLimit]);
+
+  useEffect(() => {
+    if (activeTab === "overview") loadStats();
+  }, [activeTab, loadStats]);
+
+  useEffect(() => {
+    if (activeTab === "orders") loadOrders();
+  }, [activeTab, loadOrders]);
+
+  useEffect(() => {
+    if (activeTab === "products") loadProducts();
+  }, [activeTab, loadProducts]);
 
   const handleLogout = () => {
     localStorage.removeItem("seller_access_token");
@@ -114,22 +170,81 @@ export function SellerPortal() {
     navigate("/seller/login");
   };
 
+  const handleDeleteProduct = async (productId: string) => {
+    if (!confirm("Delete this product?")) return;
+    await fetch(`${API_BASE}/products/${productId}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
+    loadProducts();
+  };
+
+  const handleEditSave = async () => {
+    if (!editProduct) return;
+    await fetch(`${API_BASE}/products/${editProduct.product_id}`, {
+      method: "PUT",
+      headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ product_name: editName, price: editPrice, summary: "" }),
+    });
+    setEditProduct(null);
+    loadProducts();
+  };
+
+  const handleSaveProfile = async () => {
+    await fetch(`${API_BASE}/profile`, {
+      method: "PUT",
+      headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ seller_name: profileName }),
+    });
+    alert("Profile saved!");
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "completed":
+      case "completed": case "delivered": case "active":
         return "bg-green-100 text-green-800";
-      case "processing":
+      case "processing": case "picking": case "shipped": case "paid":
         return "bg-blue-100 text-blue-800";
-      case "pending":
+      case "pending": case "created":
         return "bg-yellow-100 text-yellow-800";
-      case "active":
-        return "bg-green-100 text-green-800";
+      case "canceled": case "refunded":
+        return "bg-red-100 text-red-800";
       case "low stock":
         return "bg-orange-100 text-orange-800";
+      case "out of stock":
+        return "bg-red-100 text-red-800";
       default:
         return "bg-slate-100 text-slate-800";
     }
   };
+
+  const formatPct = (val: number | null) => {
+    if (val === null || val === undefined) return "N/A";
+    return `${val > 0 ? "+" : ""}${val.toFixed(1)}%`;
+  };
+
+  const mapUIStatus = (dbStatus: string) => {
+    switch (dbStatus) {
+      case "created": case "paid": return "Pending";
+      case "picking": case "shipped": return "Processing";
+      case "delivered": return "Completed";
+      case "canceled": case "refunded": return "Canceled";
+      default: return dbStatus;
+    }
+  };
+
+  // Filtered products/orders for search
+  const filteredProducts = products.filter(p =>
+    !searchQuery || p.product_name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const filteredOrders = orders.filter(o =>
+    !searchQuery ||
+    o.order_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    o.user_id.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const totalOrderPages = Math.ceil(ordersTotal / ordersLimit);
+  const totalProductPages = Math.ceil(productsTotal / productsLimit);
 
   // If showing add product page, render it instead of the main portal
   if (showAddProduct) {
@@ -149,7 +264,7 @@ export function SellerPortal() {
           </div>
         </header>
         <main className="p-8">
-          <AddProductPage onBack={() => setShowAddProduct(false)} />
+          <AddProductPage onBack={() => { setShowAddProduct(false); loadProducts(); }} />
         </main>
       </div>
     );
@@ -157,8 +272,31 @@ export function SellerPortal() {
 
   return (
     <div className="min-h-screen bg-blue-50">
+      {/* Edit Product Modal */}
+      {editProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg p-6 w-96 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4">Edit Product</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm text-slate-700">Product Name</label>
+                <Input value={editName} onChange={e => setEditName(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm text-slate-700">Price ($)</label>
+                <Input type="number" value={editPrice} onChange={e => setEditPrice(Number(e.target.value))} />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <Button className="!bg-blue-600 hover:!bg-blue-700 !text-white" onClick={handleEditSave}>Save</Button>
+              <Button variant="ghost" onClick={() => setEditProduct(null)}>Cancel</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Navigation Bar */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
         <div className="flex items-center justify-between px-6 py-4">
           {/* Logo and Brand */}
           <div className="flex items-center gap-3">
@@ -179,6 +317,8 @@ export function SellerPortal() {
                 type="search"
                 placeholder="Search products, orders..."
                 className="pl-10"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
               />
             </div>
           </div>
@@ -194,15 +334,15 @@ export function SellerPortal() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2">
                   <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span className="text-blue-600">{sellerName.slice(0, 2).toUpperCase()}</span>
+                    <span className="text-blue-600">{sellerEmail.slice(0, 2).toUpperCase()}</span>
                   </div>
-                  <span>{sellerName}</span>
+                  <span>{sellerEmail}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="cursor-pointer">
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setActiveTab("settings")}>
                   <Settings className="w-4 h-4 mr-2" />
                   Settings
                 </DropdownMenuItem>
@@ -279,39 +419,141 @@ export function SellerPortal() {
 
               {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {dashboardStats.map((stat) => (
-                  <Card key={stat.title}>
-                    <CardContent className="pt-6">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-slate-600 mb-1">{stat.title}</p>
-                          <p className="text-slate-900">{stat.value}</p>
-                        </div>
-                        <div className={`p-2 rounded-lg ${stat.trend === "up" ? "bg-green-100" : "bg-red-100"}`}>
-                          <stat.icon className={`w-5 h-5 ${stat.trend === "up" ? "text-green-600" : "text-red-600"}`} />
-                        </div>
+                {/* Revenue */}
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-slate-600 mb-1">Total Revenue</p>
+                        <p className="text-slate-900" data-testid="stat-revenue">
+                          ${stats ? stats.current.revenue.toFixed(2) : "0.00"}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-1 mt-4">
-                        {stat.trend === "up" ? (
-                          <TrendingUp className="w-4 h-4 text-green-600" />
-                        ) : (
-                          <TrendingDown className="w-4 h-4 text-red-600" />
-                        )}
-                        <span className={`${stat.trend === "up" ? "text-green-600" : "text-red-600"}`}>
-                          {stat.change}
-                        </span>
-                        <span className="text-slate-500">from last month</span>
+                      <div className={`p-2 rounded-lg ${(stats?.change.revenue ?? 0) >= 0 ? "bg-green-100" : "bg-red-100"}`}>
+                        <DollarSign className={`w-5 h-5 ${(stats?.change.revenue ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`} />
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                    </div>
+                    <div className="flex items-center gap-1 mt-4">
+                      {(stats?.change.revenue ?? 0) >= 0 ? (
+                        <TrendingUp className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <TrendingDown className="w-4 h-4 text-red-600" />
+                      )}
+                      <span className={(stats?.change.revenue ?? 0) >= 0 ? "text-green-600" : "text-red-600"}>
+                        {formatPct(stats?.change.revenue ?? null)}
+                      </span>
+                      <span className="text-slate-500">from last month</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Orders */}
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-slate-600 mb-1">Orders</p>
+                        <p className="text-slate-900" data-testid="stat-orders">
+                          {stats ? stats.current.orders : 0}
+                        </p>
+                      </div>
+                      <div className={`p-2 rounded-lg ${(stats?.change.orders ?? 0) >= 0 ? "bg-green-100" : "bg-red-100"}`}>
+                        <ShoppingCart className={`w-5 h-5 ${(stats?.change.orders ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 mt-4">
+                      {(stats?.change.orders ?? 0) >= 0 ? (
+                        <TrendingUp className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <TrendingDown className="w-4 h-4 text-red-600" />
+                      )}
+                      <span className={(stats?.change.orders ?? 0) >= 0 ? "text-green-600" : "text-red-600"}>
+                        {formatPct(stats?.change.orders ?? null)}
+                      </span>
+                      <span className="text-slate-500">from last month</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Products Sold */}
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-slate-600 mb-1">Products Sold</p>
+                        <p className="text-slate-900" data-testid="stat-products">
+                          {stats ? stats.current.products : 0}
+                        </p>
+                      </div>
+                      <div className={`p-2 rounded-lg ${(stats?.change.products ?? 0) >= 0 ? "bg-green-100" : "bg-red-100"}`}>
+                        <Package className={`w-5 h-5 ${(stats?.change.products ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 mt-4">
+                      {(stats?.change.products ?? 0) >= 0 ? (
+                        <TrendingUp className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <TrendingDown className="w-4 h-4 text-red-600" />
+                      )}
+                      <span className={(stats?.change.products ?? 0) >= 0 ? "text-green-600" : "text-red-600"}>
+                        {formatPct(stats?.change.products ?? null)}
+                      </span>
+                      <span className="text-slate-500">from last month</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Customers */}
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-slate-600 mb-1">Customers</p>
+                        <p className="text-slate-900" data-testid="stat-customers">
+                          {stats ? stats.current.customers : 0}
+                        </p>
+                      </div>
+                      <div className={`p-2 rounded-lg ${(stats?.change.customers ?? 0) >= 0 ? "bg-green-100" : "bg-red-100"}`}>
+                        <Users className={`w-5 h-5 ${(stats?.change.customers ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 mt-4">
+                      {(stats?.change.customers ?? 0) >= 0 ? (
+                        <TrendingUp className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <TrendingDown className="w-4 h-4 text-red-600" />
+                      )}
+                      <span className={(stats?.change.customers ?? 0) >= 0 ? "text-green-600" : "text-red-600"}>
+                        {formatPct(stats?.change.customers ?? null)}
+                      </span>
+                      <span className="text-slate-500">from last month</span>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Recent Orders */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Recent Orders</CardTitle>
-                  <CardDescription>You have {recentOrders.length} orders this week</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Recent Orders</CardTitle>
+                      <CardDescription>Your latest {orders.length} orders</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-slate-500">Per page:</span>
+                      <select
+                        className="border rounded px-2 py-1 text-sm"
+                        value={ordersLimit}
+                        onChange={e => { setOrdersLimit(Number(e.target.value)); setOrdersPage(1); }}
+                      >
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -319,33 +561,50 @@ export function SellerPortal() {
                       <TableRow>
                         <TableHead>Order ID</TableHead>
                         <TableHead>Customer</TableHead>
-                        <TableHead>Product</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead></TableHead>
+                        <TableHead>Date</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {recentOrders.map((order) => (
-                        <TableRow key={order.id}>
-                          <TableCell>{order.id}</TableCell>
-                          <TableCell>{order.customer}</TableCell>
-                          <TableCell>{order.product}</TableCell>
-                          <TableCell>{order.amount}</TableCell>
+                      {filteredOrders.map((order) => (
+                        <TableRow key={order.order_id}>
+                          <TableCell>{order.order_id}</TableCell>
+                          <TableCell>{order.user_id}</TableCell>
+                          <TableCell>${order.amount.toFixed(2)}</TableCell>
                           <TableCell>
                             <Badge variant="secondary" className={getStatusColor(order.status)}>
-                              {order.status}
+                              {mapUIStatus(order.status)}
                             </Badge>
                           </TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
+                          <TableCell>{order.created_at}</TableCell>
                         </TableRow>
                       ))}
+                      {filteredOrders.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                            No orders found
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
+                  {/* Pagination */}
+                  {totalOrderPages > 1 && (
+                    <div className="flex items-center justify-between mt-4">
+                      <span className="text-sm text-slate-500">
+                        Page {ordersPage} of {totalOrderPages} ({ordersTotal} total)
+                      </span>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="sm" disabled={ordersPage <= 1} onClick={() => setOrdersPage(p => p - 1)}>
+                          Previous
+                        </Button>
+                        <Button variant="ghost" size="sm" disabled={ordersPage >= totalOrderPages} onClick={() => setOrdersPage(p => p + 1)}>
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -359,13 +618,29 @@ export function SellerPortal() {
                   <h2 className="text-slate-900 mb-1">Products</h2>
                   <p className="text-slate-600">Manage your product inventory</p>
                 </div>
-                <Button
-                  className="bg-blue-600 hover:bg-blue-700"
-                  onClick={() => setShowAddProduct(true)}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Product
-                </Button>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-500">Per page:</span>
+                    <select
+                      data-testid="products-per-page"
+                      className="border rounded px-2 py-1 text-sm"
+                      value={productsLimit}
+                      onChange={e => { setProductsLimit(Number(e.target.value)); setProductsPage(1); }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+                  <Button
+                    className="!bg-blue-600 hover:!bg-blue-700 !text-white"
+                    onClick={() => setShowAddProduct(true)}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Product
+                  </Button>
+                </div>
               </div>
 
               <Card>
@@ -381,11 +656,11 @@ export function SellerPortal() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {products.map((product) => (
-                        <TableRow key={product.id}>
-                          <TableCell>{product.name}</TableCell>
-                          <TableCell>{product.price}</TableCell>
-                          <TableCell>{product.stock}</TableCell>
+                      {filteredProducts.map((product) => (
+                        <TableRow key={product.product_id}>
+                          <TableCell>{product.product_name}</TableCell>
+                          <TableCell>${product.price}</TableCell>
+                          <TableCell>{product.stocks}</TableCell>
                           <TableCell>
                             <Badge variant="secondary" className={getStatusColor(product.status)}>
                               {product.status}
@@ -399,17 +674,52 @@ export function SellerPortal() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem>Edit</DropdownMenuItem>
-                                <DropdownMenuItem>Duplicate</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => {
+                                  setEditProduct(product);
+                                  setEditName(product.product_name);
+                                  setEditPrice(product.price);
+                                }}>Edit</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => {
+                                  // Duplicate: show add product form (simplified)
+                                  setShowAddProduct(true);
+                                }}>Duplicate</DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-red-600">Delete</DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-red-600"
+                                  onClick={() => handleDeleteProduct(product.product_id)}
+                                >
+                                  Delete
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       ))}
+                      {filteredProducts.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                            No products found
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
+                  {/* Pagination */}
+                  {totalProductPages > 1 && (
+                    <div className="flex items-center justify-between mt-4">
+                      <span className="text-sm text-slate-500">
+                        Page {productsPage} of {totalProductPages} ({productsTotal} total)
+                      </span>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="sm" disabled={productsPage <= 1} onClick={() => setProductsPage(p => p - 1)}>
+                          Previous
+                        </Button>
+                        <Button variant="ghost" size="sm" disabled={productsPage >= totalProductPages} onClick={() => setProductsPage(p => p + 1)}>
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -423,14 +733,30 @@ export function SellerPortal() {
                   <h2 className="text-slate-900 mb-1">Orders</h2>
                   <p className="text-slate-600">View and manage all orders</p>
                 </div>
-                <Tabs defaultValue="all" className="w-auto">
-                  <TabsList>
-                    <TabsTrigger value="all">All</TabsTrigger>
-                    <TabsTrigger value="pending">Pending</TabsTrigger>
-                    <TabsTrigger value="processing">Processing</TabsTrigger>
-                    <TabsTrigger value="completed">Completed</TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-500">Per page:</span>
+                    <select
+                      data-testid="orders-per-page"
+                      className="border rounded px-2 py-1 text-sm"
+                      value={ordersLimit}
+                      onChange={e => { setOrdersLimit(Number(e.target.value)); setOrdersPage(1); }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+                  <Tabs value={ordersStatusFilter} onValueChange={v => { setOrdersStatusFilter(v); setOrdersPage(1); }} className="w-auto">
+                    <TabsList>
+                      <TabsTrigger value="All">All</TabsTrigger>
+                      <TabsTrigger value="Pending">Pending</TabsTrigger>
+                      <TabsTrigger value="Processing">Processing</TabsTrigger>
+                      <TabsTrigger value="Completed">Completed</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
               </div>
 
               <Card>
@@ -440,33 +766,50 @@ export function SellerPortal() {
                       <TableRow>
                         <TableHead>Order ID</TableHead>
                         <TableHead>Customer</TableHead>
-                        <TableHead>Product</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead></TableHead>
+                        <TableHead>Date</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {recentOrders.map((order) => (
-                        <TableRow key={order.id}>
-                          <TableCell>{order.id}</TableCell>
-                          <TableCell>{order.customer}</TableCell>
-                          <TableCell>{order.product}</TableCell>
-                          <TableCell>{order.amount}</TableCell>
+                      {filteredOrders.map((order) => (
+                        <TableRow key={order.order_id}>
+                          <TableCell>{order.order_id}</TableCell>
+                          <TableCell>{order.user_id}</TableCell>
+                          <TableCell>${order.amount.toFixed(2)}</TableCell>
                           <TableCell>
                             <Badge variant="secondary" className={getStatusColor(order.status)}>
-                              {order.status}
+                              {mapUIStatus(order.status)}
                             </Badge>
                           </TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
+                          <TableCell>{order.created_at}</TableCell>
                         </TableRow>
                       ))}
+                      {filteredOrders.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                            No orders found
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
+                  {/* Pagination */}
+                  {totalOrderPages > 1 && (
+                    <div className="flex items-center justify-between mt-4">
+                      <span className="text-sm text-slate-500">
+                        Page {ordersPage} of {totalOrderPages} ({ordersTotal} total)
+                      </span>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="sm" disabled={ordersPage <= 1} onClick={() => setOrdersPage(p => p - 1)}>
+                          Previous
+                        </Button>
+                        <Button variant="ghost" size="sm" disabled={ordersPage >= totalOrderPages} onClick={() => setOrdersPage(p => p + 1)}>
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -487,18 +830,28 @@ export function SellerPortal() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-slate-700">Store Name</label>
-                    <Input defaultValue="My Store" />
+                    <label htmlFor="store-name" className="text-slate-700">Store Name</label>
+                    <Input
+                      id="store-name"
+                      value={profileName}
+                      onChange={e => setProfileName(e.target.value)}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-slate-700">Store Email</label>
-                    <Input type="email" defaultValue="store@example.com" />
+                    <label htmlFor="store-email" className="text-slate-700">Store Email</label>
+                    <Input
+                      id="store-email"
+                      type="email"
+                      value={profileEmail}
+                      readOnly
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-slate-700">Phone Number</label>
-                    <Input type="tel" defaultValue="+1 (555) 000-0000" />
-                  </div>
-                  <Button className="bg-blue-600 hover:bg-blue-700">Save Changes</Button>
+                  <Button
+                    className="!bg-blue-600 hover:!bg-blue-700 !text-white"
+                    onClick={handleSaveProfile}
+                  >
+                    Save Changes
+                  </Button>
                 </CardContent>
               </Card>
             </div>

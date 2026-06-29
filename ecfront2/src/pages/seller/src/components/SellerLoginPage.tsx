@@ -1,4 +1,5 @@
 import { useState } from "react";
+import "../styles/globals.css";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -20,7 +21,7 @@ export function SellerLoginPage() {
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetStatus, setResetStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [resetError, setResetError] = useState("");
+  const [resetError] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,7 +148,7 @@ export function SellerLoginPage() {
               {error && <p className="text-red-600 text-sm">{error}</p>}
 
               {/* Login Button */}
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full !bg-blue-600 hover:!bg-blue-700 !text-white" disabled={loading}>
                 {loading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
@@ -199,7 +200,7 @@ export function SellerLoginPage() {
                 <p className="text-slate-600 text-sm">
                   A password reset email has been sent to <strong>{resetEmail}</strong>. Please check your inbox.
                 </p>
-                <Button className="w-full" onClick={() => setShowForgotModal(false)}>
+                <Button className="w-full !bg-blue-600 hover:!bg-blue-700 !text-white" onClick={() => setShowForgotModal(false)}>
                   Close
                 </Button>
               </div>
@@ -231,7 +232,7 @@ export function SellerLoginPage() {
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" className="flex-1" disabled={resetStatus === "sending"}>
+                  <Button type="submit" className="flex-1 !bg-blue-600 hover:!bg-blue-700 !text-white" disabled={resetStatus === "sending"}>
                     {resetStatus === "sending" ? "Sending..." : "Send reset link"}
                   </Button>
                 </div>

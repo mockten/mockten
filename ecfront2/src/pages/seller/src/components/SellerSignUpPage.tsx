@@ -1,4 +1,5 @@
 import { useState } from "react";
+import "../styles/globals.css";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -58,7 +59,7 @@ export function SellerSignUpPage() {
         enabled: true,
         emailVerified: true,
         firstName: formData.fullName,
-        lastName: "",
+        lastName: "Seller",
         credentials: [
           { type: "password", value: formData.password, temporary: false },
         ],
@@ -245,7 +246,7 @@ export function SellerSignUpPage() {
               {/* Sign Up Button */}
               <Button
                 type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                className="w-full !bg-blue-600 hover:!bg-blue-700 !text-white"
                 disabled={loading}
               >
                 {loading ? "Creating account..." : "Create Account"}

@@ -2,12 +2,15 @@ package main
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -91,6 +94,15 @@ func main() {
 	r.GET("/api/sale/active", handleGetActiveSales)
 	r.GET("/api/sale/products/random", handleGetRandomProducts)
 
+	// Seller Portal API
+	r.GET("/v1/seller/stats", handleSellerStats)
+	r.GET("/v1/seller/orders", handleSellerOrders)
+	r.GET("/v1/seller/products", handleSellerProducts)
+	r.PUT("/v1/seller/products/:id", handleUpdateProduct)
+	r.DELETE("/v1/seller/products/:id", handleDeleteProduct)
+	r.GET("/v1/seller/profile", handleGetProfile)
+	r.PUT("/v1/seller/profile", handleUpdateProfile)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -100,6 +112,407 @@ func main() {
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("failed to run server: %v", err)
 	}
+}
+
+// extractEmailFromJWT extracts the email claim from a JWT token without signature verification
+func extractEmailFromJWT(c *gin.Context) (string, error) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		return "", fmt.Errorf("missing Authorization header")
+	}
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+		return "", fmt.Errorf("invalid Authorization header format")
+	}
+	tokenParts := strings.Split(parts[1], ".")
+	if len(tokenParts) < 2 {
+		return "", fmt.Errorf("invalid JWT format")
+	}
+	// Add padding if needed
+	payload := tokenParts[1]
+	switch len(payload) % 4 {
+	case 2:
+		payload += "=="
+	case 3:
+		payload += "="
+	}
+	decoded, err := base64.URLEncoding.DecodeString(payload)
+	if err != nil {
+		// Try StdEncoding as fallback
+		decoded, err = base64.RawURLEncoding.DecodeString(tokenParts[1])
+		if err != nil {
+			return "", fmt.Errorf("failed to decode JWT payload: %v", err)
+		}
+	}
+	var claims map[string]interface{}
+	if err := json.Unmarshal(decoded, &claims); err != nil {
+		return "", fmt.Errorf("failed to parse JWT claims: %v", err)
+	}
+	email, ok := claims["email"].(string)
+	if !ok || email == "" {
+		return "", fmt.Errorf("email claim not found in JWT")
+	}
+	return email, nil
+}
+
+func handleSellerStats(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	now := time.Now()
+	// Current month: first day to now
+	curStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	// Previous month
+	prevEnd := curStart
+	prevStart := time.Date(prevEnd.Year(), prevEnd.Month()-1, 1, 0, 0, 0, 0, prevEnd.Location())
+
+	type PeriodStats struct {
+		Revenue   float64
+		Orders    int
+		Products  int
+		Customers int
+	}
+
+	getStats := func(start, end time.Time) (PeriodStats, error) {
+		var ps PeriodStats
+		query := `
+			SELECT
+				COALESCE(SUM(o.total_amount), 0) as revenue,
+				COUNT(DISTINCT o.order_id) as orders,
+				COUNT(DISTINCT t.product_id) as products,
+				COUNT(DISTINCT o.user_id) as customers
+			FROM ` + "`Order`" + ` o
+			JOIN ` + "`Transaction`" + ` t ON JSON_CONTAINS(o.transactions_json, JSON_QUOTE(t.transaction_id))
+			JOIN Product p ON t.product_id = p.product_id
+			WHERE p.seller_id = ?
+			  AND o.created_at >= ?
+			  AND o.created_at < ?`
+		row := db.QueryRow(query, sellerID, start, end)
+		err := row.Scan(&ps.Revenue, &ps.Orders, &ps.Products, &ps.Customers)
+		return ps, err
+	}
+
+	curStats, err := getStats(curStart, now.Add(24*time.Hour))
+	if err != nil {
+		log.Printf("failed to get current stats: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+	prevStats, err := getStats(prevStart, prevEnd)
+	if err != nil {
+		log.Printf("failed to get prev stats: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	pctChange := func(cur, prev float64) interface{} {
+		if prev == 0 {
+			return nil
+		}
+		return (cur - prev) / prev * 100
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"current": gin.H{
+			"revenue":   curStats.Revenue,
+			"orders":    curStats.Orders,
+			"products":  curStats.Products,
+			"customers": curStats.Customers,
+		},
+		"previous": gin.H{
+			"revenue":   prevStats.Revenue,
+			"orders":    prevStats.Orders,
+			"products":  prevStats.Products,
+			"customers": prevStats.Customers,
+		},
+		"change": gin.H{
+			"revenue":   pctChange(curStats.Revenue, prevStats.Revenue),
+			"orders":    pctChange(float64(curStats.Orders), float64(prevStats.Orders)),
+			"products":  pctChange(float64(curStats.Products), float64(prevStats.Products)),
+			"customers": pctChange(float64(curStats.Customers), float64(prevStats.Customers)),
+		},
+	})
+}
+
+func handleSellerOrders(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	statusFilter := c.Query("status") // Pending, Processing, Completed, Canceled, All
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+
+	// Map UI status to DB statuses
+	var dbStatuses []string
+	switch statusFilter {
+	case "Pending":
+		dbStatuses = []string{"created", "paid"}
+	case "Processing":
+		dbStatuses = []string{"picking", "shipped"}
+	case "Completed":
+		dbStatuses = []string{"delivered"}
+	case "Canceled":
+		dbStatuses = []string{"canceled", "refunded"}
+	default:
+		dbStatuses = []string{}
+	}
+
+	baseQuery := `
+		SELECT DISTINCT o.order_id, o.user_id, o.total_amount, o.status, o.created_at
+		FROM ` + "`Order`" + ` o
+		JOIN ` + "`Transaction`" + ` t ON JSON_CONTAINS(o.transactions_json, JSON_QUOTE(t.transaction_id))
+		JOIN Product p ON t.product_id = p.product_id
+		WHERE p.seller_id = ?`
+
+	args := []interface{}{sellerID}
+
+	if len(dbStatuses) > 0 {
+		placeholders := make([]string, len(dbStatuses))
+		for i, s := range dbStatuses {
+			placeholders[i] = "?"
+			args = append(args, s)
+		}
+		baseQuery += " AND o.status IN (" + strings.Join(placeholders, ",") + ")"
+	}
+
+	// Count total
+	countQuery := "SELECT COUNT(*) FROM (" + baseQuery + ") AS sub"
+	var total int
+	if err := db.QueryRow(countQuery, args...).Scan(&total); err != nil {
+		log.Printf("failed to count orders: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	// Paginated query
+	pagedQuery := baseQuery + " ORDER BY o.created_at DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	rows, err := db.Query(pagedQuery, args...)
+	if err != nil {
+		log.Printf("failed to query orders: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+	defer rows.Close()
+
+	type OrderRow struct {
+		OrderID   string  `json:"order_id"`
+		UserID    string  `json:"user_id"`
+		Amount    float64 `json:"amount"`
+		Status    string  `json:"status"`
+		CreatedAt string  `json:"created_at"`
+	}
+
+	var orders []OrderRow
+	for rows.Next() {
+		var o OrderRow
+		var createdAt time.Time
+		if err := rows.Scan(&o.OrderID, &o.UserID, &o.Amount, &o.Status, &createdAt); err != nil {
+			continue
+		}
+		o.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
+		orders = append(orders, o)
+	}
+	if orders == nil {
+		orders = []OrderRow{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"orders": orders,
+		"total":  total,
+		"page":   page,
+		"limit":  limit,
+	})
+}
+
+func handleSellerProducts(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+
+	countRow := db.QueryRow("SELECT COUNT(*) FROM Product WHERE seller_id = ?", sellerID)
+	var total int
+	if err := countRow.Scan(&total); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	query := `
+		SELECT p.product_id, p.product_name, p.price, p.product_condition, COALESCE(s.stocks, 0)
+		FROM Product p
+		LEFT JOIN Stock s ON p.product_id = s.product_id
+		WHERE p.seller_id = ?
+		ORDER BY p.product_name
+		LIMIT ? OFFSET ?`
+
+	rows, err := db.Query(query, sellerID, limit, offset)
+	if err != nil {
+		log.Printf("failed to query products: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+	defer rows.Close()
+
+	type ProductRow struct {
+		ProductID   string `json:"product_id"`
+		ProductName string `json:"product_name"`
+		Price       int    `json:"price"`
+		Condition   string `json:"condition"`
+		Stocks      int    `json:"stocks"`
+		Status      string `json:"status"`
+	}
+
+	var prods []ProductRow
+	for rows.Next() {
+		var p ProductRow
+		if err := rows.Scan(&p.ProductID, &p.ProductName, &p.Price, &p.Condition, &p.Stocks); err != nil {
+			continue
+		}
+		if p.Stocks == 0 {
+			p.Status = "out of stock"
+		} else if p.Stocks < 10 {
+			p.Status = "low stock"
+		} else {
+			p.Status = "active"
+		}
+		prods = append(prods, p)
+	}
+	if prods == nil {
+		prods = []ProductRow{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"products": prods,
+		"total":    total,
+		"page":     page,
+		"limit":    limit,
+	})
+}
+
+func handleUpdateProduct(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	productID := c.Param("id")
+	var body struct {
+		ProductName string `json:"product_name"`
+		Price       int    `json:"price"`
+		Summary     string `json:"summary"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	_, err = db.Exec(
+		"UPDATE Product SET product_name=?, price=?, summary=? WHERE product_id=? AND seller_id=?",
+		body.ProductName, body.Price, body.Summary, productID, sellerID,
+	)
+	if err != nil {
+		log.Printf("failed to update product: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func handleDeleteProduct(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	productID := c.Param("id")
+	_, err = db.Exec("DELETE FROM Product WHERE product_id=? AND seller_id=?", productID, sellerID)
+	if err != nil {
+		log.Printf("failed to delete product: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func handleGetProfile(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	var sellerName string
+	err = db.QueryRow("SELECT seller_name FROM Seller WHERE seller_id = ?", sellerID).Scan(&sellerName)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusOK, gin.H{"seller_id": sellerID, "seller_name": ""})
+		return
+	}
+	if err != nil {
+		log.Printf("failed to get profile: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"seller_id": sellerID, "seller_name": sellerName})
+}
+
+func handleUpdateProfile(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	var body struct {
+		SellerName string `json:"seller_name"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	_, err = db.Exec(
+		"INSERT INTO Seller (seller_id, seller_name) VALUES (?, ?) ON DUPLICATE KEY UPDATE seller_name = VALUES(seller_name)",
+		sellerID, body.SellerName,
+	)
+	if err != nil {
+		log.Printf("failed to update profile: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 func handleGetActiveSales(c *gin.Context) {
