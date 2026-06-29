@@ -126,8 +126,8 @@ func main() {
 		if e != nil {
 			return e
 		}
-		db.SetMaxOpenConns(25)
-		db.SetMaxIdleConns(25)
+		db.SetMaxOpenConns(5)
+		db.SetMaxIdleConns(3)
 		db.SetConnMaxLifetime(5 * time.Minute)
 		return db.Ping()
 	}); err != nil {
@@ -139,9 +139,11 @@ func main() {
 	var rdb *redis.Client
 	if err := retry(logger, "redis", retryTimeout, retrySleep, func() error {
 		rdb = redis.NewClient(&redis.Options{
-			Addr:     redisAddr,
-			Password: redisPassword,
-			DB:       redisDB,
+			Addr:         redisAddr,
+			Password:     redisPassword,
+			DB:           redisDB,
+			PoolSize:     5,
+			MinIdleConns: 1,
 		})
 		return rdb.Ping(context.Background()).Err()
 	}); err != nil {

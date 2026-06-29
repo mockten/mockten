@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import apiClient from '../module/apiClient';
 import {
   AppBar as MuiAppBar,
   Toolbar,
@@ -51,20 +50,11 @@ const Appbar: React.FC<AppbarProps> = ({
     }
   };
 
-  const handleCartClick = async () => {
-    try {
-      const response = await apiClient.get("/api/cart/list");
-      const cartData = response.data.items;
-
-      console.log('🛒 Cart contents:', cartData);
-
-      if (onCartClick) {
-        onCartClick();
-      } else {
-        navigate('/cart/list', { state: { cartData } });
-      }
-    } catch (error) {
-      console.error('Failed to get your cart', error);
+  const handleCartClick = () => {
+    if (onCartClick) {
+      onCartClick();
+    } else {
+      navigate('/cart/list');
     }
   };
 

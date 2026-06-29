@@ -11,6 +11,7 @@ import {
   MenuItem,
   Snackbar,
   Alert,
+  Skeleton,
 } from '@mui/material';
 import {
   Close,
@@ -57,73 +58,87 @@ interface ShippingInfo {
 const FavoritesListNew: React.FC = () => {
   const navigate = useNavigate();
   const [favoriteItems, setFavoriteItems] = useState<FavoriteItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
 
   const fetchFavorites = async () => {
+    setLoading(true);
     try {
-      const res = await apiClient.get('/api/fav');
-      if (res.data && Array.isArray(res.data)) {
-        // Fetch cart items to check current cart quantity
-        let cartMap = new Map();
-        try {
-          const cartRes = await apiClient.get('/api/cart/list');
-          const cartItems = cartRes.data.items || [];
-          for (const c of cartItems) {
-            const pid = c.product?.product_id || c.product_id || c.productId || c.id;
-            // c.id could be "PID:ShippingType", so we try c.product.product_id first
-            cartMap.set(String(pid), (cartMap.get(String(pid)) || 0) + c.quantity);
-          }
-        } catch (e) { console.error("Failed to fetch cart", e); }
+      const favRes = await apiClient.get('/api/fav');
 
-        const mappedItems: FavoriteItem[] = await Promise.all(res.data.map(async (item: any) => {
-          let shippingOptions: { fee: number, label: string, days: number }[] = [];
-          try {
-            const shipRes = await apiClient.get<ShippingInfo>('/api/shipping', { params: { product_id: item.productId }});
-            const data = shipRes.data;
-            if (typeof data.sea_standard_fee === 'number') shippingOptions.push({ fee: data.sea_standard_fee, label: 'Sea Standard', days: data.sea_standard_days || 0 });
-            if (typeof data.sea_express_fee === 'number') shippingOptions.push({ fee: data.sea_express_fee, label: 'Sea Express', days: data.sea_express_days || 0 });
-            if (typeof data.air_standard_fee === 'number') shippingOptions.push({ fee: data.air_standard_fee, label: 'Air Standard', days: data.air_standard_days || 0 });
-            if (typeof data.air_express_fee === 'number') shippingOptions.push({ fee: data.air_express_fee, label: 'Air Express', days: data.air_express_days || 0 });
-            if (typeof data.standard_fee === 'number') shippingOptions.push({ fee: data.standard_fee, label: 'Standard Delivery', days: data.standard_days || 0 });
-            if (typeof data.express_fee === 'number') shippingOptions.push({ fee: data.express_fee, label: 'Express Delivery', days: data.express_days || 0 });
-          } catch(e) {}
-          
-          if (shippingOptions.length === 0) {
-            shippingOptions.push({ fee: 0, label: 'Standard Delivery', days: 3 });
-          }
-          let cheapest = shippingOptions[0];
-          for(const opt of shippingOptions) {
-            if(opt.fee < cheapest.fee) cheapest = opt;
-          }
-
-          const cartQty = cartMap.get(String(item.productId)) || 0;
-          const availableStocks = Math.max(0, (item.stocks || 0) - cartQty);
-
-          return {
-            id: item.productId,
-            name: item.productName,
-            description: item.summary || 'No description',
-            price: item.price,
-            quantity: 1, // Favorite item usually doesn't have quantity
-            stocks: item.stocks || 0,
-            availableStocks,
-            selectedQuantity: availableStocks > 0 ? 1 : 0,
-            image: `/api/storage/${item.productId}.png`,
-            rating: item.avgReview || 0,
-            shippingOptions,
-            selectedShippingLabel: cheapest.label,
-            discountRate: item.discountRate || 0,
-            saleFlag: item.saleFlag || false,
-          };
-        }));
-        setFavoriteItems(mappedItems);
-      } else {
+      if (!favRes.data || !Array.isArray(favRes.data)) {
         setFavoriteItems([]);
+        setLoading(false);
+        return;
       }
+
+      // Render items immediately without waiting for cart
+      const defaultShipping = [{ fee: 0, label: 'Standard Delivery', days: 3 }];
+      const initialItems: FavoriteItem[] = favRes.data.map((item: any) => {
+        const availableStocks = item.stocks || 0;
+        return {
+          id: item.productId,
+          name: item.productName,
+          description: item.summary || 'No description',
+          price: item.price,
+          quantity: 1,
+          stocks: item.stocks || 0,
+          availableStocks,
+          selectedQuantity: availableStocks > 0 ? 1 : 0,
+          image: `/api/storage/${item.productId}.png`,
+          rating: item.avgReview || 0,
+          shippingOptions: defaultShipping,
+          selectedShippingLabel: defaultShipping[0].label,
+          discountRate: item.discountRate || 0,
+          saleFlag: item.saleFlag || false,
+        };
+      });
+      setFavoriteItems(initialItems);
+      setLoading(false);
+
+      // Enrich available stocks with cart data in background (non-blocking)
+      apiClient.get('/api/cart/list').then(cartRes => {
+        const cartMap = new Map<string, number>();
+        const cartItems = cartRes.data?.items || [];
+        for (const c of cartItems) {
+          const pid = c.product?.product_id || c.product_id || c.productId || c.id;
+          cartMap.set(String(pid), (cartMap.get(String(pid)) || 0) + c.quantity);
+        }
+        setFavoriteItems(prev => prev.map(item => {
+          const cartQty = cartMap.get(String(item.id)) || 0;
+          const availableStocks = Math.max(0, item.stocks - cartQty);
+          return { ...item, availableStocks, selectedQuantity: availableStocks > 0 ? Math.min(item.selectedQuantity, availableStocks) : 0 };
+        }));
+      }).catch(() => {});
+
+      // Enrich with actual shipping options asynchronously
+      const enriched = await Promise.all(favRes.data.map(async (item: any, idx: number) => {
+        let shippingOptions: { fee: number, label: string, days: number }[] = [];
+        try {
+          const shipRes = await apiClient.get<ShippingInfo>('/api/shipping', { params: { product_id: item.productId }});
+          const data = shipRes.data;
+          if (typeof data.sea_standard_fee === 'number') shippingOptions.push({ fee: data.sea_standard_fee, label: 'Sea Standard', days: data.sea_standard_days || 0 });
+          if (typeof data.sea_express_fee === 'number') shippingOptions.push({ fee: data.sea_express_fee, label: 'Sea Express', days: data.sea_express_days || 0 });
+          if (typeof data.air_standard_fee === 'number') shippingOptions.push({ fee: data.air_standard_fee, label: 'Air Standard', days: data.air_standard_days || 0 });
+          if (typeof data.air_express_fee === 'number') shippingOptions.push({ fee: data.air_express_fee, label: 'Air Express', days: data.air_express_days || 0 });
+          if (typeof data.standard_fee === 'number') shippingOptions.push({ fee: data.standard_fee, label: 'Standard Delivery', days: data.standard_days || 0 });
+          if (typeof data.express_fee === 'number') shippingOptions.push({ fee: data.express_fee, label: 'Express Delivery', days: data.express_days || 0 });
+        } catch(e) {}
+        if (shippingOptions.length === 0) shippingOptions.push({ fee: 0, label: 'Standard Delivery', days: 3 });
+        let cheapest = shippingOptions[0];
+        for(const opt of shippingOptions) { if(opt.fee < cheapest.fee) cheapest = opt; }
+        return { idx, shippingOptions, selectedShippingLabel: cheapest.label };
+      }));
+
+      setFavoriteItems(prev => prev.map((item, idx) => {
+        const e = enriched[idx];
+        return e ? { ...item, shippingOptions: e.shippingOptions, selectedShippingLabel: e.selectedShippingLabel } : item;
+      }));
     } catch (e) {
       console.error('Failed to fetch favorites', e);
+      setLoading(false);
     }
   };
 
@@ -282,7 +297,26 @@ const FavoritesListNew: React.FC = () => {
 
         {/* Favorite Items */}
         <Box sx={{ marginBottom: '64px' }}>
-          {favoriteItems.length > 0 ? (
+          {loading ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+              {[1, 2].map((i) => (
+                <Box key={i} sx={{ display: 'flex', gap: '16px', padding: '16px', border: '1px solid #f0f0f0', borderRadius: '8px' }}>
+                  <Skeleton variant="rectangular" width={140} height={140} sx={{ borderRadius: '8px', flexShrink: 0 }} />
+                  <Box sx={{ flex: 1 }}>
+                    <Skeleton width="60%" height={32} sx={{ mb: 1 }} />
+                    <Skeleton width="40%" height={20} sx={{ mb: 1 }} />
+                    <Skeleton width="20%" height={28} />
+                  </Box>
+                  <Box sx={{ width: 240, flexShrink: 0 }}>
+                    <Skeleton height={40} sx={{ mb: 1 }} />
+                    <Skeleton height={40} sx={{ mb: 1 }} />
+                    <Skeleton height={40} sx={{ mb: 1 }} />
+                    <Skeleton height={40} />
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          ) : favoriteItems.length > 0 ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
               {favoriteItems.map((item) => (
                 <Box
@@ -332,7 +366,7 @@ const FavoritesListNew: React.FC = () => {
                     <img 
                       src={item.image} 
                       alt={item.name} 
-                      style={{ width: '64px', height: '64px', objectFit: 'contain' }} 
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '10px' }} 
                       onError={(e) => { e.currentTarget.src = photoSvg; }}
                     />
                   </Box>
@@ -554,7 +588,7 @@ const FavoritesListNew: React.FC = () => {
           )}
         </Box>
 
-        {/* Recommended Products 
+        {/* Recommended Products
         <Box sx={{ marginTop: '64px' }}>
           <Typography
             sx={{

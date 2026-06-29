@@ -307,6 +307,7 @@ const ItemDetailNew: React.FC = () => {
         const res = await apiClient.get<ApiItemDetailResponse>(`/api/item/detail/${encodeURIComponent(id)}`);
         const apiData = res.data;
         setProduct(mapApiToProduct(apiData, id));
+        apiClient.post(`/api/browsing-history/${encodeURIComponent(id)}`).catch(() => {});
       } catch {
         setLoadError('Failed to load product detail.');
       }
@@ -535,12 +536,16 @@ const ItemDetailNew: React.FC = () => {
     }
   };
 
-  const relatedProducts = [
-    { id: 1, name: 'Sample Product', description: 'Sample Text. Sample TextSample TextSample TextSample TextSample Text', rating: 4.5 },
-    { id: 2, name: 'Sample Product', description: 'Sample Text. Sample TextSample TextSample TextSample TextSample Text', rating: 4.5 },
-    { id: 3, name: 'Sample Product', description: 'Sample Text. Sample TextSample TextSample TextSample TextSample Text', rating: 4.5 },
-    { id: 4, name: 'Sample Product', description: 'Sample Text. Sample TextSample TextSample TextSample TextSample Text', rating: 4.5 },
-  ];
+  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!id) return;
+    apiClient.get(`/api/co-purchase?product_id=${encodeURIComponent(id)}&limit=4`)
+      .then(res => {
+        if (res.data?.products) setRelatedProducts(res.data.products);
+      })
+      .catch(() => {});
+  }, [id]);
 
   const hasReviews = useMemo(() => {
     if (!product) return false;
@@ -979,7 +984,11 @@ const ItemDetailNew: React.FC = () => {
                           {key.charAt(0).toUpperCase() + key.slice(1)}
                         </TableCell>
                         <TableCell sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: 'black' }}>
-                          {value}
+                          {key === 'vendor' && value && value !== 'N/A' ? (
+                            <a href={`/search?q=${encodeURIComponent(value)}`} style={{ color: '#1976d2', textDecoration: 'none' }}>
+                              {value}
+                            </a>
+                          ) : value}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1431,45 +1440,30 @@ const ItemDetailNew: React.FC = () => {
 
           <Grid container spacing={2}>
             {relatedProducts.map((relatedProduct) => (
-              <Grid item xs={12} sm={6} md={3} key={relatedProduct.id}>
+              <Grid item xs={12} sm={6} md={3} key={relatedProduct.product_id}>
                 <Card
-                  sx={{
-                    cursor: 'pointer',
-                    '&:hover': {
-                      boxShadow: 3,
-                    },
-                  }}
-                  onClick={() => navigate(`/item/${relatedProduct.id}`)}
+                  sx={{ cursor: 'pointer', position: 'relative', '&:hover': { boxShadow: 3, transform: 'translateY(-4px)', transition: 'transform 0.2s' } }}
+                  onClick={() => navigate(`/item/${relatedProduct.product_id}`)}
                 >
-                  <Box
-                    sx={{
-                      height: '100px',
-                      backgroundColor: '#f5f5f5',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <img src={photoSvg} alt="Product" style={{ width: '64px', height: '64px' }} />
+                  <Box sx={{ width: '100%', aspectRatio: '1/1', backgroundColor: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                    <img
+                      src={`/api/storage/${relatedProduct.product_id}.png`}
+                      alt={relatedProduct.product_name}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '12px' }}
+                      onError={(e) => { e.currentTarget.src = photoSvg; }}
+                    />
                   </Box>
                   <CardContent sx={{ padding: '8px' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '8px' }}>
-                      {renderStarsSmall(relatedProduct.rating)}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '4px' }}>
+                      {renderStarsSmall(relatedProduct.avg_review)}
                     </Box>
                     <Typography
-                      variant="h6"
-                      sx={{
-                        fontFamily: 'Noto Sans',
-                        fontWeight: 'bold',
-                        fontSize: '16px',
-                        color: 'black',
-                        marginBottom: '8px',
-                      }}
+                      sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '14px', color: 'black', marginBottom: '4px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', height: '40px' }}
                     >
-                      {relatedProduct.name}
+                      {relatedProduct.product_name}
                     </Typography>
-                    <Typography variant="body2" sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: '#666666' }}>
-                      {relatedProduct.description}
+                    <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', fontWeight: 'bold', color: 'black' }}>
+                      ${relatedProduct.price}
                     </Typography>
                   </CardContent>
                 </Card>

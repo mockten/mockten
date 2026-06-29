@@ -10,6 +10,7 @@ import {
   CardContent,
   LinearProgress,
   Select,
+  IconButton,
   MenuItem,
   Pagination,
   FormControl,
@@ -23,6 +24,8 @@ import {
   Star,
   StarHalf,
   StarBorder,
+  Favorite,
+  FavoriteBorder,
 } from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
@@ -39,15 +42,6 @@ interface Order {
   image: string;
 }
 
-interface RecommendedProduct {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  rating: number;
-  image: string;
-}
-
 const OrderHistoryNew: React.FC = () => {
   const navigate = useNavigate();
 
@@ -55,12 +49,78 @@ const OrderHistoryNew: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+
+
+  useEffect(() => {
+    apiClient.get('/api/fav').then(res => {
+      if (res.data && Array.isArray(res.data)) {
+        setFavorites(new Set(res.data.map((f: any) => String(f.productId))));
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleToggleFavorite = async (e: React.MouseEvent, productId: string) => {
+    e.stopPropagation();
+    const isFav = favorites.has(productId);
+    setFavorites(prev => { const s = new Set(prev); isFav ? s.delete(productId) : s.add(productId); return s; });
+    try {
+      if (isFav) await apiClient.delete(`/api/fav/${productId}`);
+      else await apiClient.post(`/api/fav/${productId}`);
+    } catch {
+      setFavorites(prev => { const s = new Set(prev); isFav ? s.add(productId) : s.delete(productId); return s; });
+    }
+  };
+
+  const getUserIdFromToken = () => {
+    const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken') || localStorage.getItem('mockten_access_token');
+    if (!token) return '';
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      const decoded = JSON.parse(jsonPayload);
+      return decoded.email || decoded.preferred_username || decoded.sub || '';
+    } catch (e) {
+      return '';
+    }
+  };
+
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      try {
+        const userId = getUserIdFromToken();
+        const res = await apiClient.get(`/api/recommendation?user_id=${encodeURIComponent(userId)}&limit=4`);
+        if (res.data && Array.isArray(res.data.recommendations)) {
+          setRecommendedProducts(res.data.recommendations);
+        }
+      } catch (err) {
+        console.error('Failed to fetch recommendations', err);
+      }
+    };
+    fetchRecommendations();
+  }, []);
 
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const userinfoRes = await apiClient.get('/api/uam/userinfo');
-        const userId = userinfoRes.data.email || userinfoRes.data.preferred_username;
+        // Decode userId from JWT locally to avoid Keycloak roundtrip
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken') || localStorage.getItem('mockten_access_token');
+        let userId = '';
+        if (token) {
+          try {
+            const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+            const payload = JSON.parse(decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')));
+            userId = payload.email || payload.preferred_username || payload.sub || '';
+          } catch { /* fall through to API */ }
+        }
+        if (!userId) {
+          const userinfoRes = await apiClient.get('/api/uam/userinfo');
+          userId = userinfoRes.data.email || userinfoRes.data.preferred_username;
+        }
         if (!userId) {
           setLoading(false);
           return;
@@ -75,7 +135,7 @@ const OrderHistoryNew: React.FC = () => {
           purchaseDate: item.purchase_date,
           status: item.status === 'booked' ? 'Order Confirming' : 
                   (item.status === 'picked_up' || item.status === 'in_transit') ? 'Shipping' : 'Delivered',
-          quantity: 1,
+          quantity: item.quantity || 1,
           image: `/api/storage/${item.product_id}.png`,
         }));
         setOrders(mappedOrders);
@@ -88,40 +148,7 @@ const OrderHistoryNew: React.FC = () => {
     fetchOrders();
   }, []);
 
-  const mockRecommendedProducts: RecommendedProduct[] = [
-    {
-      id: 1,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      price: 2999,
-      rating: 4.5,
-      image: photoSvg,
-    },
-    {
-      id: 2,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      price: 3999,
-      rating: 4.5,
-      image: photoSvg,
-    },
-    {
-      id: 3,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      price: 4999,
-      rating: 4.5,
-      image: photoSvg,
-    },
-    {
-      id: 4,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      price: 5999,
-      rating: 4.5,
-      image: photoSvg,
-    },
-  ];
+
 
 
   const renderStars = (rating: number) => {
@@ -386,58 +413,81 @@ const OrderHistoryNew: React.FC = () => {
           </Typography>
 
           <Grid container spacing={2}>
-            {mockRecommendedProducts.map((product) => (
-              <Grid item xs={12} sm={6} md={3} key={product.id}>
-                <Card
-                  sx={{
-                    cursor: 'pointer',
-                    '&:hover': {
-                      boxShadow: 3,
-                    },
-                  }}
-                  onClick={() => navigate(`/item/${product.id}`)}
-                >
-                  <Box
-                    sx={{
-                      height: '100px',
-                      backgroundColor: '#f5f5f5',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
+            {recommendedProducts.length > 0 ? (
+              recommendedProducts.map((product) => (
+                <Grid item xs={12} sm={6} md={3} key={product.product_id}>
+                  <Card
+                    sx={{ cursor: 'pointer', position: 'relative', '&:hover': { boxShadow: 3, transform: 'translateY(-4px)', transition: 'transform 0.2s' } }}
+                    onClick={() => navigate(`/item/${product.product_id}`)}
                   >
-                    <img src={product.image} alt="Product" style={{ width: '64px', height: '64px' }} />
-                  </Box>
-                  <CardContent sx={{ padding: '8px' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '8px' }}>
-                      {renderStars(product.rating)}
+                    <Box sx={{ width: '100%', aspectRatio: '1/1', backgroundColor: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+                      <img
+                        src={`/api/storage/${product.product_id}.png`}
+                        alt={product.product_name}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '12px' }}
+                        onError={(e) => { e.currentTarget.src = photoSvg; }}
+                      />
+                      <IconButton sx={{ position: 'absolute', top: 4, right: 4 }} onClick={(e) => handleToggleFavorite(e, product.product_id)}>
+                        {favorites.has(product.product_id) ? <Favorite sx={{ color: 'red', fontSize: '20px' }} /> : <FavoriteBorder sx={{ fontSize: '20px' }} />}
+                      </IconButton>
                     </Box>
-                    <Typography
-                      variant="h6"
+                    <CardContent sx={{ padding: '8px' }}>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '14px', color: 'black', marginBottom: '4px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', height: '40px' }}>
+                        {product.product_name}
+                      </Typography>
+                      <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', fontWeight: 'bold', color: 'black' }}>
+                        ${product.price}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))
+            ) : (
+              Array.from({ length: 4 }, (_, index) => (
+                <Grid item xs={12} sm={6} md={3} key={index}>
+                  <Card>
+                    <Box
                       sx={{
-                        fontFamily: 'Noto Sans',
-                        fontWeight: 'bold',
-                        fontSize: '16px',
-                        color: 'black',
-                        marginBottom: '8px',
+                        height: '100px',
+                        backgroundColor: '#f5f5f5',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
                     >
-                      {product.name}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontFamily: 'Noto Sans',
-                        fontSize: '14px',
-                        color: '#666666',
-                      }}
-                    >
-                      {product.description}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
+                      <img src={photoSvg} alt="Placeholder" style={{ width: '64px', height: '64px' }} />
+                    </Box>
+                    <CardContent sx={{ padding: '8px' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '8px' }}>
+                        {renderStars(4.5)}
+                      </Box>
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontWeight: 'bold',
+                          fontSize: '16px',
+                          color: 'black',
+                          marginBottom: '8px',
+                        }}
+                      >
+                        Sample
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontSize: '14px',
+                          color: '#666666',
+                        }}
+                      >
+                        Product description and price will be included.
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))
+            )}
           </Grid>
         </Box>
       </Container>

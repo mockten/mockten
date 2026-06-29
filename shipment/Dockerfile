@@ -1,4 +1,4 @@
-FROM golang:1.24 AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 
@@ -6,9 +6,9 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY main.go ./
-RUN CGO_ENABLED=0 GOOS=linux go build -o shipment-service main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o shipment-service main.go
 
-FROM alpine:latest
+FROM alpine:3
 WORKDIR /app
 COPY --from=builder /app/shipment-service .
 

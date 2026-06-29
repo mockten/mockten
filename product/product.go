@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -72,6 +73,7 @@ type ItemDetailResponse struct {
 	VendorUserName    string           `json:"vendorUserName"`
 	VendorDescription string           `json:"vendorDescription"`
 	Reviews           []ReviewResponse `json:"reviews,omitempty"`
+	ImageURL          string           `json:"imageUrl"`
 	SaleFlag          bool             `json:"saleFlag"`
 	SaleID            string           `json:"saleId"`
 	DiscountRate      float64          `json:"discountRate"`
@@ -336,6 +338,20 @@ func getItemReviewsHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
+// getImageURL checks if the image exists in MinIO.
+// パフォーマンス補足:
+// POCレベルではリクエストごとに MinIO を HEAD チェックするのは許容範囲。
+// 本番化する場合は起動時に存在する画像のリストをメモリキャッシュし、
+// 定期的に更新するか、新規画像アップロード時にキャッシュをクリアする仕組みにすること。
+func getImageURL(productID string, categoryID string) string {
+	imageURL := fmt.Sprintf("/api/storage/%s.png", productID)
+	resp, err := http.Head(fmt.Sprintf("http://minio-service.default.svc.cluster.local:9000/photos/%s.png", productID))
+	if err != nil || resp.StatusCode != 200 {
+		return "/api/storage/placeholder.png"
+	}
+	return imageURL
+}
+
 func getItemDetailHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		productID := c.Param("productId")
@@ -370,6 +386,7 @@ SELECT
   p.review_count,
   ue.USERNAME AS vendor_username,
   COALESCE(ua.VALUE, '') AS vendor_description,
+  p.category_id,
   p.sale_flag,
   COALESCE(p.sale_id, '') AS sale_id,
   COALESCE(ts.discount_rate, 0.0) AS discount_rate
@@ -379,7 +396,7 @@ LEFT JOIN Stock t ON p.product_id = t.product_id
 LEFT JOIN Seller s ON p.seller_id = s.seller_id
 LEFT JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
 LEFT JOIN USER_ATTRIBUTE ua ON ue.ID = ua.USER_ID AND ua.NAME = 'description'
-LEFT JOIN Geo g ON p.geo_id = g.user_id
+LEFT JOIN Geo g ON p.geo_id = g.geo_id
 LEFT JOIN TimeSale ts ON p.sale_id = ts.id
 WHERE p.product_id = ?
 LIMIT 1
@@ -404,6 +421,7 @@ LIMIT 1
 			reviewCount       sql.NullInt64
 			vendorUserName    sql.NullString
 			vendorDescription sql.NullString
+			categoryID        string
 		)
 
 		err := db.QueryRow(query, productID).Scan(
@@ -431,6 +449,7 @@ LIMIT 1
 			&reviewCount,
 			&vendorUserName,
 			&vendorDescription,
+			&categoryID,
 			&resp.SaleFlag,
 			&resp.SaleID,
 			&resp.DiscountRate,
@@ -518,6 +537,8 @@ LIMIT 1
 		if len(reviewsPreview) > 0 {
 			resp.Reviews = reviewsPreview
 		}
+
+		resp.ImageURL = getImageURL(resp.ProductID, categoryID)
 
 		c.JSON(http.StatusOK, resp)
 	}
@@ -716,6 +737,7 @@ func getFavoriteListHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		c.Header("Cache-Control", "no-store")
 		var productIDsJSON string
 		err = db.QueryRow(`SELECT product_ids FROM Wishlist WHERE user_id = ? LIMIT 1`, userID).Scan(&productIDsJSON)
 		if err != nil {
@@ -880,6 +902,195 @@ WHERE user_id = ? AND JSON_CONTAINS(product_ids, JSON_QUOTE(?))
 	}
 }
 
+func recordBrowsingHistoryHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, err := getUserIDFromAccessToken(c)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		productID := c.Param("productId")
+		if productID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing productId"})
+			return
+		}
+
+		_, err = db.Exec(`INSERT INTO BrowsingHistory (user_id, product_id) VALUES (?, ?)`, userID, productID)
+		if err != nil {
+			logger.Error("DB insert failed (BrowsingHistory)", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"status": "recorded"})
+	}
+}
+
+func getBrowsingHistoryRecommendationsHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, err := getUserIDFromAccessToken(c)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		limit := 8
+		if l := c.Query("limit"); l != "" {
+			if parsed, err2 := strconv.Atoi(l); err2 == nil && parsed > 0 && parsed <= 50 {
+				limit = parsed
+			}
+		}
+
+		rows, err := db.Query(`
+			SELECT p.product_id, p.product_name, p.category_id, p.price, p.avg_review
+			FROM Product p
+			WHERE p.category_id IN (
+				SELECT category_id FROM (
+					SELECT p2.category_id
+					FROM BrowsingHistory bh
+					JOIN Product p2 ON bh.product_id = p2.product_id
+					WHERE bh.user_id = ?
+					GROUP BY p2.category_id
+					ORDER BY MAX(bh.viewed_at) DESC
+					LIMIT 5
+				) AS top_cats
+			)
+			AND p.product_id NOT IN (
+				SELECT product_id FROM BrowsingHistory WHERE user_id = ?
+			)
+			ORDER BY p.avg_review DESC
+			LIMIT ?
+		`, userID, userID, limit)
+		if err != nil {
+			logger.Error("DB query failed (BrowsingHistory recommendations)", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+		defer rows.Close()
+
+		type Recommendation struct {
+			ProductID   string  `json:"product_id"`
+			ProductName string  `json:"product_name"`
+			CategoryID  string  `json:"category_id"`
+			Price       int     `json:"price"`
+			AvgReview   float64 `json:"avg_review"`
+			ImageURL    string  `json:"image_url"`
+		}
+
+		results := []Recommendation{}
+		for rows.Next() {
+			var r Recommendation
+			if err2 := rows.Scan(&r.ProductID, &r.ProductName, &r.CategoryID, &r.Price, &r.AvgReview); err2 != nil {
+				continue
+			}
+			r.ImageURL = fmt.Sprintf("/api/storage/%s.png", r.ProductID)
+			results = append(results, r)
+		}
+
+		c.JSON(http.StatusOK, gin.H{"recommendations": results, "count": len(results)})
+	}
+}
+
+func getCoPurchaseHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		productID := c.Query("product_id")
+		if productID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "product_id is required"})
+			return
+		}
+
+		limit := 4
+		if l := c.Query("limit"); l != "" {
+			if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 20 {
+				limit = parsed
+			}
+		}
+
+		type Product struct {
+			ProductID   string  `json:"product_id"`
+			ProductName string  `json:"product_name"`
+			CategoryID  string  `json:"category_id"`
+			Price       int     `json:"price"`
+			AvgReview   float64 `json:"avg_review"`
+			ImageURL    string  `json:"image_url"`
+		}
+
+		results := []Product{}
+
+		// Step 1: "users who bought X also bought Y" via Transaction→Geo→user_id
+		rows, err := db.Query(`
+			SELECT p.product_id, p.product_name, p.category_id, p.price, p.avg_review,
+			       COUNT(DISTINCT g.user_id) AS co_buy_count
+			FROM `+"`Transaction`"+` t
+			JOIN Geo g ON t.geo_id = g.geo_id
+			JOIN Product p ON t.product_id = p.product_id
+			WHERE g.user_id IN (
+				SELECT DISTINCT g2.user_id
+				FROM `+"`Transaction`"+` t2
+				JOIN Geo g2 ON t2.geo_id = g2.geo_id
+				WHERE t2.product_id = ?
+			)
+			AND t.product_id != ?
+			GROUP BY p.product_id, p.product_name, p.category_id, p.price, p.avg_review
+			ORDER BY co_buy_count DESC, p.avg_review DESC
+			LIMIT ?
+		`, productID, productID, limit)
+		if err != nil {
+			logger.Error("co-purchase query failed", zap.Error(err))
+		} else {
+			defer rows.Close()
+			for rows.Next() {
+				var p Product
+				var count int
+				if err2 := rows.Scan(&p.ProductID, &p.ProductName, &p.CategoryID, &p.Price, &p.AvgReview, &count); err2 == nil {
+					p.ImageURL = fmt.Sprintf("/api/storage/%s.png", p.ProductID)
+					results = append(results, p)
+				}
+			}
+		}
+
+		// Step 2: fallback with same-category popular products
+		if len(results) < limit {
+			var categoryID string
+			_ = db.QueryRow(`SELECT category_id FROM Product WHERE product_id = ?`, productID).Scan(&categoryID)
+
+			if categoryID != "" {
+				excludeIDs := make([]interface{}, 0, len(results)+1)
+				excludeIDs = append(excludeIDs, productID)
+				placeholders := "?"
+				for _, r := range results {
+					excludeIDs = append(excludeIDs, r.ProductID)
+					placeholders += ",?"
+				}
+				remaining := limit - len(results)
+				excludeIDs = append(excludeIDs, categoryID, remaining)
+
+				fallbackRows, err2 := db.Query(fmt.Sprintf(`
+					SELECT product_id, product_name, category_id, price, avg_review
+					FROM Product
+					WHERE product_id NOT IN (%s)
+					AND category_id = ?
+					ORDER BY avg_review DESC
+					LIMIT ?
+				`, placeholders), excludeIDs...)
+				if err2 == nil {
+					defer fallbackRows.Close()
+					for fallbackRows.Next() {
+						var p Product
+						if err3 := fallbackRows.Scan(&p.ProductID, &p.ProductName, &p.CategoryID, &p.Price, &p.AvgReview); err3 == nil {
+							p.ImageURL = fmt.Sprintf("/api/storage/%s.png", p.ProductID)
+							results = append(results, p)
+						}
+					}
+				}
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{"products": results, "count": len(results)})
+	}
+}
+
 func main() {
 	var err error
 
@@ -926,6 +1137,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("DB open error: %v", err)
 	}
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(3)
+	db.SetConnMaxLifetime(5 * time.Minute)
 
 	waitForMySQL(db, logger)
 	defer db.Close()
@@ -939,6 +1153,11 @@ func main() {
 	router.GET("/v1/fav", getFavoriteListHandler(db))
 	router.POST("/v1/fav/:productId", addFavoriteItemHandler(db))
 	router.DELETE("/v1/fav/:productId", removeFavoriteItemHandler(db))
+
+	router.POST("/v1/browsing-history/:productId", recordBrowsingHistoryHandler(db))
+	router.GET("/v1/browsing-history/recommendations", getBrowsingHistoryRecommendationsHandler(db))
+
+	router.GET("/v1/co-purchase", getCoPurchaseHandler(db))
 
 	_ = router.Run(port)
 }

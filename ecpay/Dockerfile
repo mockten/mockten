@@ -1,10 +1,10 @@
-FROM golang:1.25 AS builder
+FROM golang:1.26-alpine AS builder
 
-RUN apt-get update &&\
-    apt-get -y install sysv-rc-conf &&\
-    apt-get -y install unzip &&\
-    curl -OL https://github.com/google/protobuf/releases/download/v3.11.2/protoc-3.11.2-linux-x86_64.zip &&\
-    unzip protoc-3.11.2-linux-x86_64.zip -d protoc3
+RUN ARCH=$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/aarch_64/') && \
+    apk --no-cache add curl unzip && \
+    curl -OL https://github.com/google/protobuf/releases/download/v3.11.2/protoc-3.11.2-linux-${ARCH}.zip && \
+    unzip protoc-3.11.2-linux-${ARCH}.zip -d protoc3 && \
+    rm protoc-3.11.2-linux-${ARCH}.zip
 
 RUN mkdir -p /go/src/ecpay
 WORKDIR /go/src/ecpay
@@ -13,11 +13,9 @@ RUN go get github.com/gin-contrib/cors && \
     go get github.com/gin-gonic/gin && \
     go get github.com/stripe/stripe-go/v74 && \
     go mod tidy && \
-    go build .
+    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o ecpay .
 FROM alpine:3
-RUN apk add --no-cache ca-certificates &&\
-    apk add gcompat &&\
-    mkdir /var/log/apl
+RUN apk add --no-cache ca-certificates && mkdir /var/log/apl
 # RUN ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2 &&\
 COPY --from=builder /go/src/ecpay/ecpay /ecpay
 COPY --from=builder /go/src/ecpay/config.ini  /config.ini

@@ -1,6 +1,6 @@
-FROM debian:bookworm-20250929-slim
+FROM alpine:3
 
-RUN apt-get update && apt-get install -y curl jq default-mysql-client
+RUN apk add --no-cache bash curl jq mysql-client
 
 COPY *.sh /
 RUN chmod +x /*.sh

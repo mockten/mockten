@@ -1,0 +1,7 @@
+fastapi==0.138.0
+uvicorn==0.34.0
+lightfm==1.17
+scipy==1.13.0
+numpy==1.26.4
+pymysql==1.1.1
+minio==7.2.5

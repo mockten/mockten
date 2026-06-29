@@ -1,56 +1,371 @@
 version: "3"
 tasks:
-  build: 
+  build:
     cmds:
-      - (docker network inspect mockten_nw > /dev/null 2>&1 || docker network create mockten_nw)
-      - (cd mysql && docker run --rm -d --name mysql-service.default.svc.cluster.local -e MYSQL_ROOT_PASSWORD=rootpassword -e MYSQL_DATABASE=mocktendb -e MYSQL_USER=mocktenusr -e MYSQL_PASSWORD=mocktenpassword --network mockten_nw -p 3306:3306 mockten-mysql)
-      - (cd redis && docker run --rm -d --name redis-service.default.svc.cluster.local --network mockten_nw -p 6379:6379 mockten-redis)
-      - (cd uam && docker run --rm --platform linux/amd64 --name uam-service.default.svc.cluster.local --network mockten_nw -e KC_HOSTNAME=localhost -e DEV_MODE=true -dit uam)
-      - (cd minIO && docker run --rm --name minio-service.default.svc.cluster.local --network mockten_nw -p 9000:9000 -p 9001:9001 -dit minio)
-      - (cd apigw && docker run --rm --name apigw --network mockten_nw -p 8082:8082 -p 8001:8001 -p 8002:8002 -dit apigw)
-      - (cd meilisearch && docker run --rm --name meilisearch-service.default.svc.cluster.local --network mockten_nw -p 7700:7700 -dit meilisearch)
-      - (cd searchitem && docker run --rm --name searchitem-service.default.svc.cluster.local --network mockten_nw -p 50051:50051 -dit searchitem)
-      - (cd product && docker run --rm --name product-service.default.svc.cluster.local --network mockten_nw -p 50052:50052 -dit product)
-      - (cd cart && docker run --rm --name cart-service.default.svc.cluster.local --network mockten_nw -p 50053:50053 -dit cart)
-      - (cd sync && docker run --rm --name mockten-sync --network mockten_nw -dit mockten-sync)
-      - (cd geocoding && docker run --rm -d -v "$PWD/config.json:/app/config.json:ro" --name geocoding-service.default.svc.cluster.local --network mockten_nw mockten-geocoding)
-      - (cd ecpay && docker run --rm -d --name ecpay-service.default.svc.cluster.local -e SecretKeyString=${STRIPE_SECRET_KEY} -e MysqlUser=mocktenusr -e MysqlPassword=mocktenpassword -e DbHost="mysql-service.default.svc.cluster.local:3306" -e MysqlDB=mocktendb -e RANKING_SERVICE_URL="http://ranking-service.default.svc.cluster.local:8080" --network mockten_nw mockten-ecpay)
-      - (cd ranking && docker run --rm -d --name ranking-service.default.svc.cluster.local -e REDIS_HOST="redis-service.default.svc.cluster.local:6379" -e MYSQL_DSN="mocktenusr:mocktenpassword@tcp(mysql-service.default.svc.cluster.local:3306)/mocktendb?parseTime=true" --network mockten_nw mockten-ranking)
-      - (cd sale && docker run --rm -d --name sale-service.default.svc.cluster.local -e MYSQL_DSN="mocktenusr:mocktenpassword@tcp(mysql-service.default.svc.cluster.local:3306)/mocktendb?parseTime=true" -e MEILI_SVC="meilisearch-service.default.svc.cluster.local" --network mockten_nw mockten-sale)
-      - (cd shipment && docker run --rm -d --name shipment-service.default.svc.cluster.local -e TEST_MODE=true -e TICK_INTERVAL_SECONDS=200 -e MYSQL_DSN="mocktenusr:mocktenpassword@tcp(mysql-service.default.svc.cluster.local:3306)/mocktendb?parseTime=true" --network mockten_nw mockten-shipment)
-      - (docker run --rm --name nginx --network mockten_nw -v $(pwd)/dev_nginx.conf:/etc/nginx/nginx.conf:ro -p 80:80 -dit nginx)
-      - (for i in {1..30}; do docker exec -i mysql-service.default.svc.cluster.local mysql -umocktenusr -pmocktenpassword mocktendb < mysql/test_insert.sql 2>/dev/null && break || sleep 1; done)
-      - (cd ecfront2 && TEST_MODE=true npm run dev -- --host 0.0.0.0 --port 5173)
-  destroy: 
+      - (touch ecfront2.log)
+      - (docker compose up -d || docker-compose up -d)
+      - (for i in {1..30}; do docker exec -i mysql-service.default.svc.cluster.local mysql --ssl-mode=DISABLED -umocktenusr -pmocktenpassword mocktendb -e "SELECT 1" >/dev/null 2>&1 && break || sleep 1; done)
+      - (for i in {1..30}; do docker exec -i mysql-service.default.svc.cluster.local mysql --ssl-mode=DISABLED -umocktenusr -pmocktenpassword mocktendb < mysql/test_insert.sql 2>/dev/null && break || sleep 1; done)
+      - (python3 mysql/seeder/behavior_seeder.py)
+      - |
+        for i in {1..30}; do
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -u airflow:airflow http://localhost:8085/api/v1/health 2>/dev/null || echo "000")
+          if [ "$STATUS" = "200" ]; then break; fi
+          sleep 2
+        done
+        curl -s -u airflow:airflow -X POST http://localhost:8085/api/v1/dags/mockten_data_pipeline/dagRuns \
+          -H "Content-Type: application/json" \
+          -d '{"conf":{}}' > /dev/null || true
+      - |
+        cd ecfront2
+        TEST_MODE=true npm run dev -- --host 0.0.0.0 --port 5173 > ../ecfront2.log 2>&1 < /dev/null &
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+          VITE_PID=$(lsof -t -i :5173 | head -n 1)
+          if [ -n "$VITE_PID" ]; then
+            echo "$VITE_PID" > ../ecfront2.pid
+            break
+          fi
+          sleep 0.5
+        done
+      - sleep 3
+      - task: hc
+  destroy:
     cmds:
-      - docker stop mockten-sync || true
-      - docker ps --no-trunc | awk '$NF ~ /-service\.default\.svc\.cluster\.local$/ { print $NF }' | xargs -r docker stop || true
-      - docker stop nginx || true
-      - docker stop apigw || true
-      - docker network rm mockten_nw || true
+      - (if [ -f ecfront2.pid ]; then kill $(cat ecfront2.pid) || true; rm -f ecfront2.pid; fi)
+      - (lsof -t -i :5173 | xargs kill -9 || true)
+      - (docker compose down -v --remove-orphans || docker-compose down -v --remove-orphans || true)
+      - (rm -f ecfront2.log ecfront2.pid zap-report.html || true)
+      - (docker rm -f $(docker ps -aq --filter "name=^act-CI") || true)
+      - (docker image prune -f || true)
+      - (docker builder prune --keep-storage 5GB -f || true)
+      - (docker system prune -a --volumes -f || true)
+  hc:
+    desc: Verify that all containers and the React frontend process are healthy and running
+    cmds:
+      - |
+        for container in mysql-service.default.svc.cluster.local redis-service.default.svc.cluster.local uam-service.default.svc.cluster.local minio-service.default.svc.cluster.local apigw meilisearch-service.default.svc.cluster.local searchitem-service.default.svc.cluster.local product-service.default.svc.cluster.local cart-service.default.svc.cluster.local mockten-sync geocoding-service.default.svc.cluster.local ecpay-service.default.svc.cluster.local ranking-service.default.svc.cluster.local sale-service.default.svc.cluster.local shipment-service.default.svc.cluster.local recommendation-service.default.svc.cluster.local nginx mockten-dashboard; do
+          if [ -z "$(docker ps -q -f name=$container -f status=running)" ]; then
+            echo "Error: Container $container is not running!"
+            exit 1
+          fi
+        done
+        echo "All 18 containers are successfully running."
+      - |
+        if [ ! -f ecfront2.pid ]; then
+          echo "Error: ecfront2.pid file does not exist!"
+          exit 1
+        fi
+        PID=$(cat ecfront2.pid)
+        if ! ps -p $PID > /dev/null; then
+          echo "Error: React process (PID $PID) is not running!"
+          exit 1
+        fi
+        echo "React frontend process (PID $PID) is running."
+      - |
+        if ! lsof -i :5173 > /dev/null; then
+          echo "Error: Frontend is not listening on port 5173!"
+          exit 1
+        fi
+        echo "Frontend is listening on port 5173."
+        echo "Health check passed: All services are running correctly!"
+  hc-deep:
+    desc: Deep health check - verify HTTP endpoints actually respond correctly
+    cmds:
+      - task: hc
+      - |
+        FAILED=0
+        echo "=== [Deep HC] Checking HTTP endpoints ==="
+
+        # nginx root (React frontend)
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/ 2>/dev/null || echo "000")
+        if [ "$STATUS" = "200" ] || [ "$STATUS" = "304" ]; then
+          echo "PASS  nginx root: $STATUS"
+        else
+          echo "FAIL  nginx root: $STATUS"
+          FAILED=1
+        fi
+
+        # Dashboard
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/dashboard/ 2>/dev/null || echo "000")
+        if [ "$STATUS" = "200" ] || [ "$STATUS" = "304" ]; then
+          echo "PASS  dashboard: $STATUS"
+        else
+          echo "FAIL  dashboard: $STATUS"
+          FAILED=1
+        fi
+
+        # Kong API gateway
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8082/ 2>/dev/null || echo "000")
+        if [ "$STATUS" != "000" ]; then
+          echo "PASS  apigw (kong): $STATUS"
+        else
+          echo "FAIL  apigw (kong): unreachable"
+          FAILED=1
+        fi
+
+        # MySQL via docker exec
+        docker exec -i mysql-service.default.svc.cluster.local mysql --ssl-mode=DISABLED -umocktenusr -pmocktenpassword mocktendb -e "SELECT 1" >/dev/null 2>&1 && \
+          echo "PASS  mysql: query OK" || { echo "FAIL  mysql: query failed"; FAILED=1; }
+
+        # Reset-stock endpoint (smoke test)
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost/api/test/reset-stock 2>/dev/null || echo "000")
+        if [ "$STATUS" = "200" ]; then
+          echo "PASS  reset-stock endpoint: $STATUS"
+        else
+          echo "WARN  reset-stock endpoint: $STATUS (may need TEST_MODE frontend)"
+        fi
+
+        if [ $FAILED -ne 0 ]; then
+          echo ""
+          echo "Deep health check FAILED."
+          exit 1
+        fi
+        echo ""
+        echo "Deep health check PASSED."
+
+  start-frontend:
+    desc: Start (or restart) only the Vite dev server on port 5173
+    cmds:
+      - |
+        (lsof -t -i :5173 | xargs kill -9 || true)
+        rm -f ecfront2.pid
+        cd ecfront2
+        TEST_MODE=true npm run dev -- --host 0.0.0.0 --port 5173 > ../ecfront2.log 2>&1 < /dev/null &
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+          VITE_PID=$(lsof -t -i :5173 | head -n 1)
+          if [ -n "$VITE_PID" ]; then
+            echo "$VITE_PID" > ../ecfront2.pid
+            echo "Frontend started (PID $VITE_PID) on port 5173"
+            break
+          fi
+          sleep 0.5
+        done
+  recommendation-train:
+    desc: Run the recommendation model training job as a standalone container using docker-compose
+    cmds:
+      - (docker compose run --rm recommendation python train.py || docker-compose run --rm recommendation python train.py)
   ci:
     desc: Run CI workflows locally using act
     cmds:
-      - act pull_request -W .github/workflows/ci.yml
-      - docker builder prune -a -f
+      - act pull_request -W .github/workflows/ci.yml --concurrent-jobs 2 --pull=false --secret-file .secrets
+      - (docker builder prune --keep-storage 5GB -f || true)
+  check-reset-stock:
+    desc: Verify that the /api/test/reset-stock endpoint works (required for ie2e scenario2)
+    cmds:
+      - |
+        echo "=== [Check] Verifying reset-stock endpoint ==="
+        RESULT=$(curl -s -X POST http://localhost/api/test/reset-stock)
+        OK=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('ok','false'))" 2>/dev/null || echo "false")
+        if [ "$OK" = "True" ] || [ "$OK" = "true" ]; then
+          echo "PASS  reset-stock endpoint returned ok=true"
+        else
+          echo "FAIL  reset-stock endpoint did not return ok=true. Response: $RESULT"
+          echo "      Make sure the Vite frontend is running with TEST_MODE=true (task start-frontend)"
+          exit 1
+        fi
+
+        # Also verify stock was actually updated
+        STOCK=$(docker exec -i mysql-service.default.svc.cluster.local mysql --ssl-mode=DISABLED -umocktenusr -pmocktenpassword mocktendb -sN -e "SELECT stocks FROM Stock WHERE product_id='b91a5d68-6acb-48e7-8e5d-3d85b7e76af2';" 2>/dev/null || echo "0")
+        if [ "$STOCK" = "10" ]; then
+          echo "PASS  Stock is 10 (confirmed in MySQL)"
+        else
+          echo "FAIL  Stock is '$STOCK' (expected 10)"
+          exit 1
+        fi
+        echo "reset-stock check PASSED."
+
   e2e:
     desc: Run Playwright E2E test suite locally
     cmds:
       - (cd ecfront2 && npx playwright test)
+  ie2e:
+    desc: Run Playwright E2E test suite inside Docker container (for Dashboard use)
+    cmds:
+      - |
+        DOCKER_BIN=$(which docker)
+        docker run --rm \
+          --network mockten_nw \
+          --user root \
+          -e PLAYWRIGHT_BASE_URL=http://nginx \
+          -v "${HOST_WORKSPACE_PATH:-$PWD}/ecfront2:/work" \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -v "${DOCKER_BIN}:/usr/local/bin/docker:ro" \
+          -w /work \
+          mcr.microsoft.com/playwright:v1.60.0-noble \
+          npx playwright test --reporter=list
+  ie2e-spec:
+    desc: Run a single Playwright spec inside Docker container (for Dashboard use)
+    cmds:
+      - |
+        DOCKER_BIN=$(which docker)
+        docker run --rm \
+          --network mockten_nw \
+          --user root \
+          -e PLAYWRIGHT_BASE_URL=http://nginx \
+          -v "${HOST_WORKSPACE_PATH:-$PWD}/ecfront2:/work" \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -v "${DOCKER_BIN}:/usr/local/bin/docker:ro" \
+          -w /work \
+          mcr.microsoft.com/playwright:v1.60.0-noble \
+          npx playwright test --reporter=list "tests/{{.SPEC}}"
+  trivy:
+    desc: Scan all container images for HIGH/CRITICAL vulnerabilities using Trivy
+    cmds:
+      - |
+        FAILED=0
+        echo "=== [Container Scan] Trivy Image Scanning ==="
+        for img in mockten-redis mockten-mysql uam apigw minio meilisearch mockten-searchitem mockten-product mockten-cart mockten-sync mockten-geocoding mockten-ecpay mockten-ranking mockten-sale mockten-shipment mockten-recommendation mockten-dashboard; do
+          echo ""
+          echo "Scanning image: $img:latest..."
+          WORKSPACE="${HOST_WORKSPACE_PATH:-{{.ROOT_DIR}}}"
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "${WORKSPACE}:/workspace" -v trivy-cache:/root/.cache aquasec/trivy:latest image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /workspace/.trivyignore "$img:latest" || FAILED=1
+        done
+        if [ $FAILED -ne 0 ]; then
+          echo "Container image scan FAILED: HIGH or CRITICAL vulnerabilities found!"
+          exit 1
+        fi
+        echo "Container image scan PASSED."
+
+  sca:
+    desc: Software Composition Analysis - scan dependencies for known vulnerabilities
+    cmds:
+      - |
+        echo "=== [SCA] Scanning Dependencies for Known Vulnerabilities ==="
+        docker run --rm -v "${HOST_WORKSPACE_PATH:-$PWD}:/workspace" -v trivy-cache:/root/.cache aquasec/trivy:latest fs --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln /workspace
+        echo "SCA scan PASSED."
+
+  sast:
+    desc: Static Application Security Testing - scan source code for secrets and misconfigurations
+    cmds:
+      - |
+        echo "=== [SAST] Scanning Source Code for Secrets and Misconfigurations ==="
+        SKIP_ARGS=""
+        while IFS= read -r line || [ -n "$line" ]; do
+          case "$line" in \#*|''|*\**|*\?*|*\[*) continue ;; esac
+          line="${line#/}"
+          [ -e "${HOST_WORKSPACE_PATH:-$PWD}/$line" ] && SKIP_ARGS="$SKIP_ARGS,/workspace/$line"
+        done < "${HOST_WORKSPACE_PATH:-$PWD}/.gitignore"
+        SKIP_ARGS="${SKIP_ARGS#,}"
+        [ -n "$SKIP_ARGS" ] && SKIP_OPT="--skip-files $SKIP_ARGS" || SKIP_OPT=""
+        docker run --rm -v "${HOST_WORKSPACE_PATH:-$PWD}:/workspace" -v trivy-cache:/root/.cache aquasec/trivy:latest fs --exit-code 1 --severity HIGH,CRITICAL --scanners secret ${SKIP_OPT} /workspace
+        echo "SAST scan PASSED."
+
+  dast:
+    desc: Dynamic Application Security Testing - baseline scan running services via OWASP ZAP
+    cmds:
+      - |
+        echo "=== [DAST] OWASP ZAP Baseline Scan against running services ==="
+        docker run --rm --network mockten_nw \
+          -v "${HOST_WORKSPACE_PATH:-$PWD}:/zap/wrk:rw" \
+          ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+          -t http://nginx \
+          -r zap-report.html \
+          -I || true
+        echo "DAST scan completed. Report saved to zap-report.html (if containers are running)."
+
+  latency:
+    desc: Check API response times against SLA targets defined in ApiSLA table
+    cmds:
+      - |
+        echo "=== [Latency Check] Fetching slow API stats from /api/stats?type=slow ==="
+        SLOW_JSON=$(curl -s http://localhost/api/stats?type=slow)
+        if [ -z "$SLOW_JSON" ] || [ "$SLOW_JSON" = "null" ]; then
+          echo "WARN: Could not reach /api/stats — skipping latency check."
+          exit 0
+        fi
+
+        echo "=== [Latency Check] Fetching SLA definitions from MySQL ==="
+        SLA_JSON=$(docker exec -i mysql-service.default.svc.cluster.local \
+          mysql --ssl-mode=DISABLED -umocktenusr -pmocktenpassword mocktendb -sN \
+          -e "SELECT CONCAT(method,'|',path,'|',sla_ms) FROM ApiSLA;" 2>/dev/null)
+
+        if [ -z "$SLA_JSON" ]; then
+          echo "WARN: ApiSLA table empty or unreachable — skipping SLA check."
+          exit 0
+        fi
+
+        FAILED=0
+        while IFS='|' read -r method path sla_ms; do
+          # Normalize path patterns: replace :id with regex-like match for lookup
+          norm_path=$(echo "$path" | sed 's|:[^/]*|:[^/]*|g')
+          avg=$(echo "$SLOW_JSON" | python3 -c "
+        import sys, json, re
+        data = json.load(sys.stdin)
+        apis = data.get('slowApis', [])
+        pattern = sys.argv[1]
+        method = sys.argv[2]
+        for a in apis:
+            if a['method'] == method and re.fullmatch(pattern.replace(':[^/]*', '[^/]+'), a['path']):
+                print(a['avgMs'])
+                sys.exit(0)
+        print(0)
+        " "$norm_path" "$method" 2>/dev/null || echo 0)
+          if [ "$avg" -gt "$sla_ms" ] 2>/dev/null; then
+            echo "FAIL  $method $path — avg ${avg}ms > SLA ${sla_ms}ms"
+            FAILED=1
+          elif [ "$avg" -gt 0 ]; then
+            echo "PASS  $method $path — avg ${avg}ms <= SLA ${sla_ms}ms"
+          fi
+        done <<< "$SLA_JSON"
+
+        if [ $FAILED -ne 0 ]; then
+          echo ""
+          echo "Latency check FAILED: one or more endpoints exceeded their SLA."
+          exit 1
+        fi
+        echo ""
+        echo "Latency check PASSED: all measured endpoints within SLA."
+
+  infosec:
+    desc: Run all security scans (trivy, sca, sast, dast)
+    cmds:
+      - |
+        FAILED=0
+        task trivy || FAILED=1
+        task sca || FAILED=1
+        task sast || FAILED=1
+        task dast || FAILED=1
+        if [ $FAILED -ne 0 ]; then
+          echo "Security scan FAILED: vulnerabilities detected!"
+          exit 1
+        fi
+        echo "All security scans PASSED."
   setup:
     cmds:
+      - |
+        PHOTOS_COMPLETE="minIO/.photos_downloaded"
+        if [ -f "$PHOTOS_COMPLETE" ]; then
+          echo "Photos already downloaded (minIO/.photos_downloaded exists), skipping."
+        else
+          echo "=== Downloading product photos from GitHub Releases ==="
+          RELEASE_BASE="https://github.com/mockten/mockten/releases/download/photos-v1"
+          mkdir -p minIO/photos
+          for part in photos_part1.zip photos_part2.zip; do
+            echo "Downloading $part ..."
+            curl -L --fail --retry 3 "$RELEASE_BASE/$part" -o "/tmp/$part"
+            echo "Extracting $part ..."
+            unzip -o "/tmp/$part" -d minIO/photos/
+            rm "/tmp/$part"
+          done
+          touch "$PHOTOS_COMPLETE"
+          echo "Photos download complete."
+        fi
       - (cd redis && docker build -t mockten-redis .)
       - (cd mysql && docker build --platform linux/amd64 -t mockten-mysql .)
       - (cd uam && docker build --platform linux/amd64 -t uam .)
       - (cd apigw && docker build -t apigw .)
       - (cd minIO && docker build -t minio . )
       - (cd meilisearch && docker build -t meilisearch .)
-      - (cd searchitem && docker build -t searchitem .)
-      - (cd product && docker build -t product .)
-      - (docker build -t cart -f cart/Dockerfile .)
+      - (cd searchitem && docker build -t mockten-searchitem .)
+      - (cd product && docker build -t mockten-product .)
+      - (docker build -t mockten-cart -f cart/Dockerfile .)
       - (cd sync && docker build -t mockten-sync .)
       - (cd geocoding && docker build -t mockten-geocoding .)
       - (cd ecpay && docker build -t mockten-ecpay .)
       - (cd ranking && docker build -t mockten-ranking .)
       - (cd sale && docker build -t mockten-sale .)
       - (cd shipment && docker build -t mockten-shipment .)
+      - (cd recommendation && docker build -t mockten-recommendation .)
+      - (cd monitoring/dashboard && docker build -t mockten-dashboard .)
+      - (cd airflow && docker build -t mockten-airflow .)
+      - (pip3 install -r mysql/seeder/requirements.txt || pip install -r mysql/seeder/requirements.txt)

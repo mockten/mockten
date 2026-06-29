@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import apiClient from '../module/apiClient';
 import {
   Box,
   Container,
@@ -9,83 +10,38 @@ import {
   CardContent,
   Grid,
 } from '@mui/material';
-import {
-  Star,
-  StarHalf,
-  StarBorder,
-} from '@mui/icons-material';
 import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
-// Sample photo icon when a customer does not set prodct image.
 import photoSvg from "../assets/photo.svg";
 
-interface RecommendedProduct {
-  id: number;
-  name: string;
-  description: string;
-  rating: number;
-  image: string;
+interface AlsoBoughtProduct {
+  product_id: string;
+  product_name: string;
+  category_id: string;
+  price: number;
+  image_url: string;
 }
 
 const MyCartOrderComplete: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const purchaseId = location.state?.paymentId || '000-000-000';
+  const purchasedProductId: string | undefined = location.state?.productId;
 
-  const recommendedProducts: RecommendedProduct[] = [
-    {
-      id: 1,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      rating: 3.5,
-      image: photoSvg,
-    },
-    {
-      id: 2,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      rating: 4.5,
-      image: photoSvg,
-    },
-    {
-      id: 3,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      rating: 4.5,
-      image: photoSvg,
-    },
-    {
-      id: 4,
-      name: 'Sample',
-      description: 'Product description and price will be included.',
-      rating: 4.5,
-      image: photoSvg,
-    },
-  ];
+  const [alsoBought, setAlsoBought] = useState<AlsoBoughtProduct[]>([]);
+
+  useEffect(() => {
+    if (!purchasedProductId) return;
+    apiClient
+      .get(`/api/recommendation/also-bought?product_id=${purchasedProductId}&limit=4`)
+      .then((res) => {
+        if (res.data?.also_bought) setAlsoBought(res.data.also_bought);
+      })
+      .catch((e) => console.error('Failed to fetch also-bought', e));
+  }, [purchasedProductId]);
 
   const handleBackToTop = () => {
     navigate('/');
-  };
-
-  const renderStars = (rating: number) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(<Star key={i} sx={{ color: '#ffc107', fontSize: '16px' }} />);
-    }
-
-    if (hasHalfStar) {
-      stars.push(<StarHalf key="half" sx={{ color: '#ffc107', fontSize: '16px' }} />);
-    }
-
-    const emptyStars = 5 - Math.ceil(rating);
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push(<StarBorder key={`empty-${i}`} sx={{ color: '#ffc107', fontSize: '16px' }} />);
-    }
-
-    return stars;
   };
 
   const SectionTitle: React.FC<{ title: string }> = ({ title }) => (
@@ -211,63 +167,65 @@ const MyCartOrderComplete: React.FC = () => {
           </Button>
         </Box>
 
-        {/* Recommended Products Section */}
-        <SectionTitle title="Products purchased by the same person who purchased the same product" />
-
-        <Grid container spacing={2}>
-          {recommendedProducts.map((product) => (
-            <Grid item xs={12} sm={6} md={3} key={product.id}>
-              <Card
-                sx={{
-                  cursor: 'pointer',
-                  '&:hover': {
-                    boxShadow: 3,
-                  },
-                }}
-                onClick={() => navigate(`/item/${product.id}`)}
-              >
-                <Box
-                  sx={{
-                    height: '100px',
-                    backgroundColor: '#f5f5f5',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <img src={product.image} alt="Product" style={{ width: '64px', height: '64px' }} />
-                </Box>
-                <CardContent sx={{ padding: '8px' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px', marginBottom: '8px' }}>
-                    {renderStars(product.rating)}
-                  </Box>
-                  <Typography
-                    variant="h6"
+        {/* Also Bought Section */}
+        {alsoBought.length > 0 && (
+          <>
+            <SectionTitle title="Products purchased by the same person who purchased the same product" />
+            <Grid container spacing={2} sx={{ marginBottom: '32px' }}>
+              {alsoBought.map((product) => (
+                <Grid item xs={12} sm={6} md={3} key={product.product_id}>
+                  <Card
                     sx={{
-                      fontFamily: 'Noto Sans',
-                      fontWeight: 'bold',
-                      fontSize: '16px',
-                      color: 'black',
-                      marginBottom: '8px',
+                      cursor: 'pointer',
+                      '&:hover': { boxShadow: 3, transform: 'translateY(-2px)', transition: 'transform 0.2s' },
                     }}
+                    onClick={() => navigate(`/item/${product.product_id}`)}
                   >
-                    {product.name}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontFamily: 'Noto Sans',
-                      fontSize: '14px',
-                      color: '#666666',
-                    }}
-                  >
-                    {product.description}
-                  </Typography>
-                </CardContent>
-              </Card>
+                    <Box
+                      sx={{
+                        width: '100%',
+                        aspectRatio: '1/1',
+                        backgroundColor: '#f5f5f5',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <img
+                        src={product.image_url}
+                        alt={product.product_name}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '16px' }}
+                        onError={(e) => { e.currentTarget.src = photoSvg; }}
+                      />
+                    </Box>
+                    <CardContent sx={{ padding: '8px' }}>
+                      <Typography
+                        sx={{
+                          fontFamily: 'Noto Sans',
+                          fontWeight: 'bold',
+                          fontSize: '14px',
+                          color: 'black',
+                          marginBottom: '4px',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {product.product_name}
+                      </Typography>
+                      <Typography
+                        sx={{ fontFamily: 'Noto Sans', fontSize: '14px', color: '#666666', fontWeight: 'bold' }}
+                      >
+                        ${product.price}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
             </Grid>
-          ))}
-        </Grid>
+          </>
+        )}
       </Container>
 
       {/* Footer */}

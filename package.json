@@ -57,6 +57,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "sim": "cd ecfront2 && npx playwright test playwright_simulation.ts --config=playwright.sim.config.ts"
   }
 }

@@ -14,8 +14,8 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-ecfront2/node_modules/*
-/ecfront2/node_modules/.vite
+node_modules
+**/node_modules
 /ecfront2/node_modules/.vite
 uam/config.json
 uam/config.json
@@ -29,4 +29,28 @@ ecfront2/debug_payment_page.png
 ecfront2/playwright-report/
 ecfront2/test-results/
 test-results/
-PR_SUMMARY.md
+PR_SUMMARY*
+step*
+package-lock.json
+scratch/
+.env
+**/ .env
+**/.env
+minIO/.env
+.DS_Store
+**/.DS_Store
+
+minIO/chrome_profile/*
+minIO/photos/debug*
+minIO/photos/
+minIO/.photos_downloaded
+ecfront2.log
+ecfront2.pid
+zap-report.html
+
+**/__pycache__/
+*.pyc
+ecpay/ecpay
+product/product
+searchitem/searchitem
+.agent/

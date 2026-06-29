@@ -28,5 +28,9 @@ exec /opt/keycloak/bin/kc.sh start-dev \
   --db-url=jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/mocktendb \
   --db-username=mocktenusr \
   --db-password=mocktenpassword \
-  --http-port=80  \
-  --log-level=DEBUG
+  --db-pool-initial-size=1 \
+  --db-pool-min-size=1 \
+  --db-pool-max-size=5 \
+  --cache=local \
+  --http-port=80 \
+  --log-level=WARN

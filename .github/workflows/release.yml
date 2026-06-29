@@ -49,50 +49,6 @@ jobs:
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
-  release-notification:
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: notification
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v2
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v2
-      with:
-        registry: ghcr.io
-        username: ${{ github.repository_owner }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Push the docker image
-      run: |
-        export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/notification/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/notification:release-v${SNAPSHOT_VERSION}"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
-
-  release-payexecution:
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: payexecution
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v2
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v2
-      with:
-        registry: ghcr.io
-        username: ${{ github.repository_owner }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Push the docker image
-      run: |
-        export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/payexecution/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/payexecution:release-v${SNAPSHOT_VERSION}"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
-
   release-ranking:
     runs-on: ubuntu-22.04
     defaults:
@@ -199,28 +155,6 @@ jobs:
     - name: Push the docker image
       run: |
         export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/product"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
-
-  release-adder:
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: adder
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v2
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v2
-      with:
-        registry: ghcr.io
-        username: ${{ github.repository_owner }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Push the docker image
-      run: |
-        export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/adder/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/adder:release-v${SNAPSHOT_VERSION}"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
