@@ -606,3 +606,27 @@ jobs:
         export IMAGE_TAG="ghcr.io/${{ github.repository }}/geocoding:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
+
+  snyk:
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Snyk
+        uses: snyk/actions/setup@master
+
+      - name: Snyk test
+        run: snyk test --all-projects
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
