@@ -6,18 +6,52 @@ import { Checkbox } from "./ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Store, Lock, Mail } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 export function SellerLoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Login attempt:", { email, password, rememberMe });
-    // Simulate successful login
-    navigate("/seller/portal");
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await axios.post(
+        "/api/uam/token",
+        new URLSearchParams({ username: email, password })
+      );
+
+      const accessToken: string = response.data.access_token;
+      const refreshToken: string = response.data.refresh_token;
+
+      const payload = JSON.parse(atob(accessToken.split(".")[1]));
+      const roles: string[] = payload.roles || [];
+
+      if (!roles.includes("seller")) {
+        setError("You are not authorized as a seller.");
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem("seller_access_token", accessToken);
+      localStorage.setItem("seller_refresh_token", refreshToken);
+
+      navigate("/seller/portal");
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        setError("Login failed. Please check your credentials.");
+      } else {
+        setError("An unexpected error occurred.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -76,36 +110,40 @@ export function SellerLoginPage() {
                 </div>
               </div>
 
-              {/* Remember Me and Forgot Password */}
+              {/* Remember Me */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="remember"
                     checked={rememberMe}
-                    onCheckedChange={(checked: boolean | "indeterminate") => setRememberMe(checked as boolean)}
+                    onCheckedChange={(checked: boolean | "indeterminate") =>
+                      setRememberMe(checked as boolean)
+                    }
                   />
-                  <label
-                    htmlFor="remember"
-                    className="text-slate-700 cursor-pointer select-none"
-                  >
+                  <label htmlFor="remember" className="text-slate-700 cursor-pointer select-none">
                     Remember me
                   </label>
                 </div>
                 <a
                   href="#"
                   className="text-blue-600 hover:text-blue-700 transition-colors"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    console.log("Forgot password clicked");
-                  }}
+                  onClick={(e) => e.preventDefault()}
                 >
                   Forgot password?
                 </a>
               </div>
 
+              {error && (
+                <p className="text-red-600 text-sm">{error}</p>
+              )}
+
               {/* Login Button */}
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-                Sign In
+              <Button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={loading}
+              >
+                {loading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
 
@@ -115,9 +153,7 @@ export function SellerLoginPage() {
                 <div className="w-full border-t border-slate-200" />
               </div>
               <div className="relative flex justify-center">
-                <span className="px-4 bg-white text-slate-500">
-                  New to our platform?
-                </span>
+                <span className="px-4 bg-white text-slate-500">New to our platform?</span>
               </div>
             </div>
 
@@ -125,7 +161,7 @@ export function SellerLoginPage() {
             <div className="text-center">
               <button
                 type="button"
-                onClick={() => navigate('/seller/signup')}
+                onClick={() => navigate("/seller/signup")}
                 className="text-slate-600 hover:text-slate-900 transition-colors"
               >
                 Create a seller account
@@ -138,14 +174,12 @@ export function SellerLoginPage() {
         <div className="mt-8 text-center space-y-3">
           <button
             type="button"
-            onClick={() => navigate('/admin/login')}
+            onClick={() => navigate("/admin/login")}
             className="text-slate-400 hover:text-slate-600 transition-colors text-sm"
           >
             Admin Access
           </button>
-          <p className="text-slate-500">
-            © 2025 EC Site. All rights reserved.
-          </p>
+          <p className="text-slate-500">© 2025 EC Site. All rights reserved.</p>
         </div>
       </div>
     </div>

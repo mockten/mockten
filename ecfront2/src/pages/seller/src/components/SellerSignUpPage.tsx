@@ -18,27 +18,78 @@ export function SellerSignUpPage() {
     confirmPassword: "",
   });
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const getAdminToken = async (): Promise<string> => {
+    const res = await fetch("/api/uam/creation/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    if (!res.ok) throw new Error("Failed to get admin token");
+    const data = await res.json();
+    return data.access_token;
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Basic validation
+    setError("");
+
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match!");
+      setError("Passwords do not match.");
       return;
     }
-    
     if (!agreedToTerms) {
-      alert("Please agree to the terms and conditions");
+      setError("Please agree to the Terms of Service.");
       return;
     }
-    
-    console.log("Sign up attempt:", formData);
-    // Add your signup logic here
+
+    setLoading(true);
+    try {
+      const adminToken = await getAdminToken();
+
+      const userData = {
+        username: formData.email,
+        email: formData.email,
+        enabled: true,
+        emailVerified: true,
+        firstName: formData.fullName,
+        lastName: "",
+        credentials: [
+          { type: "password", value: formData.password, temporary: false },
+        ],
+        groups: ["Seller"],
+        attributes: {
+          storeName: [formData.storeName],
+          phonenum: [formData.phone],
+        },
+      };
+
+      const res = await fetch("/api/uam/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify(userData),
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(body || `Error ${res.status}`);
+      }
+
+      alert("Account created! Please sign in.");
+      navigate("/seller/login");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign up failed.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -136,7 +187,6 @@ export function SellerSignUpPage() {
 
               {/* Password Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Password */}
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <div className="relative">
@@ -153,7 +203,6 @@ export function SellerSignUpPage() {
                   </div>
                 </div>
 
-                {/* Confirm Password */}
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirm Password</Label>
                   <div className="relative">
@@ -179,10 +228,7 @@ export function SellerSignUpPage() {
                   onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
                   className="mt-1"
                 />
-                <label
-                  htmlFor="terms"
-                  className="text-slate-700 cursor-pointer select-none"
-                >
+                <label htmlFor="terms" className="text-slate-700 cursor-pointer select-none">
                   I agree to the{" "}
                   <a href="#" className="text-blue-600 hover:text-blue-700">
                     Terms of Service
@@ -194,9 +240,15 @@ export function SellerSignUpPage() {
                 </label>
               </div>
 
+              {error && <p className="text-red-600 text-sm">{error}</p>}
+
               {/* Sign Up Button */}
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-                Create Account
+              <Button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={loading}
+              >
+                {loading ? "Creating account..." : "Create Account"}
               </Button>
             </form>
 
@@ -206,9 +258,7 @@ export function SellerSignUpPage() {
                 <div className="w-full border-t border-slate-200" />
               </div>
               <div className="relative flex justify-center">
-                <span className="px-4 bg-white text-slate-500">
-                  Already have an account?
-                </span>
+                <span className="px-4 bg-white text-slate-500">Already have an account?</span>
               </div>
             </div>
 
@@ -216,7 +266,7 @@ export function SellerSignUpPage() {
             <div className="text-center">
               <button
                 type="button"
-                onClick={() => navigate('/seller/login')}
+                onClick={() => navigate("/seller/login")}
                 className="text-slate-600 hover:text-slate-900 transition-colors"
               >
                 Sign in to your account

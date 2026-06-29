@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -92,6 +92,27 @@ export function SellerPortal() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
   const [showAddProduct, setShowAddProduct] = useState(false);
+  const [sellerName, setSellerName] = useState("Seller");
+
+  useEffect(() => {
+    const token = localStorage.getItem("seller_access_token");
+    if (!token) {
+      navigate("/seller/login");
+      return;
+    }
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      setSellerName(payload.preferred_username || payload.email || "Seller");
+    } catch {
+      navigate("/seller/login");
+    }
+  }, [navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("seller_access_token");
+    localStorage.removeItem("seller_refresh_token");
+    navigate("/seller/login");
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -173,9 +194,9 @@ export function SellerPortal() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2">
                   <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span className="text-blue-600">JS</span>
+                    <span className="text-blue-600">{sellerName.slice(0, 2).toUpperCase()}</span>
                   </div>
-                  <span>John Seller</span>
+                  <span>{sellerName}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -185,7 +206,7 @@ export function SellerPortal() {
                   <Settings className="w-4 h-4 mr-2" />
                   Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/seller/login')} className="cursor-pointer">
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                   <LogOut className="w-4 h-4 mr-2" />
                   Logout
                 </DropdownMenuItem>
