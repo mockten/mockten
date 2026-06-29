@@ -125,6 +125,32 @@ services:
           headers: ['Authorization', 'Content-Type']
           credentials: true
 
+  - name: keycloak-execute-actions-email
+    url: http://uam-service.default.svc.cluster.local/admin/realms/mockten-realm-dev/users
+    routes:
+      - name: keycloak-execute-actions-email-route
+        paths:
+          - ~/api/uam/users/(?<userId>[^/]+)/execute-actions-email
+        strip_path: false
+        methods:
+          - PUT
+          - OPTIONS
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - Authorization:$http_authorization
+          remove:
+            headers:
+              - host
+      - name: cors
+        config:
+          origins: ['*']
+          methods: ['PUT','OPTIONS']
+          headers: ['Authorization', 'Content-Type']
+          credentials: true
+
   - name: keycloak-admin-roles
     url: http://uam-service.default.svc.cluster.local/admin/realms/mockten-realm-dev/roles
     routes:

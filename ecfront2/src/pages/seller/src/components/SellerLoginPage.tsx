@@ -16,6 +16,12 @@ export function SellerLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Forgot password modal state
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetStatus, setResetStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [resetError, setResetError] = useState("");
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -51,6 +57,53 @@ export function SellerLoginPage() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetStatus("sending");
+    setResetError("");
+
+    try {
+      // Get admin token
+      const tokenRes = await fetch("/api/uam/creation/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      });
+      if (!tokenRes.ok) throw new Error("Failed to get admin token");
+      const { access_token: adminToken } = await tokenRes.json();
+
+      // Find user by email
+      const usersRes = await fetch(`/api/uam/users?email=${encodeURIComponent(resetEmail)}`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      if (!usersRes.ok) throw new Error("Failed to search user");
+      const users = await usersRes.json();
+      if (!users.length) throw new Error("No account found with that email.");
+
+      const userId = users[0].id;
+
+      // Send reset password email
+      const actionRes = await fetch(
+        `/api/uam/users/${userId}/execute-actions-email`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${adminToken}`,
+          },
+          body: JSON.stringify(["UPDATE_PASSWORD"]),
+        }
+      );
+      if (!actionRes.ok && actionRes.status !== 204) {
+        throw new Error("Failed to send reset email.");
+      }
+
+      setResetStatus("sent");
+    } catch (err) {
+      setResetStatus("error");
+      setResetError(err instanceof Error ? err.message : "Failed to send reset email.");
     }
   };
 
@@ -124,25 +177,19 @@ export function SellerLoginPage() {
                     Remember me
                   </label>
                 </div>
-                <a
-                  href="#"
-                  className="text-blue-600 hover:text-blue-700 transition-colors"
-                  onClick={(e) => e.preventDefault()}
+                <button
+                  type="button"
+                  onClick={() => { setShowForgotModal(true); setResetStatus("idle"); setResetEmail(""); }}
+                  className="text-blue-600 hover:text-blue-700 transition-colors text-sm"
                 >
                   Forgot password?
-                </a>
+                </button>
               </div>
 
-              {error && (
-                <p className="text-red-600 text-sm">{error}</p>
-              )}
+              {error && <p className="text-red-600 text-sm">{error}</p>}
 
               {/* Login Button */}
-              <Button
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                disabled={loading}
-              >
+              <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
@@ -182,6 +229,59 @@ export function SellerLoginPage() {
           <p className="text-slate-500">© 2025 EC Site. All rights reserved.</p>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="text-slate-900 font-semibold text-lg">Reset your password</h2>
+
+            {resetStatus === "sent" ? (
+              <div className="space-y-4">
+                <p className="text-slate-600 text-sm">
+                  A password reset email has been sent to <strong>{resetEmail}</strong>. Please check your inbox.
+                </p>
+                <Button className="w-full" onClick={() => setShowForgotModal(false)}>
+                  Close
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <p className="text-slate-600 text-sm">
+                  Enter your email address and we'll send you a link to reset your password.
+                </p>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    type="email"
+                    placeholder="seller@example.com"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+                {resetStatus === "error" && (
+                  <p className="text-red-600 text-sm">{resetError}</p>
+                )}
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowForgotModal(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={resetStatus === "sending"}>
+                    {resetStatus === "sending" ? "Sending..." : "Send reset link"}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
