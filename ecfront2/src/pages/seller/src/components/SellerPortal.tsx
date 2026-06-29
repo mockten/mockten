@@ -71,7 +71,7 @@ export function SellerPortal() {
 
   // Products
   const [products, setProducts] = useState<Array<{
-    product_id: string; product_name: string; price: number; condition: string; stocks: number; status: string;
+    product_id: string; product_name: string; price: number; condition: string; stocks: number; status: string; is_active: number;
   }>>([]);
   const [productsTotal, setProductsTotal] = useState(0);
   const [productsPage, setProductsPage] = useState(1);
@@ -79,7 +79,7 @@ export function SellerPortal() {
 
   // Edit product modal
   const [editProduct, setEditProduct] = useState<{
-    product_id: string; product_name: string; price: number; condition: string; stocks: number; status: string;
+    product_id: string; product_name: string; price: number; condition: string; stocks: number; status: string; is_active: number;
   } | null>(null);
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState(0);
@@ -179,6 +179,16 @@ export function SellerPortal() {
     loadProducts();
   };
 
+  const handleToggleProductStatus = async (productId: string, currentIsActive: number) => {
+    const newIsActive = currentIsActive === 1 ? 0 : 1;
+    await fetch(`${API_BASE}/products/${productId}/status`, {
+      method: "PUT",
+      headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: newIsActive }),
+    });
+    loadProducts();
+  };
+
   const handleEditSave = async () => {
     if (!editProduct) return;
     await fetch(`${API_BASE}/products/${editProduct.product_id}`, {
@@ -213,6 +223,8 @@ export function SellerPortal() {
         return "bg-orange-100 text-orange-800";
       case "out of stock":
         return "bg-red-100 text-red-800";
+      case "inactive":
+        return "bg-slate-200 text-slate-500";
       default:
         return "bg-slate-100 text-slate-800";
     }
@@ -669,7 +681,7 @@ export function SellerPortal() {
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon">
+                                <Button variant="ghost" size="icon" data-testid="product-menu-trigger">
                                   <MoreVertical className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
@@ -680,9 +692,15 @@ export function SellerPortal() {
                                   setEditPrice(product.price);
                                 }}>Edit</DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => {
-                                  // Duplicate: show add product form (simplified)
                                   setShowAddProduct(true);
                                 }}>Duplicate</DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  data-testid={product.is_active === 1 ? "menu-deactivate" : "menu-activate"}
+                                  onClick={() => handleToggleProductStatus(product.product_id, product.is_active)}
+                                >
+                                  {product.is_active === 1 ? "Deactivate" : "Activate"}
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   className="text-red-600"

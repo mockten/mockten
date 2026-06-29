@@ -246,4 +246,41 @@ test.describe.serial('Seller Portal', () => {
       page.getByText('Product added successfully!').or(page.getByText('Manage your product inventory'))
     ).toBeVisible({ timeout: 15000 });
   });
+
+  test('10. Deactivate and reactivate a product', async ({ page }) => {
+    await page.goto(SELLER_LOGIN_URL);
+    await page.getByPlaceholder('seller@example.com').fill(EXISTING_SELLER.email);
+    await page.getByPlaceholder('••••••••').fill(EXISTING_SELLER.password);
+    await page.getByRole('button', { name: 'Sign In' }).click();
+    await expect(page).toHaveURL(SELLER_PORTAL_URL, { timeout: 15000 });
+
+    await page.getByRole('button', { name: 'Products' }).click();
+    await expect(page.getByRole('columnheader', { name: 'Product Name' })).toBeVisible({ timeout: 10000 });
+
+    // Use the known "Protain bar" product (stable test data)
+    const protainRow = page.locator('table tbody tr').filter({ hasText: 'Protain bar' });
+    await expect(protainRow).toBeVisible({ timeout: 5000 });
+
+    // Helper: open dropdown and click a menu item by testid
+    const clickMenuAction = async (row: ReturnType<typeof page.locator>, testid: string) => {
+      await row.locator('[data-testid="product-menu-trigger"]').click();
+      await page.waitForSelector('[role="menu"]', { state: 'visible' });
+      await page.locator(`[data-testid="${testid}"]`).click();
+      await page.waitForSelector('[role="menu"]', { state: 'hidden' });
+    };
+
+    // Ensure product is active first (cleanup if previous test left it inactive)
+    if (await protainRow.getByText('inactive').isVisible()) {
+      await clickMenuAction(protainRow, 'menu-activate');
+      await expect(protainRow.getByText('inactive')).not.toBeVisible({ timeout: 10000 });
+    }
+
+    // Deactivate
+    await clickMenuAction(protainRow, 'menu-deactivate');
+    await expect(protainRow.getByText('inactive')).toBeVisible({ timeout: 10000 });
+
+    // Reactivate
+    await clickMenuAction(protainRow, 'menu-activate');
+    await expect(protainRow.getByText('inactive')).not.toBeVisible({ timeout: 10000 });
+  });
 });

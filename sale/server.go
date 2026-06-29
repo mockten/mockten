@@ -105,6 +105,7 @@ func main() {
 	r.GET("/v1/seller/orders", handleSellerOrders)
 	r.GET("/v1/seller/products", handleSellerProducts)
 	r.PUT("/v1/seller/products/:id", handleUpdateProduct)
+	r.PUT("/v1/seller/products/:id/status", handleToggleProductStatus)
 	r.DELETE("/v1/seller/products/:id", handleDeleteProduct)
 	r.GET("/v1/seller/profile", handleGetProfile)
 	r.PUT("/v1/seller/profile", handleUpdateProfile)
@@ -371,7 +372,7 @@ func handleSellerProducts(c *gin.Context) {
 	}
 
 	query := `
-		SELECT p.product_id, p.product_name, p.price, p.product_condition, COALESCE(s.stocks, 0)
+		SELECT p.product_id, p.product_name, p.price, p.product_condition, COALESCE(s.stocks, 0), p.is_active
 		FROM Product p
 		LEFT JOIN Stock s ON p.product_id = s.product_id
 		WHERE p.seller_id = ?
@@ -393,15 +394,18 @@ func handleSellerProducts(c *gin.Context) {
 		Condition   string `json:"condition"`
 		Stocks      int    `json:"stocks"`
 		Status      string `json:"status"`
+		IsActive    int    `json:"is_active"`
 	}
 
 	var prods []ProductRow
 	for rows.Next() {
 		var p ProductRow
-		if err := rows.Scan(&p.ProductID, &p.ProductName, &p.Price, &p.Condition, &p.Stocks); err != nil {
+		if err := rows.Scan(&p.ProductID, &p.ProductName, &p.Price, &p.Condition, &p.Stocks, &p.IsActive); err != nil {
 			continue
 		}
-		if p.Stocks == 0 {
+		if p.IsActive == 0 {
+			p.Status = "inactive"
+		} else if p.Stocks == 0 {
 			p.Status = "out of stock"
 		} else if p.Stocks < 10 {
 			p.Status = "low stock"
@@ -464,6 +468,32 @@ func handleDeleteProduct(c *gin.Context) {
 	_, err = db.Exec("DELETE FROM Product WHERE product_id=? AND seller_id=?", productID, sellerID)
 	if err != nil {
 		log.Printf("failed to delete product: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func handleToggleProductStatus(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	productID := c.Param("id")
+	var body struct {
+		IsActive int `json:"is_active"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		return
+	}
+
+	_, err = db.Exec("UPDATE Product SET is_active=? WHERE product_id=? AND seller_id=?", body.IsActive, productID, sellerID)
+	if err != nil {
+		log.Printf("failed to toggle product status: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
 		return
 	}
