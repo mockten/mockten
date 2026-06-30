@@ -51,6 +51,7 @@ export function SellerPortal() {
   const [activeTab, setActiveTab] = useState("overview");
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [sellerEmail, setSellerEmail] = useState("Seller");
+  const [sellerName, setSellerName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Stats
@@ -89,6 +90,7 @@ export function SellerPortal() {
   const [editIsActive, setEditIsActive] = useState(1);
   const [editSummary, setEditSummary] = useState("");
   const [editCategories, setEditCategories] = useState<Array<{category_id: string; category_name: string}>>([]);
+  const [editImages, setEditImages] = useState<File[]>([]);
 
   // Settings / Profile
   const [profileName, setProfileName] = useState("");
@@ -114,7 +116,10 @@ export function SellerPortal() {
     fetch(`${API_BASE}/profile`, { headers: getAuthHeaders() })
       .then(r => r.json())
       .then(data => {
-        if (data.seller_name) setProfileName(data.seller_name);
+        if (data.seller_name) {
+          setProfileName(data.seller_name);
+          setSellerName(data.seller_name);
+        }
       })
       .catch(() => {});
   }, [navigate]);
@@ -224,7 +229,17 @@ export function SellerPortal() {
         is_active: editIsActive,
       }),
     });
+    if (editImages.length > 0) {
+      const form = new FormData();
+      editImages.forEach(f => form.append("images[]", f));
+      await fetch(`${API_BASE}/products/${editProduct.product_id}/images`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: form,
+      });
+    }
     setEditProduct(null);
+    setEditImages([]);
     loadProducts();
   };
 
@@ -374,10 +389,26 @@ export function SellerPortal() {
                   onChange={e => setEditIsActive(e.target.checked ? 1 : 0)}
                 />
               </div>
+              <div>
+                <label className="text-sm text-slate-700">Product Images (max 3, overwrites existing)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="w-full mt-1 text-sm text-slate-600 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100"
+                  onChange={e => {
+                    const files = Array.from(e.target.files || []).slice(0, 3);
+                    setEditImages(files);
+                  }}
+                />
+                {editImages.length > 0 && (
+                  <p className="text-xs text-slate-500 mt-1">{editImages.length} file(s) selected</p>
+                )}
+              </div>
             </div>
             <div className="flex gap-2 mt-4">
               <Button className="!bg-blue-600 hover:!bg-blue-700 !text-white" onClick={handleEditSave}>Save</Button>
-              <Button variant="ghost" onClick={() => setEditProduct(null)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => { setEditProduct(null); setEditImages([]); }}>Cancel</Button>
             </div>
           </div>
         </div>
@@ -385,15 +416,15 @@ export function SellerPortal() {
 
       {/* Top Navigation Bar */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="flex items-center justify-between px-6 py-4">
+        <div className="flex items-center justify-between px-6 py-3">
           {/* Logo and Brand */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 bg-blue-600 rounded-lg">
-              <Store className="w-6 h-6 text-white" />
+            <div className="flex items-center justify-center w-9 h-9 bg-blue-600 rounded-lg shrink-0">
+              <Store className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-slate-900">Seller Portal</h1>
-              <p className="text-slate-500">My Store</p>
+              <h1 className="text-base font-bold leading-tight text-slate-900">Seller Portal</h1>
+              <p className="text-xs text-slate-500 leading-tight">My Store</p>
             </div>
           </div>
 
@@ -404,7 +435,7 @@ export function SellerPortal() {
               <Input
                 type="search"
                 placeholder="Search products, orders..."
-                className="pl-10"
+                className="pl-10 h-9 text-sm"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
@@ -412,19 +443,21 @@ export function SellerPortal() {
           </div>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="relative h-9 w-9">
+              <Bell className="w-4 h-4" />
+              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full"></span>
             </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="gap-2">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span className="text-blue-600">{sellerEmail.slice(0, 2).toUpperCase()}</span>
+                <Button variant="ghost" className="gap-2 h-9 px-2">
+                  <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                    <span className="text-blue-600 text-xs font-semibold">
+                      {(sellerName || sellerEmail).slice(0, 2).toUpperCase()}
+                    </span>
                   </div>
-                  <span>{sellerEmail}</span>
+                  <span className="text-sm max-w-[140px] truncate">{sellerName || sellerEmail}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">

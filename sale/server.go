@@ -507,7 +507,45 @@ func handleToggleProductStatus(c *gin.Context) {
 		return
 	}
 
+	go syncProductMeili(productID, body.IsActive == 1)
+
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// syncProductMeili removes or re-adds a product in MeiliSearch based on is_active.
+func syncProductMeili(productID string, active bool) {
+	if !active {
+		if _, err := meiliclient.Index("products").DeleteDocument(productID); err != nil {
+			log.Printf("meili delete %s: %v", productID, err)
+		}
+		return
+	}
+	// Re-add: fetch all fields needed for the index document
+	var item ProductItem
+	var saleFlag int
+	err := db.QueryRow(`
+		SELECT p.product_id, p.product_name, ue.USERNAME, p.price,
+		       c.category_name, p.product_condition, COALESCE(s.stocks,0),
+		       p.avg_review, p.review_count, p.sale_flag,
+		       COALESCE(p.sale_id,''), COALESCE(ts.discount_rate,0)
+		FROM Product p
+		JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
+		JOIN Category c ON p.category_id = c.category_id
+		LEFT JOIN Stock s ON p.product_id = s.product_id
+		LEFT JOIN TimeSale ts ON p.sale_id = ts.id
+		WHERE p.product_id = ?`, productID,
+	).Scan(&item.ProductID, &item.ProductName, &item.SellerName, &item.Price,
+		&item.CategoryName, &item.Condition, &item.Stocks,
+		&item.AvgReview, &item.ReviewCount, &saleFlag,
+		&item.SaleID, &item.DiscountRate)
+	if err != nil {
+		log.Printf("meili re-add fetch %s: %v", productID, err)
+		return
+	}
+	item.SaleFlag = saleFlag == 1
+	if _, err := meiliclient.Index("products").AddDocuments([]ProductItem{item}, "product_id"); err != nil {
+		log.Printf("meili add %s: %v", productID, err)
+	}
 }
 
 func handleGetProfile(c *gin.Context) {
