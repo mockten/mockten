@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -515,8 +516,15 @@ func handleToggleProductStatus(c *gin.Context) {
 // syncProductMeili removes or re-adds a product in MeiliSearch based on is_active.
 func syncProductMeili(productID string, active bool) {
 	if !active {
-		if _, err := meiliclient.Index("products").DeleteDocument(productID); err != nil {
+		taskInfo, err := meiliclient.Index("products").DeleteDocument(productID)
+		if err != nil {
 			log.Printf("meili delete %s: %v", productID, err)
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		if _, err = meiliclient.WaitForTask(taskInfo.TaskUID, meilisearch.WaitParams{Context: ctx, Interval: 200 * time.Millisecond}); err != nil {
+			log.Printf("meili delete wait %s: %v", productID, err)
 		}
 		return
 	}
@@ -543,8 +551,15 @@ func syncProductMeili(productID string, active bool) {
 		return
 	}
 	item.SaleFlag = saleFlag == 1
-	if _, err := meiliclient.Index("products").AddDocuments([]ProductItem{item}, "product_id"); err != nil {
-		log.Printf("meili add %s: %v", productID, err)
+	taskInfo, err2 := meiliclient.Index("products").AddDocuments([]ProductItem{item}, "product_id")
+	if err2 != nil {
+		log.Printf("meili add %s: %v", productID, err2)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if _, err2 = meiliclient.WaitForTask(taskInfo.TaskUID, meilisearch.WaitParams{Context: ctx, Interval: 200 * time.Millisecond}); err2 != nil {
+		log.Printf("meili add wait %s: %v", productID, err2)
 	}
 }
 

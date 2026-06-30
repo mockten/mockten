@@ -64,8 +64,7 @@ test.describe.serial('Seller Portal', () => {
     await loginAs(page, EXISTING_SELLER.email, EXISTING_SELLER.password);
 
     // Logout via dropdown
-    const usernameBtn = page.locator('header button').filter({ hasText: /healthcompany|example/ }).first();
-    await usernameBtn.click();
+    await page.locator('[data-testid="user-menu-trigger"]').click();
     await page.getByRole('menuitem', { name: 'Logout' }).click();
 
     await expect(page).toHaveURL(SELLER_LOGIN_URL, { timeout: 10000 });
@@ -212,6 +211,56 @@ test.describe.serial('Seller Portal', () => {
 
     await clickMenuAction(protainRow, 'menu-activate');
     await expect(protainRow.getByText('inactive')).not.toBeVisible({ timeout: 10000 });
+  });
+
+  test('10b. Deactivate removes from search, activate restores it', async ({ page, request }) => {
+    // Use Protain bar (healthcompany product known to be in MeiliSearch)
+    await loginAs(page, EXISTING_SELLER.email, EXISTING_SELLER.password);
+    await page.getByRole('button', { name: 'Products' }).click();
+    await expect(page.getByRole('columnheader', { name: 'Product Name' })).toBeVisible({ timeout: 10000 });
+
+    const protainRow = page.locator('table tbody tr').filter({ hasText: 'Protain bar' });
+    await expect(protainRow).toBeVisible({ timeout: 5000 });
+
+    const clickMenuAction = async (row: ReturnType<typeof page.locator>, testid: string) => {
+      await row.locator('[data-testid="product-menu-trigger"]').click();
+      await page.waitForSelector('[role="menu"]', { state: 'visible' });
+      await page.locator(`[data-testid="${testid}"]`).click();
+      await page.waitForSelector('[role="menu"]', { state: 'hidden' });
+    };
+
+    // Ensure active first
+    if (await protainRow.getByText('inactive').isVisible()) {
+      await clickMenuAction(protainRow, 'menu-activate');
+      await expect(protainRow.getByText('inactive')).not.toBeVisible({ timeout: 10000 });
+    }
+
+    // Confirm searchable while active (cache-bust with timestamp)
+    const searchWhileActive = await request.get(`/api/search?q=Protain+bar&_t=${Date.now()}`);
+    const activeData = await searchWhileActive.json();
+    expect(activeData.items.some((i: { product_name: string }) => i.product_name === 'Protain bar')).toBe(true);
+
+    // Deactivate
+    await clickMenuAction(protainRow, 'menu-deactivate');
+    await expect(protainRow.getByText('inactive')).toBeVisible({ timeout: 10000 });
+
+    // MeiliSearch async delete — wait up to 15s (cache-bust each poll)
+    await expect.poll(async () => {
+      const r = await request.get(`/api/search?q=Protain+bar&_t=${Date.now()}`);
+      const d = await r.json();
+      return d.items.some((i: { product_name: string }) => i.product_name === 'Protain bar');
+    }, { timeout: 15000, intervals: [500] }).toBe(false);
+
+    // Activate
+    await clickMenuAction(protainRow, 'menu-activate');
+    await expect(protainRow.getByText('inactive')).not.toBeVisible({ timeout: 10000 });
+
+    // MeiliSearch async re-add — wait up to 30s (cache-bust each poll)
+    await expect.poll(async () => {
+      const r = await request.get(`/api/search?q=Protain+bar&_t=${Date.now()}`);
+      const d = await r.json();
+      return d.items.some((i: { product_name: string }) => i.product_name === 'Protain bar');
+    }, { timeout: 30000, intervals: [1000] }).toBe(true);
   });
 
   test('11. Password show/hide toggle on login page', async ({ page }) => {
