@@ -102,6 +102,7 @@ func main() {
 	r.GET("/v1/seller/categories", handleSellerCategories)
 	r.POST("/v1/seller/products/create", handleCreateProduct)
 	r.POST("/v1/seller/products/:id/images", handleUploadProductImages)
+	r.DELETE("/v1/seller/products/:id/images/:slot", handleDeleteProductImage)
 	r.GET("/v1/seller/stats", handleSellerStats)
 	r.GET("/v1/seller/orders", handleSellerOrders)
 	r.GET("/v1/seller/products", handleSellerProducts)
@@ -725,10 +726,30 @@ func handleUploadProductImages(c *gin.Context) {
 	}
 
 	files := form.File["images[]"]
-	paths := []string{
+	allPaths := []string{
 		productID + ".png",
 		productID + "/1.png",
 		productID + "/2.png",
+	}
+
+	// If slot query param is provided, upload single file to that slot
+	if slotStr := c.Query("slot"); slotStr != "" {
+		slot, err2 := strconv.Atoi(slotStr)
+		if err2 != nil || slot < 0 || slot > 2 || len(files) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid slot"})
+			return
+		}
+		file, err2 := files[0].Open()
+		if err2 != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "open failed"})
+			return
+		}
+		defer file.Close()
+		if _, err2 = minioClient.PutObject(c.Request.Context(), "photos", allPaths[slot], file, files[0].Size, minio.PutObjectOptions{ContentType: "image/png"}); err2 != nil {
+			log.Printf("failed to upload image slot %d: %v", slot, err2)
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true})
+		return
 	}
 
 	for i, fileHeader := range files {
@@ -745,7 +766,7 @@ func handleUploadProductImages(c *gin.Context) {
 		_, err = minioClient.PutObject(
 			c.Request.Context(),
 			"photos",
-			paths[i],
+			allPaths[i],
 			file,
 			fileHeader.Size,
 			minio.PutObjectOptions{ContentType: "image/png"},
@@ -755,6 +776,29 @@ func handleUploadProductImages(c *gin.Context) {
 		}
 	}
 
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func handleDeleteProductImage(c *gin.Context) {
+	productID := c.Param("id")
+	slotStr := c.Param("slot")
+	slot, err := strconv.Atoi(slotStr)
+	if err != nil || slot < 0 || slot > 2 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid slot"})
+		return
+	}
+	paths := []string{productID + ".png", productID + "/1.png", productID + "/2.png"}
+
+	minioClient, err := minio.New("minio-service.default.svc.cluster.local:9000", &minio.Options{
+		Creds: credentials.NewStaticV4("minioadmin", "minioadmin", ""), Secure: false,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "storage error"})
+		return
+	}
+	if err = minioClient.RemoveObject(c.Request.Context(), "photos", paths[slot], minio.RemoveObjectOptions{}); err != nil {
+		log.Printf("failed to delete image slot %d: %v", slot, err)
+	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 

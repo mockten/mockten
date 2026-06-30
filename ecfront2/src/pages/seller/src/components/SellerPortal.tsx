@@ -90,7 +90,10 @@ export function SellerPortal() {
   const [editIsActive, setEditIsActive] = useState(1);
   const [editSummary, setEditSummary] = useState("");
   const [editCategories, setEditCategories] = useState<Array<{category_id: string; category_name: string}>>([]);
-  const [editImages, setEditImages] = useState<File[]>([]);
+  // Per-slot image state: null = no change, File = replace, 'delete' = delete
+  const [imageSlots, setImageSlots] = useState<(File | 'delete' | null)[]>([null, null, null]);
+  // Which slots currently have images in MinIO
+  const [existingSlots, setExistingSlots] = useState<boolean[]>([false, false, false]);
 
   // Settings / Profile
   const [profileName, setProfileName] = useState("");
@@ -229,17 +232,27 @@ export function SellerPortal() {
         is_active: editIsActive,
       }),
     });
-    if (editImages.length > 0) {
-      const form = new FormData();
-      editImages.forEach(f => form.append("images[]", f));
-      await fetch(`${API_BASE}/products/${editProduct.product_id}/images`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: form,
-      });
+    // Handle per-slot image operations
+    for (let slot = 0; slot < 3; slot++) {
+      const action = imageSlots[slot];
+      if (action === 'delete') {
+        await fetch(`${API_BASE}/products/${editProduct.product_id}/images/${slot}`, {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        });
+      } else if (action instanceof File) {
+        const form = new FormData();
+        form.append("images[]", action);
+        await fetch(`${API_BASE}/products/${editProduct.product_id}/images?slot=${slot}`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: form,
+        });
+      }
     }
     setEditProduct(null);
-    setEditImages([]);
+    setImageSlots([null, null, null]);
+    setImageSlots([null, null, null]);
     loadProducts();
   };
 
@@ -390,25 +403,49 @@ export function SellerPortal() {
                 />
               </div>
               <div>
-                <label className="text-sm text-slate-700">Product Images (max 3, overwrites existing)</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="w-full mt-1 text-sm text-slate-600 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100"
-                  onChange={e => {
-                    const files = Array.from(e.target.files || []).slice(0, 3);
-                    setEditImages(files);
-                  }}
-                />
-                {editImages.length > 0 && (
-                  <p className="text-xs text-slate-500 mt-1">{editImages.length} file(s) selected</p>
-                )}
+                <label className="text-sm text-slate-700 block mb-2">Product Images</label>
+                <div className="flex gap-2 flex-wrap">
+                  {[0, 1, 2].map(slot => {
+                    const slotPaths = [`/api/storage/${editProduct.product_id}.png`, `/api/storage/${editProduct.product_id}/1.png`, `/api/storage/${editProduct.product_id}/2.png`];
+                    const action = imageSlots[slot];
+                    const hasExisting = existingSlots[slot] && action !== 'delete';
+                    const previewUrl = action instanceof File ? URL.createObjectURL(action) : (hasExisting ? slotPaths[slot] : null);
+                    return (
+                      <div key={slot} className="relative w-24 h-24 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center bg-slate-50 overflow-hidden">
+                        {previewUrl ? (
+                          <>
+                            <img src={previewUrl} alt={`slot${slot}`} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 flex flex-col items-center justify-center gap-1 transition-opacity">
+                              <label className="cursor-pointer text-white text-xs bg-blue-600 px-2 py-0.5 rounded">
+                                Update
+                                <input type="file" accept="image/*" className="hidden" onChange={e => {
+                                  const f = e.target.files?.[0];
+                                  if (f) setImageSlots(prev => { const n=[...prev]; n[slot]=f; return n; });
+                                }} />
+                              </label>
+                              <button className="text-white text-xs bg-red-500 px-2 py-0.5 rounded" onClick={() => setImageSlots(prev => { const n=[...prev]; n[slot]='delete'; return n; })}>Delete</button>
+                            </div>
+                          </>
+                        ) : (
+                          <label className="cursor-pointer flex flex-col items-center gap-1 text-slate-400 hover:text-blue-500 transition-colors">
+                            <span className="text-2xl leading-none">+</span>
+                            <span className="text-xs">NEW</span>
+                            <input type="file" accept="image/*" className="hidden" onChange={e => {
+                              const f = e.target.files?.[0];
+                              if (f) setImageSlots(prev => { const n=[...prev]; n[slot]=f; return n; });
+                            }} />
+                          </label>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-slate-400 mt-1">Hover image to Update or Delete. Click + to add.</p>
               </div>
             </div>
             <div className="flex gap-2 mt-4">
               <Button className="!bg-blue-600 hover:!bg-blue-700 !text-white" onClick={handleEditSave}>Save</Button>
-              <Button variant="ghost" onClick={() => { setEditProduct(null); setEditImages([]); }}>Cancel</Button>
+              <Button variant="ghost" onClick={() => { setEditProduct(null); setImageSlots([null, null, null]); }}>Cancel</Button>
             </div>
           </div>
         </div>
@@ -451,7 +488,7 @@ export function SellerPortal() {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="gap-2 h-9 px-2">
+                <Button variant="ghost" className="gap-2 h-9 px-2" data-testid="user-menu-trigger">
                   <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
                     <span className="text-blue-600 text-xs font-semibold">
                       {(sellerName || sellerEmail).slice(0, 2).toUpperCase()}
@@ -795,7 +832,7 @@ export function SellerPortal() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => {
+                                <DropdownMenuItem onClick={async () => {
                                   setEditProduct(product);
                                   setEditName(product.product_name);
                                   setEditPrice(product.price);
@@ -804,6 +841,15 @@ export function SellerPortal() {
                                   setEditIsActive(product.is_active);
                                   setEditSummary("");
                                   setEditCategoryId("");
+                                  setImageSlots([null, null, null]);
+                                  // Check which image slots exist
+                                  const slotPaths = [
+                                    `/api/storage/${product.product_id}.png`,
+                                    `/api/storage/${product.product_id}/1.png`,
+                                    `/api/storage/${product.product_id}/2.png`,
+                                  ];
+                                  const checks = await Promise.all(slotPaths.map(p => fetch(p, { method: 'HEAD' }).then(r => r.ok).catch(() => false)));
+                                  setExistingSlots(checks);
                                   // Load categories for edit modal
                                   fetch(`${API_BASE}/categories`)
                                     .then(r => r.json())

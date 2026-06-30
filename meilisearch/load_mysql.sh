@@ -46,6 +46,7 @@ JOIN Category c ON p.category_id = c.category_id
 JOIN Stock t ON p.product_id = t.product_id
 LEFT JOIN TimeSale ts ON p.sale_id = ts.id
 WHERE kg.NAME = 'Seller'
+  AND p.is_active = 1
 " > /tmp/products.tsv
 
 total_lines=$(wc -l < /tmp/products.tsv | tr -d ' ')
