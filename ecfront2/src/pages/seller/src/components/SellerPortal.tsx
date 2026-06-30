@@ -108,6 +108,7 @@ export function SellerPortal() {
   // Settings / Profile
   const [profileName, setProfileName] = useState("");
   const [profileEmail, setProfileEmail] = useState("");
+  const [profileDescription, setProfileDescription] = useState("");
 
   // Load profile once
   useEffect(() => {
@@ -132,6 +133,9 @@ export function SellerPortal() {
         if (data.seller_name) {
           setProfileName(data.seller_name);
           setSellerName(data.seller_name);
+        }
+        if (typeof data.description === "string") {
+          setProfileDescription(data.description);
         }
       })
       .catch(() => {});
@@ -277,8 +281,9 @@ export function SellerPortal() {
     await fetch(`${API_BASE}/profile`, {
       method: "PUT",
       headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({ seller_name: profileName }),
+      body: JSON.stringify({ seller_name: profileName, description: profileDescription }),
     });
+    setSellerName(profileName);
     alert("Profile saved!");
   };
 
@@ -338,7 +343,7 @@ export function SellerPortal() {
                 <Store className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-lg font-bold leading-tight text-slate-900">Seller Portal</h1>
+                <h1 className="font-bold text-slate-900" style={{ fontSize: "1.25rem", lineHeight: 1.2 }}>Seller Portal</h1>
                 <p className="text-xs text-slate-500 leading-tight">My Store</p>
               </div>
             </div>
@@ -436,7 +441,7 @@ export function SellerPortal() {
                                   if (f) setImageSlots(prev => { const n=[...prev]; n[slot]=f; return n; });
                                 }} />
                               </label>
-                              <button className="text-white text-xs bg-red-500 px-2 py-0.5 rounded" onClick={() => setImageSlots(prev => { const n=[...prev]; n[slot]='delete'; return n; })}>Delete</button>
+                              <button className="text-white text-xs font-medium bg-slate-700 hover:bg-slate-800 px-2 py-0.5 rounded" onClick={() => setImageSlots(prev => { const n=[...prev]; n[slot]='delete'; return n; })}>Delete</button>
                             </div>
                           </>
                         ) : (
@@ -473,7 +478,7 @@ export function SellerPortal() {
               <Store className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold leading-tight text-slate-900">Seller Portal</h1>
+              <h1 className="font-bold text-slate-900" style={{ fontSize: "1.25rem", lineHeight: 1.2 }}>Seller Portal</h1>
               <p className="text-xs text-slate-500 leading-tight">My Store</p>
             </div>
           </div>
@@ -1114,6 +1119,16 @@ export function SellerPortal() {
                       type="email"
                       value={profileEmail}
                       readOnly
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="store-description" className="text-slate-700">About the Vendor</label>
+                    <textarea
+                      id="store-description"
+                      className="w-full border rounded-md px-3 py-2 text-sm min-h-[100px] resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={profileDescription}
+                      onChange={e => setProfileDescription(e.target.value)}
+                      placeholder="Describe your store. Shown as 'About the vendor' on your product pages. Leave empty to hide."
                     />
                   </div>
                   <Button

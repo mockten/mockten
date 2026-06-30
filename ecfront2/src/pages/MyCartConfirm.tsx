@@ -101,7 +101,9 @@ const MyCartConfirm: React.FC = () => {
           console.error('Failed to clear cart after payment', e);
         }
         const firstProductId = cartItems[0]?.productId || cartItems[0]?.id;
-        navigate('/cart/complete', { state: { paymentId: res.data.payment_id, productId: firstProductId } });
+        // Show the order_id as the Purchase ID so it matches what the seller
+        // sees in the Seller Portal (same concept → same value).
+        navigate('/cart/complete', { state: { paymentId: res.data.order_id || res.data.payment_id, productId: firstProductId } });
       }
     } catch (e) {
       console.error('Payment failed', e);

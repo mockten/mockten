@@ -190,7 +190,7 @@ func handleSellerStats(c *gin.Context) {
 			SELECT
 				COALESCE(SUM(o.total_amount), 0) as revenue,
 				COUNT(DISTINCT o.order_id) as orders,
-				COUNT(DISTINCT t.product_id) as products,
+				COALESCE(SUM(t.quantity), 0) as products,
 				COUNT(DISTINCT o.user_id) as customers
 			FROM ` + "`Order`" + ` o
 			JOIN ` + "`Transaction`" + ` t ON JSON_CONTAINS(o.transactions_json, JSON_QUOTE(t.transaction_id))
@@ -264,25 +264,36 @@ func handleSellerOrders(c *gin.Context) {
 	}
 	offset := (page - 1) * limit
 
-	// Map UI status to DB statuses
-	var dbStatuses []string
+	// Map UI status filter to a derived shipment-status rank.
+	// The fulfillment status of an order lives in its shipment-leg Transaction
+	// rows (the Order.status itself stays "paid"), so we derive the order's
+	// status from the least-progressed leg (MIN rank) to mirror the buyer's
+	// Purchase History view.
+	statusRankFilter := -1 // -1 = no filter (All)
 	switch statusFilter {
 	case "Pending":
-		dbStatuses = []string{"created", "paid"}
+		statusRankFilter = 1
 	case "Processing":
-		dbStatuses = []string{"picking", "shipped"}
+		statusRankFilter = 2
 	case "Completed":
-		dbStatuses = []string{"delivered"}
+		statusRankFilter = 3
 	case "Canceled":
-		dbStatuses = []string{"canceled", "refunded"}
-	default:
-		dbStatuses = []string{}
+		statusRankFilter = 0
 	}
 
 	search := c.Query("search")
 
+	// status_rank: 0=canceled/failed, 1=quoted/booked (Pending),
+	// 2=picked_up/in_transit/delayed (Processing), 3=delivered (Completed)
+	const statusRankExpr = `MIN(CASE t.status
+		WHEN 'canceled' THEN 0 WHEN 'failed' THEN 0
+		WHEN 'quoted' THEN 1 WHEN 'booked' THEN 1
+		WHEN 'picked_up' THEN 2 WHEN 'in_transit' THEN 2 WHEN 'delayed' THEN 2
+		WHEN 'delivered' THEN 3 ELSE 1 END)`
+
 	baseQuery := `
-		SELECT DISTINCT o.order_id, o.user_id, o.total_amount, o.status, o.created_at
+		SELECT o.order_id, o.user_id, o.total_amount, o.created_at,
+			` + statusRankExpr + ` AS status_rank
 		FROM ` + "`Order`" + ` o
 		JOIN ` + "`Transaction`" + ` t ON JSON_CONTAINS(o.transactions_json, JSON_QUOTE(t.transaction_id))
 		JOIN Product p ON t.product_id = p.product_id
@@ -296,13 +307,11 @@ func handleSellerOrders(c *gin.Context) {
 		args = append(args, like, like)
 	}
 
-	if len(dbStatuses) > 0 {
-		placeholders := make([]string, len(dbStatuses))
-		for i, s := range dbStatuses {
-			placeholders[i] = "?"
-			args = append(args, s)
-		}
-		baseQuery += " AND o.status IN (" + strings.Join(placeholders, ",") + ")"
+	baseQuery += " GROUP BY o.order_id, o.user_id, o.total_amount, o.created_at"
+
+	if statusRankFilter >= 0 {
+		baseQuery += " HAVING status_rank = ?"
+		args = append(args, statusRankFilter)
 	}
 
 	// Count total
@@ -338,13 +347,29 @@ func handleSellerOrders(c *gin.Context) {
 		CreatedAt string  `json:"created_at"`
 	}
 
+	// Map derived status rank to a status string the frontend already understands.
+	rankToStatus := func(rank int) string {
+		switch rank {
+		case 0:
+			return "canceled"
+		case 2:
+			return "shipped"
+		case 3:
+			return "delivered"
+		default:
+			return "created"
+		}
+	}
+
 	var orders []OrderRow
 	for rows.Next() {
 		var o OrderRow
 		var createdAt time.Time
-		if err := rows.Scan(&o.OrderID, &o.UserID, &o.Amount, &o.Status, &createdAt); err != nil {
+		var statusRank int
+		if err := rows.Scan(&o.OrderID, &o.UserID, &o.Amount, &createdAt, &statusRank); err != nil {
 			continue
 		}
+		o.Status = rankToStatus(statusRank)
 		o.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
 		orders = append(orders, o)
 	}
@@ -584,9 +609,10 @@ func handleGetProfile(c *gin.Context) {
 	}
 
 	var sellerName string
-	err = db.QueryRow("SELECT seller_name FROM Seller WHERE seller_id = ?", sellerID).Scan(&sellerName)
+	var description sql.NullString
+	err = db.QueryRow("SELECT seller_name, description FROM Seller WHERE seller_id = ?", sellerID).Scan(&sellerName, &description)
 	if err == sql.ErrNoRows {
-		c.JSON(http.StatusOK, gin.H{"seller_id": sellerID, "seller_name": ""})
+		c.JSON(http.StatusOK, gin.H{"seller_id": sellerID, "seller_name": "", "description": ""})
 		return
 	}
 	if err != nil {
@@ -595,7 +621,7 @@ func handleGetProfile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"seller_id": sellerID, "seller_name": sellerName})
+	c.JSON(http.StatusOK, gin.H{"seller_id": sellerID, "seller_name": sellerName, "description": description.String})
 }
 
 func handleUpdateProfile(c *gin.Context) {
@@ -606,17 +632,25 @@ func handleUpdateProfile(c *gin.Context) {
 	}
 
 	var body struct {
-		SellerName string `json:"seller_name"`
+		SellerName  string  `json:"seller_name"`
+		Description *string `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
-	_, err = db.Exec(
-		"INSERT INTO Seller (seller_id, seller_name) VALUES (?, ?) ON DUPLICATE KEY UPDATE seller_name = VALUES(seller_name)",
-		sellerID, body.SellerName,
-	)
+	if body.Description != nil {
+		_, err = db.Exec(
+			"INSERT INTO Seller (seller_id, seller_name, description) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE seller_name = VALUES(seller_name), description = VALUES(description)",
+			sellerID, body.SellerName, *body.Description,
+		)
+	} else {
+		_, err = db.Exec(
+			"INSERT INTO Seller (seller_id, seller_name) VALUES (?, ?) ON DUPLICATE KEY UPDATE seller_name = VALUES(seller_name)",
+			sellerID, body.SellerName,
+		)
+	}
 	if err != nil {
 		log.Printf("failed to update profile: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})

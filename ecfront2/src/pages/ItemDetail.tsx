@@ -209,15 +209,18 @@ const mapApiReviewsToUi = (apiReviews: ApiReview[] | undefined): Review[] => {
 const mapApiToProduct = (api: ApiItemDetailResponse, fallbackId: string): Product => {
   const rating = typeof api.avgReview === 'number' ? api.avgReview : 0.0;
 
+  // Prefer the store name; vendorUserName/sellerName both resolve to the
+  // seller's store name on the backend (falling back to the account name).
   const vendorName =
-    (api.vendorUserName && api.vendorUserName.trim().length > 0)
-      ? api.vendorUserName
-      : (api.sellerName || '');
+    (api.sellerName && api.sellerName.trim().length > 0)
+      ? api.sellerName
+      : (api.vendorUserName || '');
 
+  // Show the seller-provided description; empty when the seller hasn't set one.
   const vendorDesc =
     (api.vendorDescription && api.vendorDescription.trim().length > 0)
       ? api.vendorDescription
-      : 'Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text. Sample Text.';
+      : '';
 
   const reviews = mapApiReviewsToUi(api.reviews);
   const reviewCount =
@@ -1020,6 +1023,7 @@ const ItemDetailNew: React.FC = () => {
           </Typography>
         </Box>
 
+        {product.vendorDescription && product.vendorDescription.trim().length > 0 && (
         <Box sx={{ marginTop: '48px' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
             <Apartment sx={{ color: 'black', fontSize: '24px' }} />
@@ -1040,6 +1044,7 @@ const ItemDetailNew: React.FC = () => {
             {product.vendorDescription}
           </Typography>
         </Box>
+        )}
 
         <Box sx={{ marginTop: '48px' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>

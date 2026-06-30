@@ -390,10 +390,13 @@ func handleCreatePayment(c *gin.Context) {
 
 	orderListJSON, _ := json.Marshal([]string{orderID})
 
+	// pi.ID is Stripe's PaymentIntent id (e.g. "pi_..."), kept as an internal
+	// reference for reconciliation/support lookups in the Stripe dashboard.
+	// The customer-facing identifier is the system-generated order_id.
 	_, err = db.Exec(`
-		INSERT INTO Payment (payment_id, order_id_list, payment_method_id, amount, currency, status, idempotency_key)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, paymentID, orderListJSON, req.PaymentMethodID, req.Amount, "USD", statusStr, pi.ID)
+		INSERT INTO Payment (payment_id, order_id_list, payment_method_id, amount, currency, status, idempotency_key, stripe_payment_intent_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, paymentID, orderListJSON, req.PaymentMethodID, req.Amount, "USD", statusStr, pi.ID, pi.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record payment: " + err.Error()})
 		return

@@ -30,6 +30,7 @@ ON DUPLICATE KEY UPDATE
 CREATE TABLE IF NOT EXISTS Seller (
   seller_id VARCHAR(64) PRIMARY KEY,
   seller_name VARCHAR(255),
+  description TEXT,
   last_update DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
@@ -191,6 +192,7 @@ CREATE TABLE IF NOT EXISTS Payment (
   currency          CHAR(3) NOT NULL,
   status            ENUM('authorized','captured','failed','canceled','refunded') NOT NULL,
   idempotency_key   VARCHAR(64),
+  stripe_payment_intent_id VARCHAR(64),
   created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_payment_idem (idempotency_key)

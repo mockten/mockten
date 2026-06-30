@@ -549,6 +549,27 @@ services:
             headers:
               - host
 
+  - name: seller-product-image-slot
+    url: http://sale-service.default.svc.cluster.local:8080/v1/seller/products
+    routes:
+      - name: seller-product-image-slot-route
+        paths:
+          - ~/api/seller/products/(?<productId>[^/]+)/images/(?<slot>[^/]+)
+        strip_path: false
+        regex_priority: 10
+        methods: [DELETE, OPTIONS]
+    plugins:
+      - name: request-transformer
+        config:
+          replace:
+            uri: "/v1/seller/products/$(uri_captures['productId'])/images/$(uri_captures['slot'])"
+          add:
+            headers:
+              - Authorization:$http_authorization
+          remove:
+            headers:
+              - host
+
   - name: seller-product-images
     url: http://sale-service.default.svc.cluster.local:8080/v1/seller/products
     routes:

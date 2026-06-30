@@ -364,7 +364,7 @@ func getItemDetailHandler(db *sql.DB) gin.HandlerFunc {
 SELECT
   p.product_id,
   p.product_name,
-  COALESCE(s.seller_name, ue.USERNAME) AS seller_name,
+  COALESCE(NULLIF(s.seller_name, ''), ua_store.VALUE, ue.USERNAME) AS seller_name,
   p.price,
   c.category_name,
   p.product_condition,
@@ -384,8 +384,8 @@ SELECT
   g.longitude,
   p.avg_review,
   p.review_count,
-  ue.USERNAME AS vendor_username,
-  COALESCE(ua.VALUE, '') AS vendor_description,
+  COALESCE(NULLIF(s.seller_name, ''), ua_store.VALUE, ue.USERNAME) AS vendor_username,
+  COALESCE(s.description, '') AS vendor_description,
   p.category_id,
   p.sale_flag,
   COALESCE(p.sale_id, '') AS sale_id,
@@ -395,7 +395,7 @@ JOIN Category c ON p.category_id = c.category_id
 LEFT JOIN Stock t ON p.product_id = t.product_id
 LEFT JOIN Seller s ON p.seller_id = s.seller_id
 LEFT JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
-LEFT JOIN USER_ATTRIBUTE ua ON ue.ID = ua.USER_ID AND ua.NAME = 'description'
+LEFT JOIN USER_ATTRIBUTE ua_store ON ue.ID = ua_store.USER_ID AND ua_store.NAME = 'storeName'
 LEFT JOIN Geo g ON p.geo_id = g.geo_id
 LEFT JOIN TimeSale ts ON p.sale_id = ts.id
 WHERE p.product_id = ?
