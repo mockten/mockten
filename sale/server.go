@@ -170,11 +170,10 @@ func handleSellerStats(c *gin.Context) {
 	}
 
 	now := time.Now()
-	// Current month: first day to now
-	curStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-	// Previous month
+	// Last 30 days vs 31-60 days ago
+	curStart := now.Add(-30 * 24 * time.Hour)
 	prevEnd := curStart
-	prevStart := time.Date(prevEnd.Year(), prevEnd.Month()-1, 1, 0, 0, 0, 0, prevEnd.Location())
+	prevStart := now.Add(-60 * 24 * time.Hour)
 
 	type PeriodStats struct {
 		Revenue   float64
@@ -435,9 +434,13 @@ func handleUpdateProduct(c *gin.Context) {
 
 	productID := c.Param("id")
 	var body struct {
-		ProductName string `json:"product_name"`
-		Price       int    `json:"price"`
-		Summary     string `json:"summary"`
+		ProductName      string `json:"product_name"`
+		Price            int    `json:"price"`
+		Summary          string `json:"summary"`
+		CategoryID       string `json:"category_id"`
+		ProductCondition string `json:"product_condition"`
+		Stock            int    `json:"stock"`
+		IsActive         *int   `json:"is_active"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
@@ -445,9 +448,15 @@ func handleUpdateProduct(c *gin.Context) {
 	}
 
 	_, err = db.Exec(
-		"UPDATE Product SET product_name=?, price=?, summary=? WHERE product_id=? AND seller_id=?",
-		body.ProductName, body.Price, body.Summary, productID, sellerID,
+		"UPDATE Product SET product_name=?, price=?, summary=?, category_id=COALESCE(NULLIF(?,''), category_id), product_condition=COALESCE(NULLIF(?,''), product_condition) WHERE product_id=? AND seller_id=?",
+		body.ProductName, body.Price, body.Summary, body.CategoryID, body.ProductCondition, productID, sellerID,
 	)
+	if err == nil && body.Stock >= 0 {
+		_, err = db.Exec("INSERT INTO Stock (product_id, stocks) VALUES (?, ?) ON DUPLICATE KEY UPDATE stocks=?", productID, body.Stock, body.Stock)
+	}
+	if err == nil && body.IsActive != nil {
+		_, err = db.Exec("UPDATE Product SET is_active=? WHERE product_id=? AND seller_id=?", *body.IsActive, productID, sellerID)
+	}
 	if err != nil {
 		log.Printf("failed to update product: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})

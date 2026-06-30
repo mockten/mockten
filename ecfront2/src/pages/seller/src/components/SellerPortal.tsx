@@ -83,6 +83,12 @@ export function SellerPortal() {
   } | null>(null);
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState(0);
+  const [editStock, setEditStock] = useState(0);
+  const [editCondition, setEditCondition] = useState("");
+  const [editCategoryId, setEditCategoryId] = useState("");
+  const [editIsActive, setEditIsActive] = useState(1);
+  const [editSummary, setEditSummary] = useState("");
+  const [editCategories, setEditCategories] = useState<Array<{category_id: string; category_name: string}>>([]);
 
   // Settings / Profile
   const [profileName, setProfileName] = useState("");
@@ -152,9 +158,13 @@ export function SellerPortal() {
       .catch(() => {});
   }, [productsPage, productsLimit]);
 
+  // Load stats + recent orders together on overview
   useEffect(() => {
-    if (activeTab === "overview") loadStats();
-  }, [activeTab, loadStats]);
+    if (activeTab === "overview") {
+      loadStats();
+      loadOrders();
+    }
+  }, [activeTab, loadStats, loadOrders]);
 
   useEffect(() => {
     if (activeTab === "orders") loadOrders();
@@ -163,6 +173,16 @@ export function SellerPortal() {
   useEffect(() => {
     if (activeTab === "products") loadProducts();
   }, [activeTab, loadProducts]);
+
+  // Prevent browser back from bypassing logout
+  useEffect(() => {
+    window.history.pushState(null, "", window.location.href);
+    const onPop = () => {
+      window.history.pushState(null, "", window.location.href);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("seller_access_token");
@@ -194,7 +214,15 @@ export function SellerPortal() {
     await fetch(`${API_BASE}/products/${editProduct.product_id}`, {
       method: "PUT",
       headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({ product_name: editName, price: editPrice, summary: "" }),
+      body: JSON.stringify({
+        product_name: editName,
+        price: editPrice,
+        summary: editSummary,
+        category_id: editCategoryId,
+        product_condition: editCondition,
+        stock: editStock,
+        is_active: editIsActive,
+      }),
     });
     setEditProduct(null);
     loadProducts();
@@ -286,17 +314,65 @@ export function SellerPortal() {
     <div className="min-h-screen bg-blue-50">
       {/* Edit Product Modal */}
       {editProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg p-6 w-96 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">Edit Product</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-sm text-slate-700">Product Name</label>
+                <label className="text-sm text-slate-700">Product Name *</label>
                 <Input value={editName} onChange={e => setEditName(e.target.value)} />
               </div>
               <div>
-                <label className="text-sm text-slate-700">Price ($)</label>
-                <Input type="number" value={editPrice} onChange={e => setEditPrice(Number(e.target.value))} />
+                <label className="text-sm text-slate-700">Description</label>
+                <textarea
+                  className="w-full border rounded-md px-3 py-2 text-sm min-h-[80px] resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={editSummary}
+                  onChange={e => setEditSummary(e.target.value)}
+                  placeholder="Product description..."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm text-slate-700">Price ($) *</label>
+                  <Input type="number" min={0} step={0.01} value={editPrice} onChange={e => setEditPrice(Number(e.target.value))} />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-700">Stock *</label>
+                  <Input type="number" min={0} value={editStock} onChange={e => setEditStock(Number(e.target.value))} />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm text-slate-700">Category</label>
+                <select
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={editCategoryId}
+                  onChange={e => setEditCategoryId(e.target.value)}
+                >
+                  <option value="">-- Keep current --</option>
+                  {editCategories.map(c => (
+                    <option key={c.category_id} value={c.category_id}>{c.category_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-slate-700">Condition</label>
+                <select
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={editCondition}
+                  onChange={e => setEditCondition(e.target.value)}
+                >
+                  <option value="new">New</option>
+                  <option value="used">Used</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <label className="text-sm text-slate-700">Active (visible to customers)</label>
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 accent-blue-600"
+                  checked={editIsActive === 1}
+                  onChange={e => setEditIsActive(e.target.checked ? 1 : 0)}
+                />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
@@ -690,6 +766,16 @@ export function SellerPortal() {
                                   setEditProduct(product);
                                   setEditName(product.product_name);
                                   setEditPrice(product.price);
+                                  setEditStock(product.stocks);
+                                  setEditCondition(product.condition);
+                                  setEditIsActive(product.is_active);
+                                  setEditSummary("");
+                                  setEditCategoryId("");
+                                  // Load categories for edit modal
+                                  fetch(`${API_BASE}/categories`)
+                                    .then(r => r.json())
+                                    .then(d => { if (Array.isArray(d)) setEditCategories(d); })
+                                    .catch(() => {});
                                 }}>Edit</DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => {
                                   setShowAddProduct(true);
