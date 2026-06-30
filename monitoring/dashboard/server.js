@@ -633,6 +633,72 @@ app.get('/api/superadmin-token', async (req, res) => {
   }
 });
 
+// Seller token (healthcompany test account) — fetched server-side so the API
+// Specifications backdoor always has a valid seller Bearer, mirroring the
+// reliable superadmin-token flow (no browser Origin check, server-cached).
+let _sellerToken = null;
+let _sellerTokenExpiry = 0;
+app.get('/api/seller-token', async (req, res) => {
+  try {
+    if (_sellerToken && Date.now() < _sellerTokenExpiry) {
+      return res.json({ token: _sellerToken });
+    }
+    const r = await fetch('http://apigw:8082/api/uam/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ username: 'healthcompany@example.com', password: 'healthcompany' })
+    });
+    if (!r.ok) throw new Error(`Keycloak returned ${r.status}`);
+    const data = await r.json();
+    _sellerToken = data.access_token;
+    _sellerTokenExpiry = Date.now() + (data.expires_in - 30) * 1000;
+    res.json({ token: _sellerToken });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Returns a real, non-critical Keycloak user id so the uam users PUT/DELETE
+// backdoors are pre-filled with an existing id (picks a dev_user_* account,
+// never superadmin/healthcompany, to keep destructive test calls low-impact).
+let _firstUserIdCache = null;
+let _firstUserIdExpiry = 0;
+app.get('/api/first-user-id', async (req, res) => {
+  try {
+    if (_firstUserIdCache && Date.now() < _firstUserIdExpiry) {
+      return res.json({ id: _firstUserIdCache });
+    }
+    // Get an admin token first.
+    let token = _superadminToken && Date.now() < _superadminTokenExpiry ? _superadminToken : null;
+    if (!token) {
+      const tr = await fetch('http://apigw:8082/api/uam/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ username: 'superadmin', password: 'superadmin' })
+      });
+      if (!tr.ok) throw new Error(`token ${tr.status}`);
+      const td = await tr.json();
+      token = td.access_token;
+    }
+    const ur = await fetch('http://apigw:8082/api/uam/users?max=100', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!ur.ok) throw new Error(`users ${ur.status}`);
+    const users = await ur.json();
+    const safe = (users || []).find(u =>
+      u.username && /^dev_user_/.test(u.username)
+    ) || (users || []).find(u =>
+      u.username && !['superadmin', 'healthcompany'].includes(u.username)
+    );
+    if (!safe) throw new Error('no suitable user found');
+    _firstUserIdCache = safe.id;
+    _firstUserIdExpiry = Date.now() + 60 * 1000;
+    res.json({ id: _firstUserIdCache });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/kong/spec', (req, res) => {
   res.json(parseKongYaml());
 });

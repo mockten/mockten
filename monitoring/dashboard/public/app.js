@@ -1538,6 +1538,12 @@ const API_DESCRIPTIONS = {
   'POST /api/uam/users':
     'Creates a new user in the Keycloak realm using the Admin REST API. Requires an admin Bearer token. Kong forwards the token and strips the Host header. CORS is enabled for browser-based admin UIs.',
 
+  'DELETE /api/uam/users/([^/]+)':
+    'Deletes a user from the Keycloak realm by UUID via the Admin REST API. The <code>userId</code> path segment is the Keycloak user id. Requires an admin Bearer token (Kong forwards it and rewrites the URI to the Keycloak admin endpoint).',
+
+  'PUT /api/uam/users/([^/]+)/execute-actions-email':
+    'Sends a Keycloak "execute required actions" email to the user identified by the <code>userId</code> path segment (e.g. password reset / email verify). Optional query params control the linked client, redirect URL and link lifespan. Requires an admin Bearer token forwarded by Kong.',
+
   'GET /api/uam/roles':
     'Returns all realm-level roles defined in the Keycloak realm (e.g. <code>admin</code>, <code>user</code>). Requires an admin Bearer token forwarded by Kong. Used by the frontend to populate role assignment dropdowns.',
 
@@ -1706,6 +1712,8 @@ const API_DESCRIPTIONS_JA = {
   'POST /api/uam/broker/google/endpoint': 'Google SSOブローカーコールバックのPOSTバリアントです。Googleの認可サーバーからフォームエンコードパラメータを受け取り、Keycloak内でOIDCフェデレーションフローを完了します。',
   'GET /api/uam/users': 'Admin REST APIを通じてKeycloakレルムのユーザー一覧を返します。Kongが呼び出し元の<code>Authorization</code>（管理者トークン）ヘッダーを転送します。',
   'POST /api/uam/users': 'Admin REST APIを使用してKeycloakレルムに新しいユーザーを作成します。管理者のBearerトークンが必要です。',
+  'DELETE /api/uam/users/([^/]+)': 'Admin REST APIでKeycloakレルムのユーザーをUUID指定で削除します。<code>userId</code>パスがKeycloakユーザーIDです。管理者Bearerトークンが必要です（KongがURIをKeycloak管理エンドポイントに書き換えます）。',
+  'PUT /api/uam/users/([^/]+)/execute-actions-email': '<code>userId</code>で指定したユーザーにKeycloakの「必須アクション実行」メール（パスワードリセット／メール確認など）を送信します。クエリでクライアント・リダイレクト先・リンク有効期間を指定可能。管理者Bearerトークンが必要です。',
   'GET /api/uam/roles': 'Keycloakレルムで定義されたすべてのレルムロールを返します。Kongが管理者トークンを転送します。フロントエンドのロール割り当てドロップダウンの生成に使用されます。',
   'GET /api/storage': 'MinIOオブジェクトストレージ（<code>/photos</code>バケット）へのGETリクエストをプロキシします。<code>/api/storage</code>以降のパスがMinIOのファイル名に直接マップされます。',
   'GET /api/search': 'MeiliSearchを利用した全文商品検索。キーワード、ページネーション、カテゴリ、在庫状況、価格範囲、最低評価などのフィルターをサポートします。',
@@ -1771,6 +1779,8 @@ const API_DESCRIPTIONS_ZH = {
   'POST /api/uam/broker/google/endpoint': 'Google SSO代理回调的POST变体。接收来自Google授权服务器的表单编码参数，完成Keycloak内的OIDC联合流程。',
   'GET /api/uam/users': '通过Admin REST API列出Keycloak领域中的用户。Kong转发调用方的管理员令牌头。',
   'POST /api/uam/users': '使用Admin REST API在Keycloak领域中创建新用户。需要管理员Bearer令牌。',
+  'DELETE /api/uam/users/([^/]+)': '通过Admin REST API按UUID删除Keycloak领域中的用户。<code>userId</code>路径段为Keycloak用户ID。需要管理员Bearer令牌（Kong会将URI重写为Keycloak管理端点）。',
+  'PUT /api/uam/users/([^/]+)/execute-actions-email': '向<code>userId</code>指定的用户发送Keycloak"执行必需操作"邮件（如密码重置/邮箱验证）。可通过查询参数控制客户端、重定向URL和链接有效期。需要管理员Bearer令牌。',
   'GET /api/uam/roles': '返回Keycloak领域中定义的所有领域角色。需要管理员Bearer令牌，用于前端角色分配下拉菜单。',
   'GET /api/storage': '代理对MinIO对象存储（<code>/photos</code>存储桶）的GET请求。路径段直接映射到MinIO中的文件名。',
   'GET /api/search': '由MeiliSearch支持的全文商品搜索，支持关键词、分页、类别、库存状态、价格范围和最低评分等过滤器。',
@@ -1851,6 +1861,17 @@ const API_SCHEMAS = {
     { name: 'username', location: 'body', type: 'string', desc: 'New username',    desc_ja: '新しいユーザー名',   desc_zh: '新用户名',       required: true, default: 'newuser1' },
     { name: 'email',    location: 'body', type: 'string', desc: 'Email address',   desc_ja: 'メールアドレス',    desc_zh: '电子邮件地址',   required: true, default: 'newuser1@example.com' },
     { name: 'password', location: 'body', type: 'string', desc: 'Password',        desc_ja: 'パスワード',        desc_zh: '密码',           required: true, default: 'password123' }
+  ],
+  'DELETE /api/uam/users/([^/]+)': [
+    '__auth__',
+    { name: 'userId', location: 'path', type: 'string', desc: 'Keycloak user UUID to delete (auto-filled with a real dev_user_* id)', desc_ja: '削除するKeycloakユーザーUUID（実在のdev_user_*で自動入力）', desc_zh: '要删除的Keycloak用户UUID（自动填充真实dev_user_*）', required: true, default: '__first_user_id__' }
+  ],
+  'PUT /api/uam/users/([^/]+)/execute-actions-email': [
+    '__auth__',
+    { name: 'userId',       location: 'path',  type: 'string', desc: 'Keycloak user UUID (auto-filled with a real dev_user_* id)', desc_ja: 'KeycloakユーザーUUID（実在のdev_user_*で自動入力）', desc_zh: 'Keycloak用户UUID（自动填充真实dev_user_*）', required: true,  default: '__first_user_id__' },
+    { name: 'client_id',    location: 'query', type: 'string', desc: 'Client the action email links back to', desc_ja: 'アクションメールのリンク先クライアント', desc_zh: '操作邮件链接的客户端', required: false, default: 'mockten-react-client' },
+    { name: 'redirect_uri', location: 'query', type: 'string', desc: 'Redirect URL after the user completes the action', desc_ja: 'アクション完了後のリダイレクトURL', desc_zh: '用户完成操作后的重定向URL', required: false, default: 'http://localhost' },
+    { name: 'lifespan',     location: 'query', type: 'integer', desc: 'Link validity in seconds', desc_ja: 'リンク有効期間（秒）', desc_zh: '链接有效期（秒）', required: false, default: 43200 }
   ],
   'POST /api/item/review': [
     '__auth__',
@@ -2561,7 +2582,7 @@ function selectApiRoute(sIdx, rIdx) {
         <label style="font-weight:500; margin-bottom:4px; display:block; font-size:12px; color:var(--text-secondary);">
           ${f.name} ${f.required ? '<span style="color:var(--red); font-size:10px;">*</span>' : ''} <span style="font-size:10px; color:var(--text-muted);">(${f.location}, ${f.type})</span>
         </label>
-        <input type="text" class="form-control api-gui-input" data-name="${f.name}" data-location="${f.location}" data-type="${f.type}" style="width:100%; font-family:monospace; background:var(--bg-surface); color:#e2e8f0; border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px; font-size:13px;" data-sentinel="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__', '__first_seller_product_id__', '__seller_token__'].includes(f.default) ? f.default : ''}" value="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__', '__first_seller_product_id__', '__seller_token__'].includes(f.default) ? 'Loading...' : (f.default ?? '')}" placeholder="${fd}" />
+        <input type="text" class="form-control api-gui-input" data-name="${f.name}" data-location="${f.location}" data-type="${f.type}" style="width:100%; font-family:monospace; background:var(--bg-surface); color:#e2e8f0; border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px; font-size:13px;" data-sentinel="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__', '__first_seller_product_id__', '__seller_token__', '__first_user_id__'].includes(f.default) ? f.default : ''}" value="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__', '__first_seller_product_id__', '__seller_token__', '__first_user_id__'].includes(f.default) ? 'Loading...' : (f.default ?? '')}" placeholder="${fd}" />
       </div>`;
     }).join('');
 
@@ -2607,6 +2628,15 @@ function selectApiRoute(sIdx, rIdx) {
       _fetchFirstSellerProductId().then(() => {
         document.querySelectorAll('.api-gui-input[data-sentinel="__first_seller_product_id__"]').forEach(el => {
           el.value = _firstSellerProductIdCache || '';
+        });
+      });
+    }
+
+    // Async-fill __first_user_id__ — a real Keycloak user id for uam routes
+    if (schema.some(f => f.default === '__first_user_id__')) {
+      _fetchFirstUserId().then(() => {
+        document.querySelectorAll('.api-gui-input[data-sentinel="__first_user_id__"]').forEach(el => {
+          el.value = _firstUserIdCache || '';
         });
       });
     }
@@ -2697,6 +2727,7 @@ async function sendTestRequest() {
         if (value !== '') {
           if (type === 'integer') typedVal = parseInt(value, 10);
           else if (type === 'number') typedVal = parseFloat(value);
+          else if (type === 'boolean') typedVal = (value === 'true' || value === '1');
           else if (type === 'object') {
             try { typedVal = JSON.parse(value); } catch (err) {}
           }
@@ -2798,7 +2829,14 @@ async function sendTestRequest() {
     const contentType = res.headers.get('content-type') || '';
     const statusLine = `<span style="color:${res.ok ? 'var(--green)' : 'var(--red)'}">Status: ${res.status} ${res.statusText} (${latency}ms)</span>`;
 
-    if (contentType.startsWith('image/')) {
+    // Treat as an image by content-type OR by file extension — MinIO-served
+    // seed objects may report application/octet-stream yet still be images.
+    const isImageResponse = res.ok && (
+      contentType.startsWith('image/') ||
+      /\.(png|jpe?g|gif|webp|svg|avif)$/i.test(url.split('?')[0])
+    );
+
+    if (isImageResponse) {
       // Display image directly instead of garbled binary text
       resPanel.innerHTML = `${statusLine}
 <div style="margin-top:12px;">
@@ -5448,14 +5486,24 @@ let _sellerTokenCache = null;
 async function _fetchSellerToken() {
   if (_sellerTokenCache) return;
   try {
-    const r = await fetch('/api/uam/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'username=healthcompany&password=healthcompany'
-    });
+    // Use the dashboard's server-side token proxy (reliable, no browser Origin
+    // check) instead of calling Keycloak directly from the browser.
+    const r = await fetch('/dashboard/api/seller-token');
     if (!r.ok) return;
     const d = await r.json();
-    _sellerTokenCache = d.access_token || '';
+    _sellerTokenCache = d.token || '';
+  } catch {}
+}
+
+// First non-critical Keycloak user id, for the uam users PUT/DELETE backdoors.
+let _firstUserIdCache = null;
+async function _fetchFirstUserId() {
+  if (_firstUserIdCache) return;
+  try {
+    const r = await fetch('/dashboard/api/first-user-id');
+    if (!r.ok) return;
+    const d = await r.json();
+    _firstUserIdCache = d.id || '';
   } catch {}
 }
 

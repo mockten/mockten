@@ -23,6 +23,7 @@ export function SellerSignUpPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<null | "terms" | "privacy">(null);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -95,8 +96,42 @@ export function SellerSignUpPage() {
     }
   };
 
+  const LEGAL_CONTENT = {
+    terms: {
+      title: "Terms of Service",
+      body: [
+        "These Terms of Service govern your use of the Mockten seller platform. By creating a seller account you agree to provide accurate store and product information and to comply with all applicable laws.",
+        "You are responsible for the products you list, their pricing, fulfillment, and customer support. Mockten may suspend or remove listings or accounts that violate these terms or harm buyers.",
+        "Mockten is a demonstration environment. The platform is provided \"as is\" without warranties of any kind, and Mockten is not liable for any damages arising from its use.",
+      ],
+    },
+    privacy: {
+      title: "Privacy Policy",
+      body: [
+        "This Privacy Policy explains how Mockten handles the information you provide when registering as a seller, including your name, store name, email address, and phone number.",
+        "Your information is used solely to operate your seller account, display your store to buyers, and contact you about your account. We do not sell your personal data to third parties.",
+        "As a demonstration environment, data entered here may be reset at any time. Do not submit real or sensitive personal information.",
+      ],
+    },
+  } as const;
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-sky-100 p-8">
+      {legalDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setLegalDoc(null)}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg shadow-xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold mb-4">{LEGAL_CONTENT[legalDoc].title}</h3>
+            <div className="space-y-3">
+              {LEGAL_CONTENT[legalDoc].body.map((p, i) => (
+                <p key={i} className="text-sm text-slate-600 leading-relaxed">{p}</p>
+              ))}
+            </div>
+            <div className="mt-5 flex justify-end">
+              <Button className="!bg-blue-600 hover:!bg-blue-700 !text-white" onClick={() => setLegalDoc(null)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="w-full max-w-2xl">
         {/* Logo and Branding */}
         <div className="text-center mb-8">
@@ -239,13 +274,13 @@ export function SellerSignUpPage() {
                 />
                 <label htmlFor="terms" className="text-slate-700 cursor-pointer select-none">
                   I agree to the{" "}
-                  <a href="#" className="text-blue-600 hover:text-blue-700">
+                  <button type="button" onClick={() => setLegalDoc("terms")} className="text-blue-600 hover:text-blue-700 underline">
                     Terms of Service
-                  </a>{" "}
+                  </button>{" "}
                   and{" "}
-                  <a href="#" className="text-blue-600 hover:text-blue-700">
+                  <button type="button" onClick={() => setLegalDoc("privacy")} className="text-blue-600 hover:text-blue-700 underline">
                     Privacy Policy
-                  </a>
+                  </button>
                 </label>
               </div>
 
