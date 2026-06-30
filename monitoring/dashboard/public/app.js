@@ -1683,10 +1683,12 @@ const API_DESCRIPTIONS = {
     'Permanently deletes a product owned by the authenticated seller from the <code>Product</code> table. Associated stock rows and order history are not deleted. This action is irreversible. Requires a valid seller Bearer token.',
 
   'POST /api/seller/products/([^/]+)/images':
-    'Uploads up to 3 product images to MinIO object storage (bucket: <code>photos</code>). Images are stored as <code>{productId}.png</code>, <code>{productId}/1.png</code>, and <code>{productId}/2.png</code>. The request must be multipart/form-data with the field name <code>images[]</code>. Returns a list of the stored MinIO object paths. Requires a valid seller Bearer token.',
+    'Uploads up to 3 product images to MinIO object storage (bucket: <code>photos</code>). Images are stored as <code>{productId}.png</code>, <code>{productId}/1.png</code>, and <code>{productId}/2.png</code>. The request must be multipart/form-data with the field name <code>images[]</code>. An optional <code>?slot=N</code> (0–2) query uploads a single slot. Returns a list of the stored MinIO object paths. Requires a valid seller Bearer token.',
+  'DELETE /api/seller/products/([^/]+)/images/([^/]+)':
+    'Deletes a single product image slot from MinIO object storage. The <code>slot</code> path segment selects which object to remove: 0 → <code>{productId}.png</code>, 1 → <code>{productId}/1.png</code>, 2 → <code>{productId}/2.png</code>. Used by the Seller Portal edit modal\'s per-slot Delete control. Requires a valid seller Bearer token.',
 
   'GET /api/seller/profile':
-    'Returns the store name (seller_name) for the authenticated seller, looked up from the <code>Seller</code> table by the seller email extracted from the JWT. Returns an empty seller_name if no profile has been saved yet. Requires a valid seller Bearer token.',
+    'Returns the store name (seller_name) and About-the-Vendor description for the authenticated seller, looked up from the <code>Seller</code> table by the seller email extracted from the JWT. Falls back to the sign-up storeName attribute when no profile has been saved yet. Requires a valid seller Bearer token.',
 
   'PUT /api/seller/profile':
     'Creates or updates the store name for the authenticated seller using an upsert (<code>INSERT … ON DUPLICATE KEY UPDATE</code>) on the <code>Seller</code> table. Requires a valid seller Bearer token.',
@@ -1753,8 +1755,9 @@ const API_DESCRIPTIONS_JA = {
   'PUT /api/seller/products/([^/]+)': '認証済みセラーが所有する商品を更新します。文字列フィールドは省略可能で、省略時は既存値が維持されます。在庫は別途アップサートされます。<code>is_active</code>はリクエストボディに含まれる場合のみ更新されます。有効なセラーJWTが必要です。',
   'PUT /api/seller/products/([^/]+)/status': '認証済みセラーが所有する商品の有効/無効フラグを切り替えます。<code>is_active: 1</code>で有効化、<code>is_active: 0</code>で無効化します。有効なセラーJWTが必要です。',
   'DELETE /api/seller/products/([^/]+)': '認証済みセラーが所有する商品を<code>Product</code>テーブルから完全削除します。関連する在庫・注文履歴は削除されません。この操作は元に戻せません。有効なセラーJWTが必要です。',
-  'POST /api/seller/products/([^/]+)/images': '最大3枚の商品画像をMinIOオブジェクトストレージにアップロードします。multipart/form-dataのフィールド名は<code>images[]</code>。有効なセラーJWTが必要です。',
-  'GET /api/seller/profile': 'JWTから取得したセラーのメールアドレスをキーに<code>Seller</code>テーブルからストア名を返します。プロフィール未設定の場合は空の<code>seller_name</code>を返します。有効なセラーJWTが必要です。',
+  'POST /api/seller/products/([^/]+)/images': '最大3枚の商品画像をMinIOオブジェクトストレージにアップロードします。multipart/form-dataのフィールド名は<code>images[]</code>。<code>?slot=N</code>（0〜2）で単一スロットのアップロードも可能。有効なセラーJWTが必要です。',
+  'DELETE /api/seller/products/([^/]+)/images/([^/]+)': 'MinIOから商品画像を1スロット削除します。<code>slot</code>パスで対象を選択: 0→<code>{productId}.png</code>、1→<code>{productId}/1.png</code>、2→<code>{productId}/2.png</code>。Seller Portal編集モーダルのスロット別Deleteで使用します。有効なセラーJWTが必要です。',
+  'GET /api/seller/profile': 'JWTから取得したセラーのメールアドレスをキーに<code>Seller</code>テーブルからストア名とベンダー説明を返します。未設定の場合はサインアップ時のstoreName属性をフォールバックとして返します。有効なセラーJWTが必要です。',
   'PUT /api/seller/profile': '認証済みセラーのストア名を作成または更新します（<code>INSERT … ON DUPLICATE KEY UPDATE</code>）。有効なセラーJWTが必要です。',
   'GET /api/seller/categories': 'MySQLから商品カテゴリの全リストを名前順で返します。商品作成・編集時のカテゴリドロップダウンに使用されます。有効なセラーJWTが必要です。',
 };
@@ -1817,8 +1820,9 @@ const API_DESCRIPTIONS_ZH = {
   'PUT /api/seller/products/([^/]+)': '更新已认证卖家拥有的商品。字符串字段均可选，省略时保留现有值。库存单独进行upsert操作。仅当请求体中明确包含<code>is_active</code>时才更新该字段。需要有效的卖家Bearer令牌。',
   'PUT /api/seller/products/([^/]+)/status': '切换已认证卖家商品的启用/禁用标志。<code>is_active: 1</code>为启用，<code>is_active: 0</code>为禁用。需要有效的卖家Bearer令牌。',
   'DELETE /api/seller/products/([^/]+)': '从<code>Product</code>表中永久删除已认证卖家拥有的商品。关联的库存和订单历史不会被删除。此操作不可撤销。需要有效的卖家Bearer令牌。',
-  'POST /api/seller/products/([^/]+)/images': '将最多3张商品图片上传至MinIO对象存储。请求格式为multipart/form-data，字段名为<code>images[]</code>。需要有效的卖家Bearer令牌。',
-  'GET /api/seller/profile': '从<code>Seller</code>表返回已认证卖家的店铺名称。若尚未设置个人资料，则返回空的<code>seller_name</code>。需要有效的卖家Bearer令牌。',
+  'POST /api/seller/products/([^/]+)/images': '将最多3张商品图片上传至MinIO对象存储。请求格式为multipart/form-data，字段名为<code>images[]</code>。可选<code>?slot=N</code>（0–2）上传单个槽位。需要有效的卖家Bearer令牌。',
+  'DELETE /api/seller/products/([^/]+)/images/([^/]+)': '从MinIO删除单个商品图片槽位。<code>slot</code>路径选择对象：0→<code>{productId}.png</code>，1→<code>{productId}/1.png</code>，2→<code>{productId}/2.png</code>。用于卖家门户编辑弹窗的单槽删除。需要有效的卖家Bearer令牌。',
+  'GET /api/seller/profile': '从<code>Seller</code>表返回已认证卖家的店铺名称和供应商描述。若尚未设置，则回退到注册时的storeName属性。需要有效的卖家Bearer令牌。',
   'PUT /api/seller/profile': '创建或更新已认证卖家的店铺名称（使用<code>INSERT … ON DUPLICATE KEY UPDATE</code>）。需要有效的卖家Bearer令牌。',
   'GET /api/seller/categories': '从MySQL按名称顺序返回商品分类完整列表，用于创建或编辑商品时的分类下拉菜单。需要有效的卖家Bearer令牌。',
 };
@@ -2057,6 +2061,11 @@ const API_SCHEMAS = {
   'DELETE /api/seller/products/([^/]+)': [
     '__seller_token__',
     { name: 'id', location: 'path', type: 'string', desc: 'Product ID to permanently delete', desc_ja: '完全削除する商品ID', desc_zh: '要永久删除的商品ID', required: true, default: '__first_seller_product_id__' }
+  ],
+  'DELETE /api/seller/products/([^/]+)/images/([^/]+)': [
+    '__seller_token__',
+    { name: 'id',   location: 'path', type: 'string',  desc: 'Product ID whose image slot is removed', desc_ja: '画像スロットを削除する商品ID', desc_zh: '要删除图片槽位的商品ID', required: true, default: '__first_seller_product_id__' },
+    { name: 'slot', location: 'path', type: 'integer', desc: 'Image slot: 0={id}.png, 1={id}/1.png, 2={id}/2.png', desc_ja: '画像スロット: 0={id}.png, 1={id}/1.png, 2={id}/2.png', desc_zh: '图片槽位: 0={id}.png, 1={id}/1.png, 2={id}/2.png', required: true, default: 2 }
   ],
   'GET /api/seller/orders': [
     '__seller_token__',
@@ -2360,9 +2369,13 @@ const API_RESPONSE_SCHEMAS = {
   'DELETE /api/seller/products/([^/]+)': [
     { field: 'success', type: 'boolean', desc: 'true on success', desc_ja: '成功時はtrue', desc_zh: '成功时返回true' },
   ],
+  'DELETE /api/seller/products/([^/]+)/images/([^/]+)': [
+    { field: 'success', type: 'boolean', desc: 'true on success', desc_ja: '成功時はtrue', desc_zh: '成功时返回true' },
+  ],
   'GET /api/seller/profile': [
     { field: 'seller_id',   type: 'string', desc: 'Seller email (extracted from JWT)',      desc_ja: 'セラーメールアドレス（JWTから取得）', desc_zh: '卖家邮箱（从JWT提取）' },
-    { field: 'seller_name', type: 'string', desc: 'Store display name (empty if not set)',  desc_ja: 'ストア表示名（未設定の場合は空文字）', desc_zh: '店铺显示名称（未设置则为空）' },
+    { field: 'seller_name', type: 'string', desc: 'Store display name (falls back to sign-up storeName)',  desc_ja: 'ストア表示名（未設定時はサインアップのstoreName）', desc_zh: '店铺显示名称（未设置时回退到注册storeName）' },
+    { field: 'description', type: 'string', desc: 'About-the-Vendor text (empty if not set)', desc_ja: 'ベンダー説明（未設定の場合は空文字）', desc_zh: '供应商描述（未设置则为空）' },
   ],
   'PUT /api/seller/profile': [
     { field: 'success', type: 'boolean', desc: 'true on success', desc_ja: '成功時はtrue', desc_zh: '成功时返回true' },
@@ -2659,6 +2672,9 @@ async function sendTestRequest() {
   // Use override path when Kong route differs from actual service endpoint
   const overrideKey = `${method} ${_normalizePath(path)}`;
   if (API_TEST_PATH_OVERRIDES[overrideKey]) path = API_TEST_PATH_OVERRIDES[overrideKey];
+  // Normalize Kong regex captures (named groups like (?<id>[^/]+) or ([^/]+))
+  // and strip ~/$ so path-param substitution below works uniformly via :id.
+  path = _normalizePath(path);
   const resPanel = document.getElementById('api-test-response');
   
   resPanel.innerHTML = '<span style="color:var(--yellow)">Sending test request...</span>';

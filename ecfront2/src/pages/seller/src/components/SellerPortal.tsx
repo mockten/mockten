@@ -82,7 +82,7 @@ export function SellerPortal() {
 
   // Products
   const [products, setProducts] = useState<Array<{
-    product_id: string; product_name: string; price: number; condition: string; stocks: number; status: string; is_active: number;
+    product_id: string; product_name: string; price: number; condition: string; stocks: number; status: string; is_active: number; summary?: string; category_id?: string;
   }>>([]);
   const [productsTotal, setProductsTotal] = useState(0);
   const [productsPage, setProductsPage] = useState(1);
@@ -90,7 +90,7 @@ export function SellerPortal() {
 
   // Edit product modal
   const [editProduct, setEditProduct] = useState<{
-    product_id: string; product_name: string; price: number; condition: string; stocks: number; status: string; is_active: number;
+    product_id: string; product_name: string; price: number; condition: string; stocks: number; status: string; is_active: number; summary?: string; category_id?: string;
   } | null>(null);
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState(0);
@@ -434,14 +434,14 @@ export function SellerPortal() {
                           <>
                             <img src={previewUrl} alt={`slot${slot}`} className="w-full h-full object-cover" />
                             <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 flex flex-col items-center justify-center gap-1 transition-opacity">
-                              <label className="cursor-pointer text-white text-xs bg-blue-600 px-2 py-0.5 rounded">
+                              <label className="cursor-pointer text-white text-xs px-2 py-0.5 rounded" style={{ backgroundColor: "#2563eb" }}>
                                 Update
                                 <input type="file" accept="image/*" className="hidden" onChange={e => {
                                   const f = e.target.files?.[0];
                                   if (f) setImageSlots(prev => { const n=[...prev]; n[slot]=f; return n; });
                                 }} />
                               </label>
-                              <button className="text-white text-xs font-medium bg-slate-700 hover:bg-slate-800 px-2 py-0.5 rounded" onClick={() => setImageSlots(prev => { const n=[...prev]; n[slot]='delete'; return n; })}>Delete</button>
+                              <button className="text-white text-xs font-semibold px-2 py-0.5 rounded" style={{ backgroundColor: "#b91c1c" }} onClick={() => setImageSlots(prev => { const n=[...prev]; n[slot]='delete'; return n; })}>Delete</button>
                             </div>
                           </>
                         ) : (
@@ -894,7 +894,7 @@ export function SellerPortal() {
                                   setEditStock(product.stocks);
                                   setEditCondition(product.condition);
                                   setEditIsActive(product.is_active);
-                                  setEditSummary("");
+                                  setEditSummary(product.summary || "");
                                   setEditCategoryId("");
                                   setImageSlots([null, null, null]);
                                   // Check which image slots exist

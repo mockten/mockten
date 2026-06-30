@@ -410,7 +410,7 @@ func handleSellerProducts(c *gin.Context) {
 	}
 
 	query := `
-		SELECT p.product_id, p.product_name, p.price, p.product_condition, COALESCE(s.stocks, 0), p.is_active
+		SELECT p.product_id, p.product_name, p.price, p.product_condition, COALESCE(s.stocks, 0), p.is_active, COALESCE(p.summary, ''), COALESCE(p.category_id, '')
 		FROM Product p
 		LEFT JOIN Stock s ON p.product_id = s.product_id
 		WHERE p.seller_id = ?
@@ -433,12 +433,14 @@ func handleSellerProducts(c *gin.Context) {
 		Stocks      int    `json:"stocks"`
 		Status      string `json:"status"`
 		IsActive    int    `json:"is_active"`
+		Summary     string `json:"summary"`
+		CategoryID  string `json:"category_id"`
 	}
 
 	var prods []ProductRow
 	for rows.Next() {
 		var p ProductRow
-		if err := rows.Scan(&p.ProductID, &p.ProductName, &p.Price, &p.Condition, &p.Stocks, &p.IsActive); err != nil {
+		if err := rows.Scan(&p.ProductID, &p.ProductName, &p.Price, &p.Condition, &p.Stocks, &p.IsActive, &p.Summary, &p.CategoryID); err != nil {
 			continue
 		}
 		if p.IsActive == 0 {
@@ -608,20 +610,27 @@ func handleGetProfile(c *gin.Context) {
 		return
 	}
 
-	var sellerName string
+	var sellerName sql.NullString
 	var description sql.NullString
-	err = db.QueryRow("SELECT seller_name, description FROM Seller WHERE seller_id = ?", sellerID).Scan(&sellerName, &description)
-	if err == sql.ErrNoRows {
-		c.JSON(http.StatusOK, gin.H{"seller_id": sellerID, "seller_name": "", "description": ""})
-		return
-	}
-	if err != nil {
-		log.Printf("failed to get profile: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
-		return
+	_ = db.QueryRow("SELECT seller_name, description FROM Seller WHERE seller_id = ?", sellerID).Scan(&sellerName, &description)
+
+	// Fall back to the storeName supplied at sign-up (stored as a Keycloak user
+	// attribute) so a new seller's store name is pre-filled without re-entry.
+	storeName := sellerName.String
+	if strings.TrimSpace(storeName) == "" {
+		var attrStore sql.NullString
+		_ = db.QueryRow(`
+			SELECT ua.VALUE
+			FROM USER_ENTITY ue
+			JOIN USER_ATTRIBUTE ua ON ue.ID = ua.USER_ID AND ua.NAME = 'storeName'
+			WHERE ue.EMAIL = ?
+			LIMIT 1`, sellerID).Scan(&attrStore)
+		if attrStore.Valid {
+			storeName = attrStore.String
+		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"seller_id": sellerID, "seller_name": sellerName, "description": description.String})
+	c.JSON(http.StatusOK, gin.H{"seller_id": sellerID, "seller_name": storeName, "description": description.String})
 }
 
 func handleUpdateProfile(c *gin.Context) {

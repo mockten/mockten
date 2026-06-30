@@ -158,4 +158,71 @@ test.describe('Dashboard Enhancements Spec', () => {
     const logOutput = page.locator('#vuln-log-output');
     await expect(logOutput).toContainText('Starting security scan', { timeout: 15000 });
   });
+
+  test('API Specifications: no route renders as undefined', async ({ page }) => {
+    await page.locator('nav .nav-item').getByText('API Specifications', { exact: true }).click();
+    await expect(page.locator('#view-title')).toContainText('API Specifications');
+
+    // Wait for the route list to populate from Kong spec.
+    await page.waitForSelector('#api-list-ul .db-list-item', { timeout: 15000 });
+    const items = page.locator('#api-list-ul .db-list-item');
+    const count = await items.count();
+    expect(count).toBeGreaterThan(0);
+
+    // Every route must render a real path — guards against the phantom
+    // "<METHOD> undefined" entries (e.g. cors plugins leaking in as routes).
+    for (let i = 0; i < count; i++) {
+      const text = (await items.nth(i).innerText()).trim();
+      expect(text.toLowerCase()).not.toContain('undefined');
+      await items.nth(i).click();
+      const title = (await page.locator('#api-detail-title').innerText()).trim();
+      expect(title.toLowerCase(), `route #${i} title`).not.toContain('undefined');
+      expect(title.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('API Specifications: Send Request returns 2xx for core GET endpoints', async ({ page }) => {
+    await page.locator('nav .nav-item').getByText('API Specifications', { exact: true }).click();
+    await page.waitForSelector('#api-list-ul .db-list-item', { timeout: 15000 });
+
+    // Curated safe GET endpoints that should answer 2xx with auto-filled params.
+    const targets = [
+      'GET /api/stats',
+      'GET /api/search',
+      'GET /api/categories',
+      'GET /api/seller/stats',
+      'GET /api/seller/orders',
+      'GET /api/seller/products',
+      'GET /api/seller/profile',
+      'GET /api/seller/categories',
+    ];
+
+    const items = page.locator('#api-list-ul .db-list-item');
+    const count = await items.count();
+
+    for (const target of targets) {
+      let matched = false;
+      for (let i = 0; i < count; i++) {
+        const text = (await items.nth(i).innerText()).replace(/\s+/g, ' ').trim();
+        if (text === target) {
+          matched = true;
+          await items.nth(i).click();
+          // Wait for async-filled params (e.g. seller token) to finish loading
+          // so the request is sent with a valid Authorization header.
+          await page.waitForFunction(() => {
+            const inputs = Array.from(document.querySelectorAll('.api-gui-input')) as HTMLInputElement[];
+            return inputs.every(el => el.value !== 'Loading...');
+          }, { timeout: 20000 });
+          await page.getByRole('button', { name: 'Send Request' }).click();
+          // Response panel should report a 2xx status.
+          await expect(page.locator('#api-test-response'), `${target} response`).toContainText(
+            /Status:\s*2\d\d/,
+            { timeout: 20000 }
+          );
+          break;
+        }
+      }
+      expect(matched, `route present: ${target}`).toBe(true);
+    }
+  });
 });

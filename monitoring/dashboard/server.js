@@ -513,6 +513,11 @@ function parseKongYaml() {
     let currentService = null;
     let currentRoute = null;
     let mode = null;
+    // Track whether indent-6 "- name:" entries belong to routes or plugins.
+    // Plugins share the same indentation as routes, so without this flag a
+    // plugin block (e.g. a cors plugin with its own `methods:`) would leak in
+    // as a phantom route and render as "<METHOD> undefined".
+    let inPlugins = false;
 
     for (let line of lines) {
       const trimmed = line.trim();
@@ -530,8 +535,9 @@ function parseKongYaml() {
           };
           services.push(currentService);
           currentRoute = null;
+          inPlugins = false;
           mode = 'service';
-        } else if (indent === 6 && currentService) {
+        } else if (indent === 6 && currentService && !inPlugins) {
           currentRoute = {
             name: trimmed.replace('- name:', '').trim(),
             paths: [],
@@ -539,6 +545,11 @@ function parseKongYaml() {
           };
           currentService.routes.push(currentRoute);
           mode = 'route';
+        } else if (indent === 6 && inPlugins) {
+          // A plugin entry — not a route. Detach currentRoute so any nested
+          // keys (methods/paths inside the plugin config) are not captured.
+          currentRoute = null;
+          mode = 'plugin';
         }
       } else if (trimmed.startsWith('name:')) {
         const val = trimmed.replace('name:', '').trim();
@@ -551,8 +562,11 @@ function parseKongYaml() {
         currentService.url = trimmed.replace('url:', '').trim();
       } else if (trimmed.startsWith('routes:')) {
         mode = 'routes';
+        inPlugins = false;
       } else if (trimmed.startsWith('plugins:')) {
         mode = 'plugins';
+        inPlugins = true;
+        currentRoute = null;
       } else if (trimmed.startsWith('paths:')) {
         mode = 'paths';
         // Handle inline array: paths: [ /foo, /bar ]
