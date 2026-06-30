@@ -2,7 +2,7 @@ version: "3"
 tasks:
   build:
     cmds:
-      - (chmod -a+ ecfront2.log 2>/dev/null || true; rm -rf ecfront2.log 2>/dev/null || true; touch ecfront2.log)
+      - (chmod a+rw ecfront2.log 2>/dev/null || true; rm -rf ecfront2.log 2>/dev/null || true; touch ecfront2.log)
       - (docker compose up -d || docker-compose up -d)
       - (for i in {1..30}; do docker exec -i mysql-service.default.svc.cluster.local mysql --ssl-mode=DISABLED -umocktenusr -pmocktenpassword mocktendb -e "SELECT 1" >/dev/null 2>&1 && break || sleep 1; done)
       - (for i in {1..60}; do docker exec -i mysql-service.default.svc.cluster.local mysql --ssl-mode=DISABLED -umocktenusr -pmocktenpassword mocktendb -e "SELECT 1 FROM Product LIMIT 1" >/dev/null 2>&1 && break || sleep 2; done)
@@ -35,7 +35,7 @@ tasks:
       - (if [ -f ecfront2.pid ]; then kill $(cat ecfront2.pid) || true; rm -f ecfront2.pid; fi)
       - (lsof -t -i :5173 | xargs kill -9 || true)
       - (docker compose down -v --remove-orphans || docker-compose down -v --remove-orphans || true)
-      - (chmod -a+ ecfront2.log 2>/dev/null; rm -rf ecfront2.log ecfront2.pid zap-report.html || true)
+      - (chmod a+rw ecfront2.log 2>/dev/null || true; rm -rf ecfront2.log ecfront2.pid zap-report.html || true)
       - (docker rm -f $(docker ps -aq --filter "name=^act-CI") || true)
       - (docker image prune -f || true)
       - (docker builder prune --keep-storage 5GB -f || true)
@@ -320,6 +320,10 @@ tasks:
         fi
         echo ""
         echo "Latency check PASSED: all measured endpoints within SLA."
+      - |
+        echo ""
+        echo "=== [GUI Latency Check] Page-load budgets (Mockten storefront + Seller Portal) ==="
+        cd ecfront2 && npx playwright test tests/performance.spec.ts --reporter=list
 
   infosec:
     desc: Run all security scans (trivy, sca, sast, dast)

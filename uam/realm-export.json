@@ -48,10 +48,12 @@
       "protocol": "openid-connect",
       "publicClient": true,
       "redirectUris": [
-        "http://localhost/*"
+        "http://localhost/*",
+        "http://nginx/*"
       ],
       "webOrigins": [
-        "http://localhost"
+        "http://localhost",
+        "http://nginx"
       ],
       "directAccessGrantsEnabled": false,
       "defaultClientScopes": [

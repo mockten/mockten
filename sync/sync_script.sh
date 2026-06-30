@@ -30,6 +30,7 @@ SELECT
   p.sale_flag,
   COALESCE(p.sale_id, '') AS sale_id,
   COALESCE(ts.discount_rate, 0.0) AS discount_rate,
+  p.is_active,
   GREATEST(
     IFNULL(p.last_update, '1970-01-01 00:00:00'),
     IFNULL(c.last_update, '1970-01-01 00:00:00'),
@@ -47,36 +48,57 @@ HAVING row_last_update > '$LAST_SYNC' AND row_last_update <= '$WATERMARK'
 " > /tmp/updated_products.tsv
 
 if [ -s /tmp/updated_products.tsv ]; then
-  jq -R -s '
-    split("\n")[:-1]
-    | map(split("\t"))
-    | map({
-        product_id: .[0],
-        product_name: .[1],
-        seller_name: .[2],
-        price: (if (.[3] == null or .[3] == "") then 0 else (.[3] | tonumber) end),
-        category_name: .[4],
-        condition: .[5],
-        stocks: (if (.[6] == null or .[6] == "") then 0 else (.[6] | tonumber) end),
-        avg_review: (if (.[7] == null or .[7] == "") then 0 else (.[7] | tonumber) end),
-        review_count: (if (.[8] == null or .[8] == "") then 0 else (.[8] | tonumber) end),
-        sale_flag: (if .[9] == "1" then true else false end),
-        sale_id: .[10],
-        discount_rate: (if (.[11] == null or .[11] == "") then 0.0 else (.[11] | tonumber) end)
-      })
-  ' /tmp/updated_products.tsv > /tmp/updated_products.json
+  # Split into active (upsert) and inactive (delete)
+  awk -F'\t' '$13 == "1"' /tmp/updated_products.tsv > /tmp/active_products.tsv
+  awk -F'\t' '$13 == "0"' /tmp/updated_products.tsv > /tmp/inactive_products.tsv
 
-  http_code=$(curl -s -o /tmp/meili_sync_resp.txt -w "%{http_code}" -X POST "$MEILI_URL/indexes/products/documents?primaryKey=product_id" \
-    -H 'Content-Type: application/json' \
-    --data-binary @/tmp/updated_products.json)
+  # Upsert active products
+  if [ -s /tmp/active_products.tsv ]; then
+    jq -R -s '
+      split("\n")[:-1]
+      | map(split("\t"))
+      | map({
+          product_id: .[0],
+          product_name: .[1],
+          seller_name: .[2],
+          price: (if (.[3] == null or .[3] == "") then 0 else (.[3] | tonumber) end),
+          category_name: .[4],
+          condition: .[5],
+          stocks: (if (.[6] == null or .[6] == "") then 0 else (.[6] | tonumber) end),
+          avg_review: (if (.[7] == null or .[7] == "") then 0 else (.[7] | tonumber) end),
+          review_count: (if (.[8] == null or .[8] == "") then 0 else (.[8] | tonumber) end),
+          sale_flag: (if .[9] == "1" then true else false end),
+          sale_id: .[10],
+          discount_rate: (if (.[11] == null or .[11] == "") then 0.0 else (.[11] | tonumber) end)
+        })
+    ' /tmp/active_products.tsv > /tmp/active_products.json
 
-  if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-    echo "$WATERMARK" > "$LAST_SYNC_FILE"
-  else
-    echo "Meili sync failed (HTTP $http_code)"
-    cat /tmp/meili_sync_resp.txt
-    exit 1
+    http_code=$(curl -s -o /tmp/meili_sync_resp.txt -w "%{http_code}" -X POST "$MEILI_URL/indexes/products/documents?primaryKey=product_id" \
+      -H 'Content-Type: application/json' \
+      --data-binary @/tmp/active_products.json)
+
+    if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+      echo "Meili upsert failed (HTTP $http_code)"
+      cat /tmp/meili_sync_resp.txt
+      exit 1
+    fi
   fi
+
+  # Delete inactive products from MeiliSearch
+  if [ -s /tmp/inactive_products.tsv ]; then
+    awk -F'\t' '{print $1}' /tmp/inactive_products.tsv | jq -R -s 'split("\n")[:-1]' > /tmp/delete_ids.json
+    http_code=$(curl -s -o /tmp/meili_del_resp.txt -w "%{http_code}" -X DELETE "$MEILI_URL/indexes/products/documents/delete-batch" \
+      -H 'Content-Type: application/json' \
+      --data-binary @/tmp/delete_ids.json)
+
+    if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+      echo "Meili delete failed (HTTP $http_code)"
+      cat /tmp/meili_del_resp.txt
+      exit 1
+    fi
+  fi
+
+  echo "$WATERMARK" > "$LAST_SYNC_FILE"
 else
   echo "$WATERMARK" > "$LAST_SYNC_FILE"
 fi

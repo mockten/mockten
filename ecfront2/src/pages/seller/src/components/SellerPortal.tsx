@@ -35,6 +35,10 @@ import {
   MoreVertical,
   Plus,
   Store,
+  RefreshCw,
+  Loader2,
+  ArrowDown,
+  ArrowUp,
 } from "lucide-react";
 import { AddProductPage } from "./AddProductPage";
 import { useNavigate } from "react-router-dom";
@@ -69,6 +73,12 @@ export function SellerPortal() {
   const [ordersPage, setOrdersPage] = useState(1);
   const [ordersLimit, setOrdersLimit] = useState(10);
   const [ordersStatusFilter, setOrdersStatusFilter] = useState("All");
+  const [ordersSort, setOrdersSort] = useState<"desc" | "asc">("desc");
+
+  // Loading flags (so we show a spinner, not "No ... found", while fetching)
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState(false);
 
   // Products
   const [products, setProducts] = useState<Array<{
@@ -129,30 +139,37 @@ export function SellerPortal() {
 
   // Load stats
   const loadStats = useCallback(() => {
+    setLoadingStats(true);
     fetch(`${API_BASE}/stats`, { headers: getAuthHeaders() })
       .then(r => r.json())
       .then(data => setStats(data))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoadingStats(false));
   }, []);
 
   // Load orders
   const loadOrders = useCallback(() => {
+    setLoadingOrders(true);
     const params = new URLSearchParams({
       page: String(ordersPage),
       limit: String(ordersLimit),
       status: ordersStatusFilter,
+      sort: ordersSort,
     });
+    if (searchQuery && activeTab === "orders") params.set("search", searchQuery);
     fetch(`${API_BASE}/orders?${params}`, { headers: getAuthHeaders() })
       .then(r => r.json())
       .then(data => {
         setOrders(data.orders || []);
         setOrdersTotal(data.total || 0);
       })
-      .catch(() => {});
-  }, [ordersPage, ordersLimit, ordersStatusFilter]);
+      .catch(() => {})
+      .finally(() => setLoadingOrders(false));
+  }, [ordersPage, ordersLimit, ordersStatusFilter, ordersSort, searchQuery, activeTab]);
 
   // Load products
   const loadProducts = useCallback(() => {
+    setLoadingProducts(true);
     const params = new URLSearchParams({
       page: String(productsPage),
       limit: String(productsLimit),
@@ -163,7 +180,8 @@ export function SellerPortal() {
         setProducts(data.products || []);
         setProductsTotal(data.total || 0);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoadingProducts(false));
   }, [productsPage, productsLimit]);
 
   // Load stats + recent orders together on overview
@@ -252,7 +270,6 @@ export function SellerPortal() {
     }
     setEditProduct(null);
     setImageSlots([null, null, null]);
-    setImageSlots([null, null, null]);
     loadProducts();
   };
 
@@ -305,11 +322,7 @@ export function SellerPortal() {
   const filteredProducts = products.filter(p =>
     !searchQuery || p.product_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  const filteredOrders = orders.filter(o =>
-    !searchQuery ||
-    o.order_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    o.user_id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredOrders = orders;
 
   const totalOrderPages = Math.ceil(ordersTotal / ordersLimit);
   const totalProductPages = Math.ceil(productsTotal / productsLimit);
@@ -319,14 +332,14 @@ export function SellerPortal() {
     return (
       <div className="min-h-screen bg-blue-50">
         <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-          <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center justify-between px-6 py-3">
             <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 bg-blue-600 rounded-lg">
-                <Store className="w-6 h-6 text-white" />
+              <div className="flex items-center justify-center w-9 h-9 bg-blue-600 rounded-lg">
+                <Store className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-slate-900">Seller Portal</h1>
-                <p className="text-slate-500">My Store</p>
+                <h1 className="text-lg font-bold leading-tight text-slate-900">Seller Portal</h1>
+                <p className="text-xs text-slate-500 leading-tight">My Store</p>
               </div>
             </div>
           </div>
@@ -460,7 +473,7 @@ export function SellerPortal() {
               <Store className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-base font-bold leading-tight text-slate-900">Seller Portal</h1>
+              <h1 className="text-lg font-bold leading-tight text-slate-900">Seller Portal</h1>
               <p className="text-xs text-slate-500 leading-tight">My Store</p>
             </div>
           </div>
@@ -517,49 +530,49 @@ export function SellerPortal() {
       {/* Main Content */}
       <div className="flex">
         {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-slate-200 min-h-[calc(100vh-73px)] p-4">
-          <nav className="space-y-2">
+        <aside className="w-52 bg-white border-r border-slate-200 min-h-[calc(100vh-57px)] p-3">
+          <nav className="space-y-1">
             <button
               onClick={() => setActiveTab("overview")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === "overview"
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === "overview"
                 ? "bg-blue-50 text-blue-600"
                 : "text-slate-600 hover:bg-slate-50"
                 }`}
             >
-              <LayoutDashboard className="w-5 h-5" />
+              <LayoutDashboard className="w-4 h-4" />
               <span>Overview</span>
             </button>
 
             <button
               onClick={() => setActiveTab("products")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === "products"
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === "products"
                 ? "bg-blue-50 text-blue-600"
                 : "text-slate-600 hover:bg-slate-50"
                 }`}
             >
-              <Package className="w-5 h-5" />
+              <Package className="w-4 h-4" />
               <span>Products</span>
             </button>
 
             <button
               onClick={() => setActiveTab("orders")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === "orders"
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === "orders"
                 ? "bg-blue-50 text-blue-600"
                 : "text-slate-600 hover:bg-slate-50"
                 }`}
             >
-              <ShoppingCart className="w-5 h-5" />
+              <ShoppingCart className="w-4 h-4" />
               <span>Orders</span>
             </button>
 
             <button
               onClick={() => setActiveTab("settings")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === "settings"
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === "settings"
                 ? "bg-blue-50 text-blue-600"
                 : "text-slate-600 hover:bg-slate-50"
                 }`}
             >
-              <Settings className="w-5 h-5" />
+              <Settings className="w-4 h-4" />
               <span>Settings</span>
             </button>
           </nav>
@@ -570,11 +583,29 @@ export function SellerPortal() {
           {/* Overview Tab */}
           {activeTab === "overview" && (
             <div className="space-y-6">
-              <div>
-                <h2 className="text-slate-900 mb-1">Dashboard Overview</h2>
-                <p className="text-slate-600">Welcome back! Here's what's happening with your store.</p>
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-slate-900 mb-1">Dashboard Overview</h2>
+                  <p className="text-slate-600">Welcome back! Here's what's happening with your store.</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => { loadStats(); loadOrders(); }}
+                  disabled={loadingStats}
+                >
+                  <RefreshCw className={`w-4 h-4 ${loadingStats ? "animate-spin" : ""}`} />
+                  Reload
+                </Button>
               </div>
 
+              {loadingStats && !stats ? (
+                <div className="flex items-center justify-center py-20 text-slate-500">
+                  <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading...
+                </div>
+              ) : (
+              <>
               {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Revenue */}
@@ -738,7 +769,14 @@ export function SellerPortal() {
                           <TableCell>{order.created_at}</TableCell>
                         </TableRow>
                       ))}
-                      {filteredOrders.length === 0 && (
+                      {loadingOrders && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                            <span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {!loadingOrders && filteredOrders.length === 0 && (
                         <TableRow>
                           <TableCell colSpan={5} className="text-center text-slate-500 py-8">
                             No orders found
@@ -765,6 +803,8 @@ export function SellerPortal() {
                   )}
                 </CardContent>
               </Card>
+              </>
+              )}
             </div>
           )}
 
@@ -791,6 +831,16 @@ export function SellerPortal() {
                       <option value={100}>100</option>
                     </select>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => loadProducts()}
+                    disabled={loadingProducts}
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loadingProducts ? "animate-spin" : ""}`} />
+                    Reload
+                  </Button>
                   <Button
                     className="!bg-blue-600 hover:!bg-blue-700 !text-white"
                     onClick={() => setShowAddProduct(true)}
@@ -848,7 +898,9 @@ export function SellerPortal() {
                                     `/api/storage/${product.product_id}/1.png`,
                                     `/api/storage/${product.product_id}/2.png`,
                                   ];
-                                  const checks = await Promise.all(slotPaths.map(p => fetch(p, { method: 'HEAD' }).then(r => r.ok).catch(() => false)));
+                                  // MinIO/Kong storage route does not support HEAD (returns 404),
+                                  // so probe with GET and check the response is OK.
+                                  const checks = await Promise.all(slotPaths.map(p => fetch(p, { method: 'GET' }).then(r => r.ok).catch(() => false)));
                                   setExistingSlots(checks);
                                   // Load categories for edit modal
                                   fetch(`${API_BASE}/categories`)
@@ -878,7 +930,14 @@ export function SellerPortal() {
                           </TableCell>
                         </TableRow>
                       ))}
-                      {filteredProducts.length === 0 && (
+                      {loadingProducts && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                            <span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {!loadingProducts && filteredProducts.length === 0 && (
                         <TableRow>
                           <TableCell colSpan={5} className="text-center text-slate-500 py-8">
                             No products found
@@ -939,6 +998,27 @@ export function SellerPortal() {
                       <TabsTrigger value="Completed">Completed</TabsTrigger>
                     </TabsList>
                   </Tabs>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    data-testid="orders-sort-toggle"
+                    onClick={() => { setOrdersSort(s => (s === "desc" ? "asc" : "desc")); setOrdersPage(1); }}
+                    title={ordersSort === "desc" ? "Newest first" : "Oldest first"}
+                  >
+                    {ordersSort === "desc" ? <ArrowDown className="w-4 h-4" /> : <ArrowUp className="w-4 h-4" />}
+                    Date
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => loadOrders()}
+                    disabled={loadingOrders}
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loadingOrders ? "animate-spin" : ""}`} />
+                    Reload
+                  </Button>
                 </div>
               </div>
 
@@ -968,7 +1048,14 @@ export function SellerPortal() {
                           <TableCell>{order.created_at}</TableCell>
                         </TableRow>
                       ))}
-                      {filteredOrders.length === 0 && (
+                      {loadingOrders && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                            <span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {!loadingOrders && filteredOrders.length === 0 && (
                         <TableRow>
                           <TableCell colSpan={5} className="text-center text-slate-500 py-8">
                             No orders found

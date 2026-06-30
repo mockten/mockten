@@ -12,6 +12,30 @@ export default defineConfig(({ mode }) => {
         ignored: ['**/test-results/**', '**/playwright-report/**']
       }
     },
+    // Pre-bundle heavy barrel dependencies so the dev server serves single
+    // optimized chunks instead of thousands of on-demand icon/module requests.
+    // Icon barrels (lucide-react, @mui/icons-material) are the main offenders.
+    // Dev-only — does not affect the production build used by `task ci`.
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        'react-router-dom',
+        'axios',
+        'lucide-react',
+        '@mui/material',
+        '@mui/icons-material',
+        'recharts',
+        'react-slick',
+        'slick-carousel',
+        'embla-carousel-react',
+        'react-day-picker',
+        'react-hook-form',
+        'sonner',
+        'cmdk',
+        'vaul',
+      ],
+    },
     plugins: [
       react(),
       tailwindcss(),

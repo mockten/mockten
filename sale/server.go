@@ -279,6 +279,8 @@ func handleSellerOrders(c *gin.Context) {
 		dbStatuses = []string{}
 	}
 
+	search := c.Query("search")
+
 	baseQuery := `
 		SELECT DISTINCT o.order_id, o.user_id, o.total_amount, o.status, o.created_at
 		FROM ` + "`Order`" + ` o
@@ -287,6 +289,12 @@ func handleSellerOrders(c *gin.Context) {
 		WHERE p.seller_id = ?`
 
 	args := []interface{}{sellerID}
+
+	if search != "" {
+		baseQuery += " AND (o.order_id LIKE ? OR o.user_id LIKE ?)"
+		like := "%" + search + "%"
+		args = append(args, like, like)
+	}
 
 	if len(dbStatuses) > 0 {
 		placeholders := make([]string, len(dbStatuses))
@@ -306,8 +314,12 @@ func handleSellerOrders(c *gin.Context) {
 		return
 	}
 
-	// Paginated query
-	pagedQuery := baseQuery + " ORDER BY o.created_at DESC LIMIT ? OFFSET ?"
+	// Paginated query (sort by created_at; default newest first)
+	sortDir := "DESC"
+	if strings.EqualFold(c.Query("sort"), "asc") {
+		sortDir = "ASC"
+	}
+	pagedQuery := baseQuery + " ORDER BY o.created_at " + sortDir + " LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
 
 	rows, err := db.Query(pagedQuery, args...)

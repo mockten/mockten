@@ -46,6 +46,7 @@ export const clearTokens = () => {
 const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache',
   },
 });
 

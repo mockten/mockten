@@ -43,47 +43,56 @@ const MyCartConfirm: React.FC = () => {
       return;
     }
     try {
+      // Create shipment-leg transactions first so the resulting transaction_ids
+      // can be attached to the Order created during payment (enables seller visibility).
+      const transactionIds: string[] = [];
+      try {
+        // Build scheduled_start from delivery date + time slot start
+        const parseScheduledStart = (dateStr: string, timeStr: string): string => {
+          try {
+            const startHHMM = timeStr.split('〜')[0].trim(); // "10:00"
+            const d = new Date(`${dateStr} ${startHHMM}`);
+            if (isNaN(d.getTime())) return '';
+            const pad = (n: number) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+          } catch {
+            return '';
+          }
+        };
+        const scheduledStart = parseScheduledStart(selectedDate, selectedTime);
+
+        // Create shipment records for each item
+        for (const item of cartItems) {
+          const shipPayload: any = {
+            product_id: item.productId || item.id,
+            geo_id: shippingAddress.geo_id || '40e1eeca-7db5-4df3-8ab0-8addd3ec9103',
+            quantity: item.quantity || 1,
+          };
+          if (scheduledStart) {
+            shipPayload.scheduled_start = scheduledStart;
+          }
+          const shipRes = await apiClient.post('/api/shipment', shipPayload);
+          if (shipRes.data?.transaction_id) {
+            transactionIds.push(shipRes.data.transaction_id);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to create shipment records', e);
+      }
+
       const res = await apiClient.post('/api/payment', {
         payment_method_id: selectedCardId,
         amount: Math.round(orderSummary.total),
+        subtotal: Math.round(orderSummary.subtotal),
+        shipping: Math.round(orderSummary.shipping),
         items: cartItems.map((item: any) => ({
           product_id: item.productId || item.id,
           quantity: item.quantity,
         })),
+        transaction_ids: transactionIds,
       });
       if (res.status === 200) {
         console.log('Payment successful:', res.data);
-        try {
-          // Build scheduled_start from delivery date + time slot start
-          const parseScheduledStart = (dateStr: string, timeStr: string): string => {
-            try {
-              const startHHMM = timeStr.split('〜')[0].trim(); // "10:00"
-              const d = new Date(`${dateStr} ${startHHMM}`);
-              if (isNaN(d.getTime())) return '';
-              const pad = (n: number) => String(n).padStart(2, '0');
-              return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
-            } catch {
-              return '';
-            }
-          };
-          const scheduledStart = parseScheduledStart(selectedDate, selectedTime);
-
-          // Create shipment records for each item
-          for (const item of cartItems) {
-            const shipPayload: any = {
-              product_id: item.productId || item.id,
-              geo_id: shippingAddress.geo_id || '40e1eeca-7db5-4df3-8ab0-8addd3ec9103',
-              quantity: item.quantity || 1,
-            };
-            if (scheduledStart) {
-              shipPayload.scheduled_start = scheduledStart;
-            }
-            await apiClient.post('/api/shipment', shipPayload);
-          }
-        } catch (e) {
-          console.error('Failed to create shipment records', e);
-        }
-
         try {
           if (isFromCart) {
             await apiClient.delete('/api/cart');
