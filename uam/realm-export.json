@@ -544,6 +544,31 @@
           "Bottled water and hydration items"
         ]
       }
+    },
+    {
+      "username": "bookstore",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "bookstore@example.com",
+      "firstName": "Bookstore",
+      "lastName": "Seller",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "bookstore"
+        }
+      ],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
+      "attributes": {
+        "description": [
+          "Books and literature"
+        ]
+      }
     }
   ]
 }

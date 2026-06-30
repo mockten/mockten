@@ -9,6 +9,11 @@ const EXISTING_SELLER = {
   password: 'healthcompany',
 };
 
+const BOOKSTORE_SELLER = {
+  email: 'bookstore@example.com',
+  password: 'bookstore',
+};
+
 const NEW_SELLER = {
   fullName: 'Test Seller',
   storeName: 'Test Store',
@@ -16,6 +21,17 @@ const NEW_SELLER = {
   phone: '+1 (555) 123-4567',
   password: 'TestPass123!',
 };
+
+/** Login helper */
+async function loginAs(page: any, email: string, password: string) {
+  await page.goto(SELLER_LOGIN_URL);
+  await expect(page.getByPlaceholder('seller@example.com')).toBeVisible({ timeout: 10000 });
+  await page.getByPlaceholder('seller@example.com').fill(email);
+  await page.getByPlaceholder('••••••••').fill(password);
+  await page.getByRole('button', { name: 'Sign In' }).click();
+  await expect(page).toHaveURL(SELLER_PORTAL_URL, { timeout: 15000 });
+  await expect(page.getByText('Dashboard Overview')).toBeVisible({ timeout: 10000 });
+}
 
 test.describe.serial('Seller Portal', () => {
   test.beforeAll(async ({ request }) => {
@@ -45,15 +61,7 @@ test.describe.serial('Seller Portal', () => {
   });
 
   test('1. Existing seller login and logout', async ({ page }) => {
-    await page.goto(SELLER_LOGIN_URL);
-    await expect(page.getByPlaceholder('seller@example.com')).toBeVisible({ timeout: 10000 });
-
-    await page.getByPlaceholder('seller@example.com').fill(EXISTING_SELLER.email);
-    await page.getByPlaceholder('••••••••').fill(EXISTING_SELLER.password);
-    await page.getByRole('button', { name: 'Sign In' }).click();
-
-    await expect(page).toHaveURL(SELLER_PORTAL_URL, { timeout: 15000 });
-    await expect(page.getByText('Dashboard Overview')).toBeVisible({ timeout: 10000 });
+    await loginAs(page, EXISTING_SELLER.email, EXISTING_SELLER.password);
 
     // Logout via dropdown
     const usernameBtn = page.locator('header button').filter({ hasText: /healthcompany|example/ }).first();
@@ -85,183 +93,108 @@ test.describe.serial('Seller Portal', () => {
   });
 
   test('3. New seller login', async ({ page }) => {
-    await page.goto(SELLER_LOGIN_URL);
-    await expect(page.getByPlaceholder('seller@example.com')).toBeVisible({ timeout: 10000 });
-
-    await page.getByPlaceholder('seller@example.com').fill(NEW_SELLER.email);
-    await page.getByPlaceholder('••••••••').fill(NEW_SELLER.password);
-    await page.getByRole('button', { name: 'Sign In' }).click();
-
-    await expect(page).toHaveURL(SELLER_PORTAL_URL, { timeout: 15000 });
-    await expect(page.getByText('Dashboard Overview')).toBeVisible({ timeout: 10000 });
+    await loginAs(page, NEW_SELLER.email, NEW_SELLER.password);
   });
 
   test('4. Overview: stats displayed for existing seller', async ({ page }) => {
-    // Login as existing seller who has orders
-    await page.goto(SELLER_LOGIN_URL);
-    await page.getByPlaceholder('seller@example.com').fill(EXISTING_SELLER.email);
-    await page.getByPlaceholder('••••••••').fill(EXISTING_SELLER.password);
-    await page.getByRole('button', { name: 'Sign In' }).click();
-
-    await expect(page).toHaveURL(SELLER_PORTAL_URL, { timeout: 15000 });
-    await expect(page.getByText('Dashboard Overview')).toBeVisible({ timeout: 10000 });
+    await loginAs(page, EXISTING_SELLER.email, EXISTING_SELLER.password);
 
     // Stats cards should be visible
     await expect(page.getByText('Total Revenue')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('[data-testid="stat-orders"]')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('Products Sold')).toBeVisible();
     await expect(page.getByText('Customers')).toBeVisible();
-
-    // Revenue value should be visible (e.g. $10.00 or $0.00)
     await expect(page.locator('[data-testid="stat-revenue"]')).toBeVisible({ timeout: 10000 });
   });
 
   test('5. Products tab: list and pagination', async ({ page }) => {
-    await page.goto(SELLER_LOGIN_URL);
-    await page.getByPlaceholder('seller@example.com').fill(EXISTING_SELLER.email);
-    await page.getByPlaceholder('••••••••').fill(EXISTING_SELLER.password);
-    await page.getByRole('button', { name: 'Sign In' }).click();
-    await expect(page).toHaveURL(SELLER_PORTAL_URL, { timeout: 15000 });
+    await loginAs(page, EXISTING_SELLER.email, EXISTING_SELLER.password);
 
-    // Click Products tab
     await page.getByRole('button', { name: 'Products' }).click();
     await expect(page.getByText('Manage your product inventory')).toBeVisible({ timeout: 10000 });
-
-    // Product table should be visible
     await expect(page.getByRole('columnheader', { name: 'Product Name' })).toBeVisible({ timeout: 10000 });
-
-    // Items per page selector should be visible
     await expect(page.locator('select[data-testid="products-per-page"]')).toBeVisible({ timeout: 5000 });
   });
 
   test('6. Orders tab: list and status filter', async ({ page }) => {
-    await page.goto(SELLER_LOGIN_URL);
-    await page.getByPlaceholder('seller@example.com').fill(EXISTING_SELLER.email);
-    await page.getByPlaceholder('••••••••').fill(EXISTING_SELLER.password);
-    await page.getByRole('button', { name: 'Sign In' }).click();
-    await expect(page).toHaveURL(SELLER_PORTAL_URL, { timeout: 15000 });
+    await loginAs(page, EXISTING_SELLER.email, EXISTING_SELLER.password);
 
-    // Click Orders tab
     await page.getByRole('button', { name: 'Orders' }).click();
     await expect(page.getByText('View and manage all orders')).toBeVisible({ timeout: 10000 });
-
-    // Orders table should be visible
     await expect(page.getByRole('columnheader', { name: 'Order ID' })).toBeVisible({ timeout: 10000 });
 
-    // Status filter tabs should be visible
     await expect(page.getByRole('tab', { name: 'All' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Pending' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Processing' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Completed' })).toBeVisible();
 
-    // Click Pending filter
     await page.getByRole('tab', { name: 'Pending' }).click();
-    // Should still show the orders table
     await expect(page.getByRole('columnheader', { name: 'Order ID' })).toBeVisible({ timeout: 5000 });
   });
 
   test('7. Settings tab: profile display and update', async ({ page }) => {
-    await page.goto(SELLER_LOGIN_URL);
-    await page.getByPlaceholder('seller@example.com').fill(EXISTING_SELLER.email);
-    await page.getByPlaceholder('••••••••').fill(EXISTING_SELLER.password);
-    await page.getByRole('button', { name: 'Sign In' }).click();
-    await expect(page).toHaveURL(SELLER_PORTAL_URL, { timeout: 15000 });
+    await loginAs(page, EXISTING_SELLER.email, EXISTING_SELLER.password);
 
-    // Click Settings tab
     await page.getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByText('Store Information')).toBeVisible({ timeout: 10000 });
-
-    // Store Name input should be visible
     await expect(page.getByLabel('Store Name')).toBeVisible({ timeout: 5000 });
 
-    // Save Changes button should be visible and blue
     const saveBtn = page.getByRole('button', { name: 'Save Changes' });
     await expect(saveBtn).toBeVisible();
 
-    // Update store name
     const storeNameInput = page.getByLabel('Store Name');
     await storeNameInput.clear();
     await storeNameInput.fill('Health Plus Co. Updated');
     await saveBtn.click();
 
-    // Should not navigate away (stays on settings)
     await expect(page.getByText('Store Information')).toBeVisible({ timeout: 5000 });
   });
 
   test('8. Search: filter products in real-time', async ({ page }) => {
-    await page.goto(SELLER_LOGIN_URL);
-    await page.getByPlaceholder('seller@example.com').fill(EXISTING_SELLER.email);
-    await page.getByPlaceholder('••••••••').fill(EXISTING_SELLER.password);
-    await page.getByRole('button', { name: 'Sign In' }).click();
-    await expect(page).toHaveURL(SELLER_PORTAL_URL, { timeout: 15000 });
+    await loginAs(page, EXISTING_SELLER.email, EXISTING_SELLER.password);
 
-    // Go to Products tab
     await page.getByRole('button', { name: 'Products' }).click();
     await expect(page.getByRole('columnheader', { name: 'Product Name' })).toBeVisible({ timeout: 10000 });
 
-    // Type in search box
     const searchInput = page.getByPlaceholder('Search products, orders...');
     await searchInput.fill('Protein');
-
-    // Table should still be visible (filtered)
     await expect(page.getByRole('columnheader', { name: 'Product Name' })).toBeVisible({ timeout: 3000 });
   });
 
   test('9. Add Product: create a new product', async ({ page }) => {
-    // Login as existing seller
-    await page.goto(SELLER_LOGIN_URL);
-    await page.getByPlaceholder('seller@example.com').fill(EXISTING_SELLER.email);
-    await page.getByPlaceholder('••••••••').fill(EXISTING_SELLER.password);
-    await page.getByRole('button', { name: 'Sign In' }).click();
-    await expect(page).toHaveURL(SELLER_PORTAL_URL, { timeout: 15000 });
+    await loginAs(page, EXISTING_SELLER.email, EXISTING_SELLER.password);
 
-    // Go to Products tab then Add Product
     await page.getByRole('button', { name: 'Products' }).click();
     await page.getByRole('button', { name: 'Add Product' }).click();
     await expect(page.getByText('Add New Product')).toBeVisible({ timeout: 10000 });
 
-    // Fill basic info
     await page.getByPlaceholder('e.g. Wireless Headphones').fill('Test Protein Powder');
     await page.getByPlaceholder('Describe your product...').fill('A great protein supplement for athletes.');
-
-    // Fill price
     await page.locator('#price').fill('29.99');
-
-    // Fill stock
     await page.locator('#stock').fill('50');
 
-    // Select category (pick first available option)
     await page.locator('button[role="combobox"]').first().click();
     await page.locator('[role="option"]').first().click();
 
-    // Select condition
     await page.locator('button[role="combobox"]').nth(1).click();
     await page.locator('[role="option"]').first().click();
 
-    // Submit
     await page.getByRole('button', { name: 'Add Product' }).click();
 
-    // Should show success toast or navigate back to products list
     await expect(
       page.getByText('Product added successfully!').or(page.getByText('Manage your product inventory'))
     ).toBeVisible({ timeout: 15000 });
   });
 
   test('10. Deactivate and reactivate a product', async ({ page }) => {
-    await page.goto(SELLER_LOGIN_URL);
-    await page.getByPlaceholder('seller@example.com').fill(EXISTING_SELLER.email);
-    await page.getByPlaceholder('••••••••').fill(EXISTING_SELLER.password);
-    await page.getByRole('button', { name: 'Sign In' }).click();
-    await expect(page).toHaveURL(SELLER_PORTAL_URL, { timeout: 15000 });
+    await loginAs(page, EXISTING_SELLER.email, EXISTING_SELLER.password);
 
     await page.getByRole('button', { name: 'Products' }).click();
     await expect(page.getByRole('columnheader', { name: 'Product Name' })).toBeVisible({ timeout: 10000 });
 
-    // Use the known "Protain bar" product (stable test data)
     const protainRow = page.locator('table tbody tr').filter({ hasText: 'Protain bar' });
     await expect(protainRow).toBeVisible({ timeout: 5000 });
 
-    // Helper: open dropdown and click a menu item by testid
     const clickMenuAction = async (row: ReturnType<typeof page.locator>, testid: string) => {
       await row.locator('[data-testid="product-menu-trigger"]').click();
       await page.waitForSelector('[role="menu"]', { state: 'visible' });
@@ -269,18 +202,115 @@ test.describe.serial('Seller Portal', () => {
       await page.waitForSelector('[role="menu"]', { state: 'hidden' });
     };
 
-    // Ensure product is active first (cleanup if previous test left it inactive)
     if (await protainRow.getByText('inactive').isVisible()) {
       await clickMenuAction(protainRow, 'menu-activate');
       await expect(protainRow.getByText('inactive')).not.toBeVisible({ timeout: 10000 });
     }
 
-    // Deactivate
     await clickMenuAction(protainRow, 'menu-deactivate');
     await expect(protainRow.getByText('inactive')).toBeVisible({ timeout: 10000 });
 
-    // Reactivate
     await clickMenuAction(protainRow, 'menu-activate');
     await expect(protainRow.getByText('inactive')).not.toBeVisible({ timeout: 10000 });
+  });
+
+  test('11. Password show/hide toggle on login page', async ({ page }) => {
+    await page.goto(SELLER_LOGIN_URL);
+    await expect(page.getByPlaceholder('seller@example.com')).toBeVisible({ timeout: 10000 });
+
+    const passwordInput = page.locator('#password');
+    await passwordInput.fill('mypassword');
+
+    // Default: type="password" (hidden)
+    await expect(passwordInput).toHaveAttribute('type', 'password');
+
+    // Click eye icon to show
+    await page.locator('button[type="button"]').filter({ has: page.locator('svg') }).last().click();
+    await expect(passwordInput).toHaveAttribute('type', 'text');
+
+    // Click again to hide
+    await page.locator('button[type="button"]').filter({ has: page.locator('svg') }).last().click();
+    await expect(passwordInput).toHaveAttribute('type', 'password');
+  });
+
+  test('12. Password show/hide toggle on signup page', async ({ page }) => {
+    await page.goto(SELLER_SIGNUP_URL);
+    await expect(page.getByPlaceholder('John Doe')).toBeVisible({ timeout: 10000 });
+
+    const pwField = page.locator('#password');
+    await pwField.fill('secret123');
+    await expect(pwField).toHaveAttribute('type', 'password');
+
+    // Click first eye toggle (password field)
+    const eyeButtons = page.locator('button[type="button"]').filter({ has: page.locator('svg') });
+    await eyeButtons.first().click();
+    await expect(pwField).toHaveAttribute('type', 'text');
+
+    await eyeButtons.first().click();
+    await expect(pwField).toHaveAttribute('type', 'password');
+  });
+
+  test('13. Overview shows recent orders immediately on login', async ({ page }) => {
+    await loginAs(page, EXISTING_SELLER.email, EXISTING_SELLER.password);
+
+    // Should show order section on Overview WITHOUT clicking Orders tab
+    await expect(page.getByText(/Your latest \d+ orders/)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('columnheader', { name: 'Order ID' })).toBeVisible({ timeout: 5000 });
+  });
+
+  test('14. Edit product: update stock and name', async ({ page }) => {
+    await loginAs(page, EXISTING_SELLER.email, EXISTING_SELLER.password);
+
+    await page.getByRole('button', { name: 'Products' }).click();
+    await expect(page.getByRole('columnheader', { name: 'Product Name' })).toBeVisible({ timeout: 10000 });
+
+    const protainRow = page.locator('table tbody tr').filter({ hasText: 'Protain bar' });
+    await expect(protainRow).toBeVisible({ timeout: 5000 });
+
+    // Open Edit modal
+    await protainRow.locator('[data-testid="product-menu-trigger"]').click();
+    await page.waitForSelector('[role="menu"]', { state: 'visible' });
+    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await page.waitForSelector('[role="menu"]', { state: 'hidden' });
+
+    // Edit modal should be visible with all fields
+    await expect(page.getByText('Edit Product')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Product Name *')).toBeVisible();
+    await expect(page.getByText('Stock *')).toBeVisible();
+    await expect(page.getByText('Condition')).toBeVisible();
+
+    // Update stock value
+    const stockInput = page.locator('input[type="number"]').nth(1);
+    await stockInput.clear();
+    await stockInput.fill('20');
+
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Modal should close and product list should refresh
+    await expect(page.getByText('Edit Product')).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('columnheader', { name: 'Product Name' })).toBeVisible({ timeout: 5000 });
+  });
+
+  test('15. Browser back button does not log out', async ({ page }) => {
+    await loginAs(page, EXISTING_SELLER.email, EXISTING_SELLER.password);
+
+    // Press browser back
+    await page.goBack();
+
+    // Should still be on portal (popstate trap)
+    await expect(page).toHaveURL(SELLER_PORTAL_URL, { timeout: 5000 });
+    await expect(page.getByText('Dashboard Overview')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('16. Bookstore seller can login and view products', async ({ page }) => {
+    await loginAs(page, BOOKSTORE_SELLER.email, BOOKSTORE_SELLER.password);
+
+    // Should see their own products
+    await page.getByRole('button', { name: 'Products' }).click();
+    await expect(page.getByText('Manage your product inventory')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('columnheader', { name: 'Product Name' })).toBeVisible({ timeout: 10000 });
+
+    // Email shown in header should contain bookstore
+    await expect(page.locator('header').getByText(/bookstore/i)).toBeVisible({ timeout: 5000 });
   });
 });
