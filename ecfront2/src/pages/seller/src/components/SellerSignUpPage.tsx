@@ -321,7 +321,7 @@ export function SellerSignUpPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-slate-500">
-          <p>© 2025 EC Site. All rights reserved.</p>
+          <p>© 2026 EC Site. All rights reserved.</p>
         </div>
       </div>
     </div>

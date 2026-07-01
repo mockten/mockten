@@ -193,7 +193,7 @@ export function SellerLoginPage() {
           >
             Admin Access
           </button>
-          <p className="text-slate-500">© 2025 EC Site. All rights reserved.</p>
+          <p className="text-slate-500">© 2026 EC Site. All rights reserved.</p>
         </div>
       </div>
 
