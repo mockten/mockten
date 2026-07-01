@@ -499,6 +499,7 @@ const INTERNAL_SERVICE_NAMES = new Set([
 const INTERNAL_ROUTE_NAMES = new Set([
   'train-model',       // triggered from dashboard only
   'get-model-status',  // dashboard internal polling
+  'keycloak-execute-actions-email-route', // requires SMTP; not testable from the API console
 ]);
 
 function parseKongYaml() {
