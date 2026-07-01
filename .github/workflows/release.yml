@@ -347,3 +347,84 @@ jobs:
         export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/geocoding"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
+
+  release-cart:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v2
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push the docker image
+      run: |
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/cart"
+        docker build -f cart/Dockerfile -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
+  release-recommendation:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: recommendation
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v2
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push the docker image
+      run: |
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/recommendation"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
+  release-airflow:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: airflow
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v2
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push the docker image
+      run: |
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/airflow"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
+  release-dashboard:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: monitoring/dashboard
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v2
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push the docker image
+      run: |
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/dashboard"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
