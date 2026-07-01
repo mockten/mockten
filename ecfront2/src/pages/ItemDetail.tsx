@@ -1333,7 +1333,7 @@ const ItemDetailNew: React.FC = () => {
                             {renderStarsSmall(review.rating)}
                           </Box>
                         </Box>
-                        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', marginBottom: '8px' }}>
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', fontWeight: 'bold', marginBottom: '8px' }}>
                           {review.userName}
                         </Typography>
                         <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', lineHeight: 1.8, textAlign: 'left' }}>
@@ -1518,7 +1518,7 @@ const ItemDetailNew: React.FC = () => {
                             {renderStarsSmall(review.rating)}
                           </Box>
                         </Box>
-                        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', marginBottom: '8px' }}>
+                        <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', fontWeight: 'bold', marginBottom: '8px' }}>
                           {review.userName}
                         </Typography>
                         <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '16px', color: 'black', lineHeight: 1.8, textAlign: 'left' }}>
