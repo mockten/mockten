@@ -1853,6 +1853,12 @@ const API_SCHEMAS = {
     { name: 'nonce',         location: 'query', type: 'string', desc: 'Nonce embedded in ID token',                  desc_ja: 'IDトークンに埋め込まれるnonce',          desc_zh: '嵌入ID令牌的nonce值',              required: false, default: '' },
   ],
   'GET /api/uam/userinfo': ['__auth__'],
+  'GET /api/uam/users': [
+    '__auth__',
+    { name: 'email', location: 'query', type: 'string',  desc: 'Filter users by email (substring)', desc_ja: 'メールでユーザーを絞り込み（部分一致）', desc_zh: '按邮箱筛选用户（子串匹配）', required: false, default: '' },
+    { name: 'max',   location: 'query', type: 'integer', desc: 'Max number of users to return',      desc_ja: '返す最大ユーザー数',            desc_zh: '返回的最大用户数',       required: false, default: 20 }
+  ],
+  'GET /api/uam/roles': ['__auth__'],
   'POST /api/uam/creation/token': [
     { name: 'username', location: 'body', type: 'string', desc: 'Admin login name', desc_ja: '管理者ユーザー名', desc_zh: '管理员用户名', required: true, default: 'superadmin' },
     { name: 'password', location: 'body', type: 'string', desc: 'Admin password',   desc_ja: '管理者パスワード', desc_zh: '管理员密码',   required: true, default: 'superadmin' }
@@ -2087,6 +2093,12 @@ const API_SCHEMAS = {
     '__seller_token__',
     { name: 'id',   location: 'path', type: 'string',  desc: 'Product ID whose image slot is removed', desc_ja: '画像スロットを削除する商品ID', desc_zh: '要删除图片槽位的商品ID', required: true, default: '__first_seller_product_id__' },
     { name: 'slot', location: 'path', type: 'integer', desc: 'Image slot: 0={id}.png, 1={id}/1.png, 2={id}/2.png', desc_ja: '画像スロット: 0={id}.png, 1={id}/1.png, 2={id}/2.png', desc_zh: '图片槽位: 0={id}.png, 1={id}/1.png, 2={id}/2.png', required: true, default: 2 }
+  ],
+  'POST /api/seller/products/([^/]+)/images': [
+    '__seller_token__',
+    { name: 'id',       location: 'path',  type: 'string',  desc: 'Product ID to attach the image to',            desc_ja: '画像を添付する商品ID',          desc_zh: '要附加图片的商品ID',        required: true,  default: '__first_seller_product_id__' },
+    { name: 'slot',     location: 'query', type: 'integer', desc: 'Optional single slot 0-2 (omit to fill in order)', desc_ja: '任意の単一スロット0〜2（省略時は順に）', desc_zh: '可选单槽0-2（省略则按顺序）', required: false, default: 2 },
+    { name: 'images[]', location: 'file',  type: 'file',    desc: 'Product image file (a 1×1 test PNG is generated automatically)', desc_ja: '商品画像ファイル（1×1テストPNGを自動生成）', desc_zh: '商品图片文件（自动生成1×1测试PNG）', required: true, default: '(auto-generated test PNG)' }
   ],
   'GET /api/seller/orders': [
     '__seller_token__',
@@ -2392,6 +2404,9 @@ const API_RESPONSE_SCHEMAS = {
   ],
   'DELETE /api/seller/products/([^/]+)/images/([^/]+)': [
     { field: 'success', type: 'boolean', desc: 'true on success', desc_ja: '成功時はtrue', desc_zh: '成功时返回true' },
+  ],
+  'POST /api/seller/products/([^/]+)/images': [
+    { field: 'success', type: 'boolean', desc: 'true when the image(s) were stored in MinIO', desc_ja: 'MinIOへ画像を保存できた場合はtrue', desc_zh: '图片成功存入MinIO时返回true' },
   ],
   'GET /api/seller/profile': [
     { field: 'seller_id',   type: 'string', desc: 'Seller email (extracted from JWT)',      desc_ja: 'セラーメールアドレス（JWTから取得）', desc_zh: '卖家邮箱（从JWT提取）' },
@@ -2711,6 +2726,7 @@ async function sendTestRequest() {
 
   try {
     let parsedBody = null;
+    let multipartBody = null; // FormData for file-upload (multipart) endpoints
     let queryParams = new URLSearchParams();
     const explicitHeaders = {};  // from schema fields with location === 'header'
 
@@ -2722,6 +2738,19 @@ async function sendTestRequest() {
         const loc = input.getAttribute('data-location');
         const type = input.getAttribute('data-type');
         let value = input.value.trim();
+
+        // File uploads: auto-generate a tiny valid PNG so the multipart
+        // endpoint returns a real 2xx without the user picking a file.
+        if (loc === 'file') {
+          const b64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+          const bin = atob(b64);
+          const arr = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+          const blob = new Blob([arr], { type: 'image/png' });
+          if (!multipartBody) multipartBody = new FormData();
+          multipartBody.append(name, blob, 'test.png');
+          return;
+        }
 
         let typedVal = value;
         if (value !== '') {
@@ -2806,7 +2835,10 @@ async function sendTestRequest() {
 
     const headers = { ...explicitHeaders };
     let fetchBody;
-    if (parsedBody) {
+    if (multipartBody) {
+      // Do NOT set Content-Type — the browser adds the multipart boundary.
+      fetchBody = multipartBody;
+    } else if (parsedBody) {
       if (isFormEncoded) {
         headers['Content-Type'] = 'application/x-www-form-urlencoded';
         fetchBody = new URLSearchParams(parsedBody).toString();

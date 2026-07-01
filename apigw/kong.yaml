@@ -166,6 +166,8 @@ services:
     plugins:
       - name: request-transformer
         config:
+          replace:
+            uri: /admin/realms/mockten-realm-dev/users/$(uri_captures["userId"])/execute-actions-email
           add:
             headers:
               - Authorization:$http_authorization

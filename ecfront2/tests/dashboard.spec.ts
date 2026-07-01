@@ -159,7 +159,7 @@ test.describe('Dashboard Enhancements Spec', () => {
     await expect(logOutput).toContainText('Starting security scan', { timeout: 15000 });
   });
 
-  test('API Specifications: no route renders as undefined', async ({ page }) => {
+  test('API Specifications: no route renders as undefined or raw JSON body', async ({ page }) => {
     await page.locator('nav .nav-item').getByText('API Specifications', { exact: true }).click();
     await expect(page.locator('#view-title')).toContainText('API Specifications');
 
@@ -169,15 +169,19 @@ test.describe('Dashboard Enhancements Spec', () => {
     const count = await items.count();
     expect(count).toBeGreaterThan(0);
 
-    // Every route must render a real path — guards against the phantom
-    // "<METHOD> undefined" entries (e.g. cors plugins leaking in as routes).
     for (let i = 0; i < count; i++) {
       const text = (await items.nth(i).innerText()).trim();
       expect(text.toLowerCase()).not.toContain('undefined');
       await items.nth(i).click();
+      // Every route must render a real path — guards against the phantom
+      // "<METHOD> undefined" entries (e.g. cors plugins leaking in as routes).
       const title = (await page.locator('#api-detail-title').innerText()).trim();
       expect(title.toLowerCase(), `route #${i} title`).not.toContain('undefined');
       expect(title.length).toBeGreaterThan(0);
+      // No route may fall back to a raw JSON body editor — every request-bearing
+      // route must expose a proper GUI form (Test Request Backdoor).
+      const rawJsonVisible = await page.locator('#api-test-body').isVisible().catch(() => false);
+      expect(rawJsonVisible, `route "${title}" must use a form, not raw JSON`).toBe(false);
     }
   });
 
@@ -224,5 +228,36 @@ test.describe('Dashboard Enhancements Spec', () => {
       }
       expect(matched, `route present: ${target}`).toBe(true);
     }
+  });
+
+  test('API Specifications: image upload (new API) Send Request returns 2xx', async ({ page }) => {
+    await page.locator('nav .nav-item').getByText('API Specifications', { exact: true }).click();
+    await page.waitForSelector('#api-list-ul .db-list-item', { timeout: 15000 });
+
+    // Find the multipart image-upload route (POST .../images) by its rendered path.
+    const items = page.locator('#api-list-ul .db-list-item');
+    const count = await items.count();
+    let selected = false;
+    for (let i = 0; i < count; i++) {
+      const text = (await items.nth(i).innerText()).replace(/\s+/g, ' ').trim();
+      if (/^POST\b/.test(text) && /\/images$/.test(text)) {
+        await items.nth(i).click();
+        selected = true;
+        break;
+      }
+    }
+    expect(selected, 'POST .../images route present').toBe(true);
+
+    // Wait for the seller token + product id to auto-fill.
+    await page.waitForFunction(() => {
+      const inputs = Array.from(document.querySelectorAll('.api-gui-input')) as HTMLInputElement[];
+      return inputs.length > 0 && inputs.every(el => el.value !== 'Loading...');
+    }, { timeout: 20000 });
+
+    await page.getByRole('button', { name: 'Send Request' }).click();
+    await expect(page.locator('#api-test-response'), 'image upload response').toContainText(
+      /Status:\s*2\d\d/,
+      { timeout: 20000 }
+    );
   });
 });
