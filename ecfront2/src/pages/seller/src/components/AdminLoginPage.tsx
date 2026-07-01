@@ -80,7 +80,7 @@ export function AdminLoginPage({ onLogin, onBackToSeller }: AdminLoginPageProps)
               {/* Warning Message */}
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="text-amber-800">
-                  <strong>Warning:</strong> This area is for authorized personnel only. 
+                  <strong>Warning:</strong> This area is for authorized personnel only.
                   All access is logged and monitored.
                 </p>
               </div>
@@ -106,7 +106,7 @@ export function AdminLoginPage({ onLogin, onBackToSeller }: AdminLoginPageProps)
 
         {/* Footer */}
         <div className="mt-8 text-center text-slate-500">
-          <p>© 2025 EC Site. All rights reserved.</p>
+          <p>© 2026 EC Site. All rights reserved.</p>
         </div>
       </div>
     </div>

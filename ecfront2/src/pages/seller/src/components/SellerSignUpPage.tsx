@@ -1,10 +1,11 @@
 import { useState } from "react";
+import "../styles/globals.css";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Store, Lock, Mail, User, Building2, Phone } from "lucide-react";
+import { Store, Lock, Mail, User, Building2, Phone, Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export function SellerSignUpPage() {
@@ -18,31 +19,119 @@ export function SellerSignUpPage() {
     confirmPassword: "",
   });
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<null | "terms" | "privacy">(null);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSignUp = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Basic validation
-    if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match!");
-      return;
-    }
-    
-    if (!agreedToTerms) {
-      alert("Please agree to the terms and conditions");
-      return;
-    }
-    
-    console.log("Sign up attempt:", formData);
-    // Add your signup logic here
+  const getAdminToken = async (): Promise<string> => {
+    const res = await fetch("/api/uam/creation/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    if (!res.ok) throw new Error("Failed to get admin token");
+    const data = await res.json();
+    return data.access_token;
   };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (!agreedToTerms) {
+      setError("Please agree to the Terms of Service.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const adminToken = await getAdminToken();
+
+      const userData = {
+        username: formData.email,
+        email: formData.email,
+        enabled: true,
+        emailVerified: true,
+        firstName: formData.fullName,
+        lastName: "Seller",
+        credentials: [
+          { type: "password", value: formData.password, temporary: false },
+        ],
+        groups: ["Seller"],
+        attributes: {
+          storeName: [formData.storeName],
+          phonenum: [formData.phone],
+        },
+      };
+
+      const res = await fetch("/api/uam/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify(userData),
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(body || `Error ${res.status}`);
+      }
+
+      alert("Account created! Please sign in.");
+      navigate("/seller/login");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign up failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const LEGAL_CONTENT = {
+    terms: {
+      title: "Terms of Service",
+      body: [
+        "These Terms of Service govern your use of the Mockten seller platform. By creating a seller account you agree to provide accurate store and product information and to comply with all applicable laws.",
+        "You are responsible for the products you list, their pricing, fulfillment, and customer support. Mockten may suspend or remove listings or accounts that violate these terms or harm buyers.",
+        "Mockten is a demonstration environment. The platform is provided \"as is\" without warranties of any kind, and Mockten is not liable for any damages arising from its use.",
+      ],
+    },
+    privacy: {
+      title: "Privacy Policy",
+      body: [
+        "This Privacy Policy explains how Mockten handles the information you provide when registering as a seller, including your name, store name, email address, and phone number.",
+        "Your information is used solely to operate your seller account, display your store to buyers, and contact you about your account. We do not sell your personal data to third parties.",
+        "As a demonstration environment, data entered here may be reset at any time. Do not submit real or sensitive personal information.",
+      ],
+    },
+  } as const;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-sky-100 p-8">
+      {legalDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setLegalDoc(null)}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg shadow-xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold mb-4">{LEGAL_CONTENT[legalDoc].title}</h3>
+            <div className="space-y-3">
+              {LEGAL_CONTENT[legalDoc].body.map((p, i) => (
+                <p key={i} className="text-sm text-slate-600 leading-relaxed">{p}</p>
+              ))}
+            </div>
+            <div className="mt-5 flex justify-end">
+              <Button className="!bg-blue-600 hover:!bg-blue-700 !text-white" onClick={() => setLegalDoc(null)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="w-full max-w-2xl">
         {/* Logo and Branding */}
         <div className="text-center mb-8">
@@ -136,37 +225,41 @@ export function SellerSignUpPage() {
 
               {/* Password Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Password */}
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <Input
                       id="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
                       value={formData.password}
                       onChange={(e) => handleInputChange("password", e.target.value)}
-                      className="pl-10"
+                      className="pl-10 pr-10"
                       required
                     />
+                    <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
 
-                {/* Confirm Password */}
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirm Password</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <Input
                       id="confirmPassword"
-                      type="password"
+                      type={showConfirm ? "text" : "password"}
                       placeholder="••••••••"
                       value={formData.confirmPassword}
                       onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
-                      className="pl-10"
+                      className="pl-10 pr-10"
                       required
                     />
+                    <button type="button" onClick={() => setShowConfirm(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                      {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -179,24 +272,27 @@ export function SellerSignUpPage() {
                   onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
                   className="mt-1"
                 />
-                <label
-                  htmlFor="terms"
-                  className="text-slate-700 cursor-pointer select-none"
-                >
+                <label htmlFor="terms" className="text-slate-700 cursor-pointer select-none">
                   I agree to the{" "}
-                  <a href="#" className="text-blue-600 hover:text-blue-700">
+                  <button type="button" onClick={() => setLegalDoc("terms")} className="text-blue-600 hover:text-blue-700 underline">
                     Terms of Service
-                  </a>{" "}
+                  </button>{" "}
                   and{" "}
-                  <a href="#" className="text-blue-600 hover:text-blue-700">
+                  <button type="button" onClick={() => setLegalDoc("privacy")} className="text-blue-600 hover:text-blue-700 underline">
                     Privacy Policy
-                  </a>
+                  </button>
                 </label>
               </div>
 
+              {error && <p className="text-red-600 text-sm">{error}</p>}
+
               {/* Sign Up Button */}
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-                Create Account
+              <Button
+                type="submit"
+                className="w-full !bg-blue-600 hover:!bg-blue-700 !text-white"
+                disabled={loading}
+              >
+                {loading ? "Creating account..." : "Create Account"}
               </Button>
             </form>
 
@@ -206,9 +302,7 @@ export function SellerSignUpPage() {
                 <div className="w-full border-t border-slate-200" />
               </div>
               <div className="relative flex justify-center">
-                <span className="px-4 bg-white text-slate-500">
-                  Already have an account?
-                </span>
+                <span className="px-4 bg-white text-slate-500">Already have an account?</span>
               </div>
             </div>
 
@@ -216,7 +310,7 @@ export function SellerSignUpPage() {
             <div className="text-center">
               <button
                 type="button"
-                onClick={() => navigate('/seller/login')}
+                onClick={() => navigate("/seller/login")}
                 className="text-slate-600 hover:text-slate-900 transition-colors"
               >
                 Sign in to your account
@@ -227,7 +321,7 @@ export function SellerSignUpPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-slate-500">
-          <p>© 2025 EC Site. All rights reserved.</p>
+          <p>© 2026 EC Site. All rights reserved.</p>
         </div>
       </div>
     </div>

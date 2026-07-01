@@ -10,7 +10,60 @@ export default defineConfig(({ mode }) => {
       allowedHosts: ['nginx', 'localhost'],
       watch: {
         ignored: ['**/test-results/**', '**/playwright-report/**']
-      }
+      },
+      // Pre-transform the main entry and the heaviest routes on server start so
+      // the first navigation to the storefront and Seller Portal is fast
+      // (avoids the on-demand transform stall users saw as "slow first load").
+      warmup: {
+        clientFiles: [
+          './src/main.tsx',
+          './src/App.tsx',
+          './src/pages/ItemDetail.tsx',
+          './src/pages/SearchResultDashboard.tsx',
+          './src/pages/seller/src/components/SellerPortal.tsx',
+        ],
+      },
+    },
+    // Pre-bundle heavy barrel dependencies so the dev server serves single
+    // optimized chunks instead of thousands of on-demand icon/module requests.
+    // Icon barrels (lucide-react, @mui/icons-material) and the many Radix UI
+    // packages used by the Seller Portal are the main offenders.
+    // Dev-only — does not affect the production build used by `task ci`.
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        'react-router-dom',
+        'axios',
+        'lucide-react',
+        '@mui/material',
+        '@mui/icons-material',
+        '@emotion/react',
+        '@emotion/styled',
+        'recharts',
+        'react-slick',
+        'slick-carousel',
+        'embla-carousel-react',
+        'react-day-picker',
+        'react-hook-form',
+        'sonner',
+        'cmdk',
+        'vaul',
+        '@stripe/stripe-js',
+        '@stripe/react-stripe-js',
+        'clsx',
+        'tailwind-merge',
+        'class-variance-authority',
+        '@radix-ui/react-dropdown-menu',
+        '@radix-ui/react-tabs',
+        '@radix-ui/react-select',
+        '@radix-ui/react-checkbox',
+        '@radix-ui/react-label',
+        '@radix-ui/react-avatar',
+        '@radix-ui/react-popover',
+        '@radix-ui/react-tooltip',
+        '@radix-ui/react-separator',
+      ],
     },
     plugins: [
       react(),

@@ -2,14 +2,14 @@
 set -e
 
 MYSQL_HOST="mysql-service.default.svc.cluster.local"
-MYSQL_USER="mocktenusr"
+MYSQL_USER="mocktenro"
 MYSQL_PASS="mocktenpassword"
 MYSQL_DB="mocktendb"
 
 KEYCLOAK_URL="http://uam-service.default.svc.cluster.local/realms/mockten-realm-dev"
 MEILI_URL="http://meilisearch-service.default.svc.cluster.local:7700"
 
-until mysqladmin ping -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" --silent; do
+until mysqladmin --skip-ssl ping -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" --silent 2>/dev/null; do
   echo "Waiting for MySQL to be available..."
   sleep 1
 done
@@ -24,7 +24,7 @@ until curl -sf "$MEILI_URL/health" > /dev/null; do
   sleep 1
 done
 
-mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" -D "$MYSQL_DB" --batch --raw --silent -e "
+mysql --skip-ssl -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" -D "$MYSQL_DB" --batch --raw --silent -e "
 SELECT
   p.product_id,
   p.product_name,
@@ -46,6 +46,7 @@ JOIN Category c ON p.category_id = c.category_id
 JOIN Stock t ON p.product_id = t.product_id
 LEFT JOIN TimeSale ts ON p.sale_id = ts.id
 WHERE kg.NAME = 'Seller'
+  AND p.is_active = 1
 " > /tmp/products.tsv
 
 total_lines=$(wc -l < /tmp/products.tsv | tr -d ' ')

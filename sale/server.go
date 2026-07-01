@@ -1,19 +1,26 @@
 package main
 
 import (
+	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 	meilisearch "github.com/meilisearch/meilisearch-go"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 var (
@@ -91,6 +98,20 @@ func main() {
 	r.GET("/api/sale/active", handleGetActiveSales)
 	r.GET("/api/sale/products/random", handleGetRandomProducts)
 
+	// Seller Portal API
+	r.GET("/v1/seller/categories", handleSellerCategories)
+	r.POST("/v1/seller/products/create", handleCreateProduct)
+	r.POST("/v1/seller/products/:id/images", handleUploadProductImages)
+	r.DELETE("/v1/seller/products/:id/images/:slot", handleDeleteProductImage)
+	r.GET("/v1/seller/stats", handleSellerStats)
+	r.GET("/v1/seller/orders", handleSellerOrders)
+	r.GET("/v1/seller/products", handleSellerProducts)
+	r.PUT("/v1/seller/products/:id", handleUpdateProduct)
+	r.PUT("/v1/seller/products/:id/status", handleToggleProductStatus)
+	r.DELETE("/v1/seller/products/:id", handleDeleteProduct)
+	r.GET("/v1/seller/profile", handleGetProfile)
+	r.PUT("/v1/seller/profile", handleUpdateProfile)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -100,6 +121,740 @@ func main() {
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("failed to run server: %v", err)
 	}
+}
+
+// extractEmailFromJWT extracts the email claim from a JWT token without signature verification
+func extractEmailFromJWT(c *gin.Context) (string, error) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		return "", fmt.Errorf("missing Authorization header")
+	}
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+		return "", fmt.Errorf("invalid Authorization header format")
+	}
+	tokenParts := strings.Split(parts[1], ".")
+	if len(tokenParts) < 2 {
+		return "", fmt.Errorf("invalid JWT format")
+	}
+	// Add padding if needed
+	payload := tokenParts[1]
+	switch len(payload) % 4 {
+	case 2:
+		payload += "=="
+	case 3:
+		payload += "="
+	}
+	decoded, err := base64.URLEncoding.DecodeString(payload)
+	if err != nil {
+		// Try StdEncoding as fallback
+		decoded, err = base64.RawURLEncoding.DecodeString(tokenParts[1])
+		if err != nil {
+			return "", fmt.Errorf("failed to decode JWT payload: %v", err)
+		}
+	}
+	var claims map[string]interface{}
+	if err := json.Unmarshal(decoded, &claims); err != nil {
+		return "", fmt.Errorf("failed to parse JWT claims: %v", err)
+	}
+	email, ok := claims["email"].(string)
+	if !ok || email == "" {
+		return "", fmt.Errorf("email claim not found in JWT")
+	}
+	return email, nil
+}
+
+func handleSellerStats(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	now := time.Now()
+	// Last 30 days vs 31-60 days ago
+	curStart := now.Add(-30 * 24 * time.Hour)
+	prevEnd := curStart
+	prevStart := now.Add(-60 * 24 * time.Hour)
+
+	type PeriodStats struct {
+		Revenue   float64
+		Orders    int
+		Products  int
+		Customers int
+	}
+
+	getStats := func(start, end time.Time) (PeriodStats, error) {
+		var ps PeriodStats
+		query := `
+			SELECT
+				COALESCE(SUM(o.total_amount), 0) as revenue,
+				COUNT(DISTINCT o.order_id) as orders,
+				COALESCE(SUM(t.quantity), 0) as products,
+				COUNT(DISTINCT o.user_id) as customers
+			FROM ` + "`Order`" + ` o
+			JOIN ` + "`Transaction`" + ` t ON JSON_CONTAINS(o.transactions_json, JSON_QUOTE(t.transaction_id))
+			JOIN Product p ON t.product_id = p.product_id
+			WHERE p.seller_id = ?
+			  AND o.created_at >= ?
+			  AND o.created_at < ?`
+		row := db.QueryRow(query, sellerID, start, end)
+		err := row.Scan(&ps.Revenue, &ps.Orders, &ps.Products, &ps.Customers)
+		return ps, err
+	}
+
+	curStats, err := getStats(curStart, now.Add(24*time.Hour))
+	if err != nil {
+		log.Printf("failed to get current stats: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+	prevStats, err := getStats(prevStart, prevEnd)
+	if err != nil {
+		log.Printf("failed to get prev stats: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	pctChange := func(cur, prev float64) interface{} {
+		if prev == 0 {
+			return nil
+		}
+		return (cur - prev) / prev * 100
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"current": gin.H{
+			"revenue":   curStats.Revenue,
+			"orders":    curStats.Orders,
+			"products":  curStats.Products,
+			"customers": curStats.Customers,
+		},
+		"previous": gin.H{
+			"revenue":   prevStats.Revenue,
+			"orders":    prevStats.Orders,
+			"products":  prevStats.Products,
+			"customers": prevStats.Customers,
+		},
+		"change": gin.H{
+			"revenue":   pctChange(curStats.Revenue, prevStats.Revenue),
+			"orders":    pctChange(float64(curStats.Orders), float64(prevStats.Orders)),
+			"products":  pctChange(float64(curStats.Products), float64(prevStats.Products)),
+			"customers": pctChange(float64(curStats.Customers), float64(prevStats.Customers)),
+		},
+	})
+}
+
+func handleSellerOrders(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	statusFilter := c.Query("status") // Pending, Processing, Completed, Canceled, All
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+
+	// Map UI status filter to a derived shipment-status rank.
+	// The fulfillment status of an order lives in its shipment-leg Transaction
+	// rows (the Order.status itself stays "paid"), so we derive the order's
+	// status from the least-progressed leg (MIN rank) to mirror the buyer's
+	// Purchase History view.
+	statusRankFilter := -1 // -1 = no filter (All)
+	switch statusFilter {
+	case "Pending":
+		statusRankFilter = 1
+	case "Processing":
+		statusRankFilter = 2
+	case "Completed":
+		statusRankFilter = 3
+	case "Canceled":
+		statusRankFilter = 0
+	}
+
+	search := c.Query("search")
+
+	// status_rank: 0=canceled/failed, 1=quoted/booked (Pending),
+	// 2=picked_up/in_transit/delayed (Processing), 3=delivered (Completed)
+	const statusRankExpr = `MIN(CASE t.status
+		WHEN 'canceled' THEN 0 WHEN 'failed' THEN 0
+		WHEN 'quoted' THEN 1 WHEN 'booked' THEN 1
+		WHEN 'picked_up' THEN 2 WHEN 'in_transit' THEN 2 WHEN 'delayed' THEN 2
+		WHEN 'delivered' THEN 3 ELSE 1 END)`
+
+	baseQuery := `
+		SELECT o.order_id, o.user_id, o.total_amount, o.created_at,
+			` + statusRankExpr + ` AS status_rank
+		FROM ` + "`Order`" + ` o
+		JOIN ` + "`Transaction`" + ` t ON JSON_CONTAINS(o.transactions_json, JSON_QUOTE(t.transaction_id))
+		JOIN Product p ON t.product_id = p.product_id
+		WHERE p.seller_id = ?`
+
+	args := []interface{}{sellerID}
+
+	if search != "" {
+		baseQuery += " AND (o.order_id LIKE ? OR o.user_id LIKE ?)"
+		like := "%" + search + "%"
+		args = append(args, like, like)
+	}
+
+	baseQuery += " GROUP BY o.order_id, o.user_id, o.total_amount, o.created_at"
+
+	if statusRankFilter >= 0 {
+		baseQuery += " HAVING status_rank = ?"
+		args = append(args, statusRankFilter)
+	}
+
+	// Count total
+	countQuery := "SELECT COUNT(*) FROM (" + baseQuery + ") AS sub"
+	var total int
+	if err := db.QueryRow(countQuery, args...).Scan(&total); err != nil {
+		log.Printf("failed to count orders: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	// Paginated query (sort by created_at; default newest first)
+	sortDir := "DESC"
+	if strings.EqualFold(c.Query("sort"), "asc") {
+		sortDir = "ASC"
+	}
+	pagedQuery := baseQuery + " ORDER BY o.created_at " + sortDir + " LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	rows, err := db.Query(pagedQuery, args...)
+	if err != nil {
+		log.Printf("failed to query orders: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+	defer rows.Close()
+
+	type OrderRow struct {
+		OrderID   string  `json:"order_id"`
+		UserID    string  `json:"user_id"`
+		Amount    float64 `json:"amount"`
+		Status    string  `json:"status"`
+		CreatedAt string  `json:"created_at"`
+	}
+
+	// Map derived status rank to a status string the frontend already understands.
+	rankToStatus := func(rank int) string {
+		switch rank {
+		case 0:
+			return "canceled"
+		case 2:
+			return "shipped"
+		case 3:
+			return "delivered"
+		default:
+			return "created"
+		}
+	}
+
+	var orders []OrderRow
+	for rows.Next() {
+		var o OrderRow
+		var createdAt time.Time
+		var statusRank int
+		if err := rows.Scan(&o.OrderID, &o.UserID, &o.Amount, &createdAt, &statusRank); err != nil {
+			continue
+		}
+		o.Status = rankToStatus(statusRank)
+		o.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
+		orders = append(orders, o)
+	}
+	if orders == nil {
+		orders = []OrderRow{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"orders": orders,
+		"total":  total,
+		"page":   page,
+		"limit":  limit,
+	})
+}
+
+func handleSellerProducts(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+
+	countRow := db.QueryRow("SELECT COUNT(*) FROM Product WHERE seller_id = ?", sellerID)
+	var total int
+	if err := countRow.Scan(&total); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	query := `
+		SELECT p.product_id, p.product_name, p.price, p.product_condition, COALESCE(s.stocks, 0), p.is_active, COALESCE(p.summary, ''), COALESCE(p.category_id, '')
+		FROM Product p
+		LEFT JOIN Stock s ON p.product_id = s.product_id
+		WHERE p.seller_id = ?
+		ORDER BY p.product_name
+		LIMIT ? OFFSET ?`
+
+	rows, err := db.Query(query, sellerID, limit, offset)
+	if err != nil {
+		log.Printf("failed to query products: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+	defer rows.Close()
+
+	type ProductRow struct {
+		ProductID   string `json:"product_id"`
+		ProductName string `json:"product_name"`
+		Price       int    `json:"price"`
+		Condition   string `json:"condition"`
+		Stocks      int    `json:"stocks"`
+		Status      string `json:"status"`
+		IsActive    int    `json:"is_active"`
+		Summary     string `json:"summary"`
+		CategoryID  string `json:"category_id"`
+	}
+
+	var prods []ProductRow
+	for rows.Next() {
+		var p ProductRow
+		if err := rows.Scan(&p.ProductID, &p.ProductName, &p.Price, &p.Condition, &p.Stocks, &p.IsActive, &p.Summary, &p.CategoryID); err != nil {
+			continue
+		}
+		if p.IsActive == 0 {
+			p.Status = "inactive"
+		} else if p.Stocks == 0 {
+			p.Status = "out of stock"
+		} else if p.Stocks < 10 {
+			p.Status = "low stock"
+		} else {
+			p.Status = "active"
+		}
+		prods = append(prods, p)
+	}
+	if prods == nil {
+		prods = []ProductRow{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"products": prods,
+		"total":    total,
+		"page":     page,
+		"limit":    limit,
+	})
+}
+
+func handleUpdateProduct(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	productID := c.Param("id")
+	var body struct {
+		ProductName      string `json:"product_name"`
+		Price            int    `json:"price"`
+		Summary          string `json:"summary"`
+		CategoryID       string `json:"category_id"`
+		ProductCondition string `json:"product_condition"`
+		Stock            int    `json:"stock"`
+		IsActive         *int   `json:"is_active"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	_, err = db.Exec(
+		"UPDATE Product SET product_name=?, price=?, summary=?, category_id=COALESCE(NULLIF(?,''), category_id), product_condition=COALESCE(NULLIF(?,''), product_condition) WHERE product_id=? AND seller_id=?",
+		body.ProductName, body.Price, body.Summary, body.CategoryID, body.ProductCondition, productID, sellerID,
+	)
+	if err == nil && body.Stock >= 0 {
+		_, err = db.Exec("INSERT INTO Stock (product_id, stocks) VALUES (?, ?) ON DUPLICATE KEY UPDATE stocks=?", productID, body.Stock, body.Stock)
+	}
+	if err == nil && body.IsActive != nil {
+		_, err = db.Exec("UPDATE Product SET is_active=? WHERE product_id=? AND seller_id=?", *body.IsActive, productID, sellerID)
+	}
+	if err != nil {
+		log.Printf("failed to update product: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func handleDeleteProduct(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	productID := c.Param("id")
+	_, err = db.Exec("DELETE FROM Product WHERE product_id=? AND seller_id=?", productID, sellerID)
+	if err != nil {
+		log.Printf("failed to delete product: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func handleToggleProductStatus(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	productID := c.Param("id")
+	var body struct {
+		IsActive int `json:"is_active"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		return
+	}
+
+	_, err = db.Exec("UPDATE Product SET is_active=? WHERE product_id=? AND seller_id=?", body.IsActive, productID, sellerID)
+	if err != nil {
+		log.Printf("failed to toggle product status: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	go syncProductMeili(productID, body.IsActive == 1)
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// syncProductMeili removes or re-adds a product in MeiliSearch based on is_active.
+func syncProductMeili(productID string, active bool) {
+	if !active {
+		taskInfo, err := meiliclient.Index("products").DeleteDocument(productID)
+		if err != nil {
+			log.Printf("meili delete %s: %v", productID, err)
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		if _, err = meiliclient.WaitForTask(taskInfo.TaskUID, meilisearch.WaitParams{Context: ctx, Interval: 200 * time.Millisecond}); err != nil {
+			log.Printf("meili delete wait %s: %v", productID, err)
+		}
+		return
+	}
+	// Re-add: fetch all fields needed for the index document
+	var item ProductItem
+	var saleFlag int
+	err := db.QueryRow(`
+		SELECT p.product_id, p.product_name, ue.USERNAME, p.price,
+		       c.category_name, p.product_condition, COALESCE(s.stocks,0),
+		       p.avg_review, p.review_count, p.sale_flag,
+		       COALESCE(p.sale_id,''), COALESCE(ts.discount_rate,0)
+		FROM Product p
+		JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
+		JOIN Category c ON p.category_id = c.category_id
+		LEFT JOIN Stock s ON p.product_id = s.product_id
+		LEFT JOIN TimeSale ts ON p.sale_id = ts.id
+		WHERE p.product_id = ?`, productID,
+	).Scan(&item.ProductID, &item.ProductName, &item.SellerName, &item.Price,
+		&item.CategoryName, &item.Condition, &item.Stocks,
+		&item.AvgReview, &item.ReviewCount, &saleFlag,
+		&item.SaleID, &item.DiscountRate)
+	if err != nil {
+		log.Printf("meili re-add fetch %s: %v", productID, err)
+		return
+	}
+	item.SaleFlag = saleFlag == 1
+	taskInfo, err2 := meiliclient.Index("products").AddDocuments([]ProductItem{item}, "product_id")
+	if err2 != nil {
+		log.Printf("meili add %s: %v", productID, err2)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if _, err2 = meiliclient.WaitForTask(taskInfo.TaskUID, meilisearch.WaitParams{Context: ctx, Interval: 200 * time.Millisecond}); err2 != nil {
+		log.Printf("meili add wait %s: %v", productID, err2)
+	}
+}
+
+func handleGetProfile(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	var sellerName sql.NullString
+	var description sql.NullString
+	_ = db.QueryRow("SELECT seller_name, description FROM Seller WHERE seller_id = ?", sellerID).Scan(&sellerName, &description)
+
+	// Fall back to the storeName supplied at sign-up (stored as a Keycloak user
+	// attribute) so a new seller's store name is pre-filled without re-entry.
+	storeName := sellerName.String
+	if strings.TrimSpace(storeName) == "" {
+		var attrStore sql.NullString
+		_ = db.QueryRow(`
+			SELECT ua.VALUE
+			FROM USER_ENTITY ue
+			JOIN USER_ATTRIBUTE ua ON ue.ID = ua.USER_ID AND ua.NAME = 'storeName'
+			WHERE ue.EMAIL = ?
+			LIMIT 1`, sellerID).Scan(&attrStore)
+		if attrStore.Valid {
+			storeName = attrStore.String
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"seller_id": sellerID, "seller_name": storeName, "description": description.String})
+}
+
+func handleUpdateProfile(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	var body struct {
+		SellerName  string  `json:"seller_name"`
+		Description *string `json:"description"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	if body.Description != nil {
+		_, err = db.Exec(
+			"INSERT INTO Seller (seller_id, seller_name, description) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE seller_name = VALUES(seller_name), description = VALUES(description)",
+			sellerID, body.SellerName, *body.Description,
+		)
+	} else {
+		_, err = db.Exec(
+			"INSERT INTO Seller (seller_id, seller_name) VALUES (?, ?) ON DUPLICATE KEY UPDATE seller_name = VALUES(seller_name)",
+			sellerID, body.SellerName,
+		)
+	}
+	if err != nil {
+		log.Printf("failed to update profile: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func handleSellerCategories(c *gin.Context) {
+	rows, err := db.Query("SELECT category_id, category_name FROM Category ORDER BY category_name")
+	if err != nil {
+		log.Printf("failed to query categories: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+	defer rows.Close()
+
+	type CategoryRow struct {
+		CategoryID   string `json:"category_id"`
+		CategoryName string `json:"category_name"`
+	}
+	var cats []CategoryRow
+	for rows.Next() {
+		var cat CategoryRow
+		if err := rows.Scan(&cat.CategoryID, &cat.CategoryName); err != nil {
+			continue
+		}
+		cats = append(cats, cat)
+	}
+	if cats == nil {
+		cats = []CategoryRow{}
+	}
+	c.JSON(http.StatusOK, cats)
+}
+
+func handleCreateProduct(c *gin.Context) {
+	sellerID, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	var body struct {
+		Name             string  `json:"name"`
+		Description      string  `json:"description"`
+		Price            float64 `json:"price"`
+		ComparePrice     float64 `json:"comparePrice"`
+		CategoryID       string  `json:"category_id"`
+		ProductCondition string  `json:"product_condition"`
+		Stock            int     `json:"stock"`
+		Status           bool    `json:"status"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	productID := uuid.New().String()
+
+	// Get geo_id for seller
+	var geoID string
+	err = db.QueryRow("SELECT geo_id FROM Geo WHERE user_id = ? LIMIT 1", sellerID).Scan(&geoID)
+	if err != nil {
+		geoID = "40e1eeca-7db5-4df3-8ab0-8addd3ec9103"
+	}
+
+	// Determine sale_flag and sale_id
+	saleFlag := 0
+	var saleID interface{} = nil
+	if body.ComparePrice > 0 && body.ComparePrice > body.Price {
+		saleFlag = 1
+		saleID = "f1234567-abcd-1234-abcd-1234567890ab"
+	}
+
+	// Default condition
+	condition := body.ProductCondition
+	if condition == "" {
+		condition = "new"
+	}
+
+	_, err = db.Exec(
+		`INSERT INTO Product (product_id, product_name, seller_id, price, category_id, summary, product_condition, geo_id, sale_flag, sale_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		productID, body.Name, sellerID, int(body.Price), body.CategoryID, body.Description, condition, geoID, saleFlag, saleID,
+	)
+	if err != nil {
+		log.Printf("failed to insert product: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	_, err = db.Exec("INSERT INTO Stock (product_id, stocks) VALUES (?, ?)", productID, body.Stock)
+	if err != nil {
+		log.Printf("failed to insert stock: %v", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"product_id": productID})
+}
+
+func handleUploadProductImages(c *gin.Context) {
+	productID := c.Param("id")
+
+	minioEndpoint := "minio-service.default.svc.cluster.local:9000"
+	minioClient, err := minio.New(minioEndpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4("minioadmin", "minioadmin", ""),
+		Secure: false,
+	})
+	if err != nil {
+		log.Printf("failed to create minio client: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "storage error"})
+		return
+	}
+
+	form, err := c.MultipartForm()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid multipart form"})
+		return
+	}
+
+	files := form.File["images[]"]
+	allPaths := []string{
+		productID + ".png",
+		productID + "/1.png",
+		productID + "/2.png",
+	}
+
+	// If slot query param is provided, upload single file to that slot
+	if slotStr := c.Query("slot"); slotStr != "" {
+		slot, err2 := strconv.Atoi(slotStr)
+		if err2 != nil || slot < 0 || slot > 2 || len(files) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid slot"})
+			return
+		}
+		file, err2 := files[0].Open()
+		if err2 != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "open failed"})
+			return
+		}
+		defer file.Close()
+		if _, err2 = minioClient.PutObject(c.Request.Context(), "photos", allPaths[slot], file, files[0].Size, minio.PutObjectOptions{ContentType: "image/png"}); err2 != nil {
+			log.Printf("failed to upload image slot %d: %v", slot, err2)
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true})
+		return
+	}
+
+	for i, fileHeader := range files {
+		if i >= 3 {
+			break
+		}
+		file, err := fileHeader.Open()
+		if err != nil {
+			log.Printf("failed to open file: %v", err)
+			continue
+		}
+		defer file.Close()
+
+		_, err = minioClient.PutObject(
+			c.Request.Context(),
+			"photos",
+			allPaths[i],
+			file,
+			fileHeader.Size,
+			minio.PutObjectOptions{ContentType: "image/png"},
+		)
+		if err != nil {
+			log.Printf("failed to upload image %d: %v", i, err)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func handleDeleteProductImage(c *gin.Context) {
+	productID := c.Param("id")
+	slotStr := c.Param("slot")
+	slot, err := strconv.Atoi(slotStr)
+	if err != nil || slot < 0 || slot > 2 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid slot"})
+		return
+	}
+	paths := []string{productID + ".png", productID + "/1.png", productID + "/2.png"}
+
+	minioClient, err := minio.New("minio-service.default.svc.cluster.local:9000", &minio.Options{
+		Creds: credentials.NewStaticV4("minioadmin", "minioadmin", ""), Secure: false,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "storage error"})
+		return
+	}
+	if err = minioClient.RemoveObject(c.Request.Context(), "photos", paths[slot], minio.RemoveObjectOptions{}); err != nil {
+		log.Printf("failed to delete image slot %d: %v", slot, err)
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 func handleGetActiveSales(c *gin.Context) {

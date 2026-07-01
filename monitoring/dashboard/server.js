@@ -499,6 +499,7 @@ const INTERNAL_SERVICE_NAMES = new Set([
 const INTERNAL_ROUTE_NAMES = new Set([
   'train-model',       // triggered from dashboard only
   'get-model-status',  // dashboard internal polling
+  'keycloak-execute-actions-email-route', // requires SMTP; not testable from the API console
 ]);
 
 function parseKongYaml() {
@@ -513,6 +514,11 @@ function parseKongYaml() {
     let currentService = null;
     let currentRoute = null;
     let mode = null;
+    // Track whether indent-6 "- name:" entries belong to routes or plugins.
+    // Plugins share the same indentation as routes, so without this flag a
+    // plugin block (e.g. a cors plugin with its own `methods:`) would leak in
+    // as a phantom route and render as "<METHOD> undefined".
+    let inPlugins = false;
 
     for (let line of lines) {
       const trimmed = line.trim();
@@ -530,8 +536,9 @@ function parseKongYaml() {
           };
           services.push(currentService);
           currentRoute = null;
+          inPlugins = false;
           mode = 'service';
-        } else if (indent === 6 && currentService) {
+        } else if (indent === 6 && currentService && !inPlugins) {
           currentRoute = {
             name: trimmed.replace('- name:', '').trim(),
             paths: [],
@@ -539,6 +546,11 @@ function parseKongYaml() {
           };
           currentService.routes.push(currentRoute);
           mode = 'route';
+        } else if (indent === 6 && inPlugins) {
+          // A plugin entry — not a route. Detach currentRoute so any nested
+          // keys (methods/paths inside the plugin config) are not captured.
+          currentRoute = null;
+          mode = 'plugin';
         }
       } else if (trimmed.startsWith('name:')) {
         const val = trimmed.replace('name:', '').trim();
@@ -551,8 +563,11 @@ function parseKongYaml() {
         currentService.url = trimmed.replace('url:', '').trim();
       } else if (trimmed.startsWith('routes:')) {
         mode = 'routes';
+        inPlugins = false;
       } else if (trimmed.startsWith('plugins:')) {
         mode = 'plugins';
+        inPlugins = true;
+        currentRoute = null;
       } else if (trimmed.startsWith('paths:')) {
         mode = 'paths';
         // Handle inline array: paths: [ /foo, /bar ]
@@ -614,6 +629,72 @@ app.get('/api/superadmin-token', async (req, res) => {
     _superadminToken = data.access_token;
     _superadminTokenExpiry = Date.now() + (data.expires_in - 30) * 1000;
     res.json({ token: _superadminToken });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Seller token (healthcompany test account) — fetched server-side so the API
+// Specifications backdoor always has a valid seller Bearer, mirroring the
+// reliable superadmin-token flow (no browser Origin check, server-cached).
+let _sellerToken = null;
+let _sellerTokenExpiry = 0;
+app.get('/api/seller-token', async (req, res) => {
+  try {
+    if (_sellerToken && Date.now() < _sellerTokenExpiry) {
+      return res.json({ token: _sellerToken });
+    }
+    const r = await fetch('http://apigw:8082/api/uam/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ username: 'healthcompany@example.com', password: 'healthcompany' })
+    });
+    if (!r.ok) throw new Error(`Keycloak returned ${r.status}`);
+    const data = await r.json();
+    _sellerToken = data.access_token;
+    _sellerTokenExpiry = Date.now() + (data.expires_in - 30) * 1000;
+    res.json({ token: _sellerToken });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Returns a real, non-critical Keycloak user id so the uam users PUT/DELETE
+// backdoors are pre-filled with an existing id (picks a dev_user_* account,
+// never superadmin/healthcompany, to keep destructive test calls low-impact).
+let _firstUserIdCache = null;
+let _firstUserIdExpiry = 0;
+app.get('/api/first-user-id', async (req, res) => {
+  try {
+    if (_firstUserIdCache && Date.now() < _firstUserIdExpiry) {
+      return res.json({ id: _firstUserIdCache });
+    }
+    // Get an admin token first.
+    let token = _superadminToken && Date.now() < _superadminTokenExpiry ? _superadminToken : null;
+    if (!token) {
+      const tr = await fetch('http://apigw:8082/api/uam/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ username: 'superadmin', password: 'superadmin' })
+      });
+      if (!tr.ok) throw new Error(`token ${tr.status}`);
+      const td = await tr.json();
+      token = td.access_token;
+    }
+    const ur = await fetch('http://apigw:8082/api/uam/users?max=100', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!ur.ok) throw new Error(`users ${ur.status}`);
+    const users = await ur.json();
+    const safe = (users || []).find(u =>
+      u.username && /^dev_user_/.test(u.username)
+    ) || (users || []).find(u =>
+      u.username && !['superadmin', 'healthcompany'].includes(u.username)
+    );
+    if (!safe) throw new Error('no suitable user found');
+    _firstUserIdCache = safe.id;
+    _firstUserIdExpiry = Date.now() + 60 * 1000;
+    res.json({ id: _firstUserIdCache });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

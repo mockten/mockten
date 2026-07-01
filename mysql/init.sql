@@ -1,6 +1,10 @@
 -- Airflow metadata DB (uses same MySQL instance, separate DB)
 CREATE DATABASE IF NOT EXISTS airflow CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 GRANT ALL PRIVILEGES ON airflow.* TO 'mocktenusr'@'%';
+-- Create a read-only user with sha256_password for MariaDB clients (meilisearch/sync containers)
+-- sha256_password is still supported in MySQL 8.4 and works with older clients
+CREATE USER IF NOT EXISTS 'mocktenro'@'%' IDENTIFIED WITH sha256_password BY 'mocktenpassword';
+GRANT SELECT ON mocktendb.* TO 'mocktenro'@'%';
 FLUSH PRIVILEGES;
 
 CREATE TABLE IF NOT EXISTS TimeSale (
@@ -26,6 +30,7 @@ ON DUPLICATE KEY UPDATE
 CREATE TABLE IF NOT EXISTS Seller (
   seller_id VARCHAR(64) PRIMARY KEY,
   seller_name VARCHAR(255),
+  description TEXT,
   last_update DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
@@ -51,6 +56,7 @@ CREATE TABLE IF NOT EXISTS Product (
   last_update DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   sale_flag TINYINT(1) NOT NULL DEFAULT 0,
   sale_id VARCHAR(36) NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
   KEY idx_product_category (category_id),
   KEY idx_product_geo (geo_id),
   KEY idx_product_last_update (last_update)
@@ -186,6 +192,7 @@ CREATE TABLE IF NOT EXISTS Payment (
   currency          CHAR(3) NOT NULL,
   status            ENUM('authorized','captured','failed','canceled','refunded') NOT NULL,
   idempotency_key   VARCHAR(64),
+  stripe_payment_intent_id VARCHAR(64),
   created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_payment_idem (idempotency_key)

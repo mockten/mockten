@@ -1,8 +1,9 @@
-FROM alpine:3
+FROM mysql:8.4
 
-RUN apk add --no-cache bash curl jq mysql-client
+RUN microdnf install -y curl jq && microdnf clean all
 
 COPY *.sh /
 RUN chmod +x /*.sh
 
-CMD ["bash", "-c", "while true; do sleep 300; /sync_script.sh; done"]
+ENTRYPOINT ["bash", "-c"]
+CMD ["while true; do sleep 300; /sync_script.sh; done"]
