@@ -58,7 +58,10 @@ type CartItemReq struct {
 type CheckoutRequest struct {
 	PaymentMethodID string        `json:"payment_method_id"`
 	Amount          int64         `json:"amount"` // typically calculated by backend but for mockup here
+	Subtotal        int64         `json:"subtotal"`
+	Shipping        int64         `json:"shipping"`
 	Items           []CartItemReq `json:"items"`
+	TransactionIDs  []string      `json:"transaction_ids"` // shipment-leg transaction ids, used to link the Order
 }
 
 type UserContext struct {
@@ -387,10 +390,13 @@ func handleCreatePayment(c *gin.Context) {
 
 	orderListJSON, _ := json.Marshal([]string{orderID})
 
+	// pi.ID is Stripe's PaymentIntent id (e.g. "pi_..."), kept as an internal
+	// reference for reconciliation/support lookups in the Stripe dashboard.
+	// The customer-facing identifier is the system-generated order_id.
 	_, err = db.Exec(`
-		INSERT INTO Payment (payment_id, order_id_list, payment_method_id, amount, currency, status, idempotency_key)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, paymentID, orderListJSON, req.PaymentMethodID, req.Amount, "USD", statusStr, pi.ID)
+		INSERT INTO Payment (payment_id, order_id_list, payment_method_id, amount, currency, status, idempotency_key, stripe_payment_intent_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, paymentID, orderListJSON, req.PaymentMethodID, req.Amount, "USD", statusStr, pi.ID, pi.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record payment: " + err.Error()})
 		return
@@ -427,7 +433,30 @@ func handleCreatePayment(c *gin.Context) {
 				log.Printf("failed to get category for ranking: %v", err)
 			}
 		}
+
+		// Create the Order record so sellers can see the purchase in the Seller Portal.
+		// The Order is linked to products (and thus sellers) via transactions_json,
+		// which references the shipment-leg Transaction rows created by the frontend.
+		totalQty := 0
+		for _, item := range req.Items {
+			totalQty += item.Quantity
+		}
+		subtotal := req.Subtotal
+		if subtotal == 0 {
+			subtotal = req.Amount
+		}
+		txnJSON, _ := json.Marshal(req.TransactionIDs)
+		if len(req.TransactionIDs) == 0 {
+			txnJSON = []byte("[]")
+		}
+		_, err = db.Exec(`
+			INSERT INTO `+"`Order`"+` (order_id, user_id, currency, subtotal_amount, shipping_amount, total_amount, quantity, status, transactions_json)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, orderID, user.UserID, "USD", subtotal, req.Shipping, req.Amount, totalQty, "paid", txnJSON)
+		if err != nil {
+			log.Printf("failed to create order %s: %v", orderID, err)
+		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "success", "payment_intent_id": pi.ID, "payment_id": paymentID})
+	c.JSON(http.StatusOK, gin.H{"status": "success", "payment_intent_id": pi.ID, "payment_id": paymentID, "order_id": orderID})
 }

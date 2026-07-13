@@ -1538,6 +1538,12 @@ const API_DESCRIPTIONS = {
   'POST /api/uam/users':
     'Creates a new user in the Keycloak realm using the Admin REST API. Requires an admin Bearer token. Kong forwards the token and strips the Host header. CORS is enabled for browser-based admin UIs.',
 
+  'DELETE /api/uam/users/([^/]+)':
+    'Deletes a user from the Keycloak realm by UUID via the Admin REST API. The <code>userId</code> path segment is the Keycloak user id. Requires an admin Bearer token (Kong forwards it and rewrites the URI to the Keycloak admin endpoint).',
+
+  'PUT /api/uam/users/([^/]+)/execute-actions-email':
+    'Sends a Keycloak "execute required actions" email to the user identified by the <code>userId</code> path segment (e.g. password reset / email verify). Optional query params control the linked client, redirect URL and link lifespan. Requires an admin Bearer token forwarded by Kong.',
+
   'GET /api/uam/roles':
     'Returns all realm-level roles defined in the Keycloak realm (e.g. <code>admin</code>, <code>user</code>). Requires an admin Bearer token forwarded by Kong. Used by the frontend to populate role assignment dropdowns.',
 
@@ -1659,6 +1665,42 @@ const API_DESCRIPTIONS = {
 
   'GET /api/stats':
     'Returns API gateway telemetry derived from Kong\'s access log. By default returns both <code>topApis</code> (most requested endpoints) and <code>slowApis</code> (highest average latency, min 3 samples). Pass <code>type=top</code> or <code>type=slow</code> to get a single array. Served by the monitoring dashboard service.',
+
+  // Seller Portal
+  'GET /api/seller/stats':
+    'Returns aggregated sales statistics for the authenticated seller. Compares the last 30 days (current window) against the preceding 31–60 days (previous window) and includes percentage change for each metric. All four metrics — revenue, orders, products sold, and unique customers — are derived from the <code>Order</code> and <code>Transaction</code> MySQL tables joined on the seller\'s products. Requires a valid seller Bearer token.',
+
+  'GET /api/seller/orders':
+    'Returns a paginated list of orders that contain at least one product owned by the authenticated seller. Supports filtering by status group: Pending (created/paid), Processing (picking/shipped), Completed (delivered), or Canceled. Ordered by creation date descending. Requires a valid seller Bearer token.',
+
+  'GET /api/seller/products':
+    'Returns a paginated list of the authenticated seller\'s products with stock levels and computed status labels: active, low stock (< 10 units), out of stock (0 units), or inactive (manually deactivated). Requires a valid seller Bearer token.',
+
+  'POST /api/seller/products/create':
+    'Creates a new product for the authenticated seller. Inserts a row into the <code>Product</code> table and an initial stock row into <code>Stock</code>. If <code>comparePrice</code> is set higher than <code>price</code>, the product is automatically linked to the default sale campaign. Returns the generated product UUID. Requires a valid seller Bearer token.',
+
+  'PUT /api/seller/products/([^/]+)':
+    'Updates an existing product owned by the authenticated seller. All fields are optional — omitted string fields fall back to the existing value via <code>COALESCE(NULLIF(?, \'\'), column)</code>. Stock is upserted separately. <code>is_active</code> is only updated if explicitly included in the request body. Requires a valid seller Bearer token.',
+
+  'PUT /api/seller/products/([^/]+)/status':
+    'Toggles the active/inactive flag of a product owned by the authenticated seller. Send <code>is_active: 1</code> to activate or <code>is_active: 0</code> to deactivate. The product will show an "inactive" badge in the seller portal and will not appear as purchasable to buyers. Requires a valid seller Bearer token.',
+
+  'DELETE /api/seller/products/([^/]+)':
+    'Permanently deletes a product owned by the authenticated seller from the <code>Product</code> table. Associated stock rows and order history are not deleted. This action is irreversible. Requires a valid seller Bearer token.',
+
+  'POST /api/seller/products/([^/]+)/images':
+    'Uploads up to 3 product images to MinIO object storage (bucket: <code>photos</code>). Images are stored as <code>{productId}.png</code>, <code>{productId}/1.png</code>, and <code>{productId}/2.png</code>. The request must be multipart/form-data with the field name <code>images[]</code>. An optional <code>?slot=N</code> (0–2) query uploads a single slot. Returns a list of the stored MinIO object paths. Requires a valid seller Bearer token.',
+  'DELETE /api/seller/products/([^/]+)/images/([^/]+)':
+    'Deletes a single product image slot from MinIO object storage. The <code>slot</code> path segment selects which object to remove: 0 → <code>{productId}.png</code>, 1 → <code>{productId}/1.png</code>, 2 → <code>{productId}/2.png</code>. Used by the Seller Portal edit modal\'s per-slot Delete control. Requires a valid seller Bearer token.',
+
+  'GET /api/seller/profile':
+    'Returns the store name (seller_name) and About-the-Vendor description for the authenticated seller, looked up from the <code>Seller</code> table by the seller email extracted from the JWT. Falls back to the sign-up storeName attribute when no profile has been saved yet. Requires a valid seller Bearer token.',
+
+  'PUT /api/seller/profile':
+    'Creates or updates the store name for the authenticated seller using an upsert (<code>INSERT … ON DUPLICATE KEY UPDATE</code>) on the <code>Seller</code> table. Requires a valid seller Bearer token.',
+
+  'GET /api/seller/categories':
+    'Returns the complete list of product categories from MySQL, ordered by name. Used by the seller portal to populate the category dropdown when creating or editing products. Requires a valid seller Bearer token.',
 };
 
 const API_DESCRIPTIONS_JA = {
@@ -1670,6 +1712,8 @@ const API_DESCRIPTIONS_JA = {
   'POST /api/uam/broker/google/endpoint': 'Google SSOブローカーコールバックのPOSTバリアントです。Googleの認可サーバーからフォームエンコードパラメータを受け取り、Keycloak内でOIDCフェデレーションフローを完了します。',
   'GET /api/uam/users': 'Admin REST APIを通じてKeycloakレルムのユーザー一覧を返します。Kongが呼び出し元の<code>Authorization</code>（管理者トークン）ヘッダーを転送します。',
   'POST /api/uam/users': 'Admin REST APIを使用してKeycloakレルムに新しいユーザーを作成します。管理者のBearerトークンが必要です。',
+  'DELETE /api/uam/users/([^/]+)': 'Admin REST APIでKeycloakレルムのユーザーをUUID指定で削除します。<code>userId</code>パスがKeycloakユーザーIDです。管理者Bearerトークンが必要です（KongがURIをKeycloak管理エンドポイントに書き換えます）。',
+  'PUT /api/uam/users/([^/]+)/execute-actions-email': '<code>userId</code>で指定したユーザーにKeycloakの「必須アクション実行」メール（パスワードリセット／メール確認など）を送信します。クエリでクライアント・リダイレクト先・リンク有効期間を指定可能。管理者Bearerトークンが必要です。',
   'GET /api/uam/roles': 'Keycloakレルムで定義されたすべてのレルムロールを返します。Kongが管理者トークンを転送します。フロントエンドのロール割り当てドロップダウンの生成に使用されます。',
   'GET /api/storage': 'MinIOオブジェクトストレージ（<code>/photos</code>バケット）へのGETリクエストをプロキシします。<code>/api/storage</code>以降のパスがMinIOのファイル名に直接マップされます。',
   'GET /api/search': 'MeiliSearchを利用した全文商品検索。キーワード、ページネーション、カテゴリ、在庫状況、価格範囲、最低評価などのフィルターをサポートします。',
@@ -1712,6 +1756,18 @@ const API_DESCRIPTIONS_JA = {
   'POST /api/browsing-history/([^/]+)': '認証済みユーザーの商品閲覧履歴をMySQLの<code>BrowsingHistory</code>テーブルに記録します。パスセグメント<code>:productId</code>が閲覧商品を識別します。フロントエンドが商品詳細ページ訪問時に自動的に呼び出します。有効なJWTが必要です。',
   'GET /api/browsing-history/recommendations': '認証済みユーザーの閲覧履歴に基づく商品レコメンドを返します。直近5種類の閲覧商品のカテゴリを特定し、そのカテゴリ内で未閲覧かつ評価の高い商品を返します。履歴がない場合は空リストを返します。有効なJWTが必要です。',
   'GET /api/stats': 'Kongのアクセスログを集計したAPIゲートウェイテレメトリを返します。デフォルトでは<code>topApis</code>（リクエスト数上位）と<code>slowApis</code>（平均レイテンシ上位、最低3サンプル）の両方を返します。<code>type=top</code>または<code>type=slow</code>で絞り込み可能です。',
+  'GET /api/seller/stats': '認証済みセラーの売上統計を返します。直近30日間（現在）と31〜60日前（前期）を比較し、収益・注文数・販売商品数・ユニーク顧客数の変化率も含めて返します。有効なセラーJWTが必要です。',
+  'GET /api/seller/orders': '認証済みセラーの商品を含む注文をページネーション形式で返します。ステータスグループ（Pending/Processing/Completed/Canceled）でフィルタリング可能。作成日時降順。有効なセラーJWTが必要です。',
+  'GET /api/seller/products': '認証済みセラーの商品一覧をページネーション形式で返します。在庫数に基づく状態ラベル（active / low stock / out of stock / inactive）付き。有効なセラーJWTが必要です。',
+  'POST /api/seller/products/create': '認証済みセラーの新商品を作成します。<code>Product</code>テーブルに行を挿入し、<code>Stock</code>に初期在庫を登録します。<code>comparePrice</code>が<code>price</code>より高い場合は自動的にセールに紐付けます。生成された商品UUIDを返します。有効なセラーJWTが必要です。',
+  'PUT /api/seller/products/([^/]+)': '認証済みセラーが所有する商品を更新します。文字列フィールドは省略可能で、省略時は既存値が維持されます。在庫は別途アップサートされます。<code>is_active</code>はリクエストボディに含まれる場合のみ更新されます。有効なセラーJWTが必要です。',
+  'PUT /api/seller/products/([^/]+)/status': '認証済みセラーが所有する商品の有効/無効フラグを切り替えます。<code>is_active: 1</code>で有効化、<code>is_active: 0</code>で無効化します。有効なセラーJWTが必要です。',
+  'DELETE /api/seller/products/([^/]+)': '認証済みセラーが所有する商品を<code>Product</code>テーブルから完全削除します。関連する在庫・注文履歴は削除されません。この操作は元に戻せません。有効なセラーJWTが必要です。',
+  'POST /api/seller/products/([^/]+)/images': '最大3枚の商品画像をMinIOオブジェクトストレージにアップロードします。multipart/form-dataのフィールド名は<code>images[]</code>。<code>?slot=N</code>（0〜2）で単一スロットのアップロードも可能。有効なセラーJWTが必要です。',
+  'DELETE /api/seller/products/([^/]+)/images/([^/]+)': 'MinIOから商品画像を1スロット削除します。<code>slot</code>パスで対象を選択: 0→<code>{productId}.png</code>、1→<code>{productId}/1.png</code>、2→<code>{productId}/2.png</code>。Seller Portal編集モーダルのスロット別Deleteで使用します。有効なセラーJWTが必要です。',
+  'GET /api/seller/profile': 'JWTから取得したセラーのメールアドレスをキーに<code>Seller</code>テーブルからストア名とベンダー説明を返します。未設定の場合はサインアップ時のstoreName属性をフォールバックとして返します。有効なセラーJWTが必要です。',
+  'PUT /api/seller/profile': '認証済みセラーのストア名を作成または更新します（<code>INSERT … ON DUPLICATE KEY UPDATE</code>）。有効なセラーJWTが必要です。',
+  'GET /api/seller/categories': 'MySQLから商品カテゴリの全リストを名前順で返します。商品作成・編集時のカテゴリドロップダウンに使用されます。有効なセラーJWTが必要です。',
 };
 
 const API_DESCRIPTIONS_ZH = {
@@ -1723,6 +1779,8 @@ const API_DESCRIPTIONS_ZH = {
   'POST /api/uam/broker/google/endpoint': 'Google SSO代理回调的POST变体。接收来自Google授权服务器的表单编码参数，完成Keycloak内的OIDC联合流程。',
   'GET /api/uam/users': '通过Admin REST API列出Keycloak领域中的用户。Kong转发调用方的管理员令牌头。',
   'POST /api/uam/users': '使用Admin REST API在Keycloak领域中创建新用户。需要管理员Bearer令牌。',
+  'DELETE /api/uam/users/([^/]+)': '通过Admin REST API按UUID删除Keycloak领域中的用户。<code>userId</code>路径段为Keycloak用户ID。需要管理员Bearer令牌（Kong会将URI重写为Keycloak管理端点）。',
+  'PUT /api/uam/users/([^/]+)/execute-actions-email': '向<code>userId</code>指定的用户发送Keycloak"执行必需操作"邮件（如密码重置/邮箱验证）。可通过查询参数控制客户端、重定向URL和链接有效期。需要管理员Bearer令牌。',
   'GET /api/uam/roles': '返回Keycloak领域中定义的所有领域角色。需要管理员Bearer令牌，用于前端角色分配下拉菜单。',
   'GET /api/storage': '代理对MinIO对象存储（<code>/photos</code>存储桶）的GET请求。路径段直接映射到MinIO中的文件名。',
   'GET /api/search': '由MeiliSearch支持的全文商品搜索，支持关键词、分页、类别、库存状态、价格范围和最低评分等过滤器。',
@@ -1765,6 +1823,18 @@ const API_DESCRIPTIONS_ZH = {
   'POST /api/browsing-history/([^/]+)': '将已认证用户的商品浏览记录写入MySQL的<code>BrowsingHistory</code>表。路径段<code>:productId</code>标识被浏览的商品。前端在用户访问商品详情页时自动调用。需要有效的JWT。',
   'GET /api/browsing-history/recommendations': '根据已认证用户的浏览历史返回商品推荐。提取最近5种浏览商品所属分类，返回这些分类中评分最高且未曾浏览的商品。若无历史记录则返回空列表。需要有效的JWT。',
   'GET /api/stats': '返回基于Kong访问日志聚合的API网关遥测数据。默认同时返回<code>topApis</code>（请求量最高的端点）和<code>slowApis</code>（平均延迟最高，至少3个样本）。可通过<code>type=top</code>或<code>type=slow</code>筛选。',
+  'GET /api/seller/stats': '返回已认证卖家的销售统计数据。比较最近30天（当前窗口）与31–60天前（前一周期）的差异，包含收入、订单数、已售商品数和独立客户数的变化百分比。需要有效的卖家Bearer令牌。',
+  'GET /api/seller/orders': '以分页形式返回包含已认证卖家商品的订单。支持按状态组过滤（Pending/Processing/Completed/Canceled）。按创建时间倒序排列。需要有效的卖家Bearer令牌。',
+  'GET /api/seller/products': '以分页形式返回已认证卖家的商品列表，包含库存数量和计算状态标签（active/low stock/out of stock/inactive）。需要有效的卖家Bearer令牌。',
+  'POST /api/seller/products/create': '为已认证卖家创建新商品。向<code>Product</code>表插入记录并在<code>Stock</code>表插入初始库存。若<code>comparePrice</code>高于<code>price</code>，则自动关联促销活动。返回生成的商品UUID。需要有效的卖家Bearer令牌。',
+  'PUT /api/seller/products/([^/]+)': '更新已认证卖家拥有的商品。字符串字段均可选，省略时保留现有值。库存单独进行upsert操作。仅当请求体中明确包含<code>is_active</code>时才更新该字段。需要有效的卖家Bearer令牌。',
+  'PUT /api/seller/products/([^/]+)/status': '切换已认证卖家商品的启用/禁用标志。<code>is_active: 1</code>为启用，<code>is_active: 0</code>为禁用。需要有效的卖家Bearer令牌。',
+  'DELETE /api/seller/products/([^/]+)': '从<code>Product</code>表中永久删除已认证卖家拥有的商品。关联的库存和订单历史不会被删除。此操作不可撤销。需要有效的卖家Bearer令牌。',
+  'POST /api/seller/products/([^/]+)/images': '将最多3张商品图片上传至MinIO对象存储。请求格式为multipart/form-data，字段名为<code>images[]</code>。可选<code>?slot=N</code>（0–2）上传单个槽位。需要有效的卖家Bearer令牌。',
+  'DELETE /api/seller/products/([^/]+)/images/([^/]+)': '从MinIO删除单个商品图片槽位。<code>slot</code>路径选择对象：0→<code>{productId}.png</code>，1→<code>{productId}/1.png</code>，2→<code>{productId}/2.png</code>。用于卖家门户编辑弹窗的单槽删除。需要有效的卖家Bearer令牌。',
+  'GET /api/seller/profile': '从<code>Seller</code>表返回已认证卖家的店铺名称和供应商描述。若尚未设置，则回退到注册时的storeName属性。需要有效的卖家Bearer令牌。',
+  'PUT /api/seller/profile': '创建或更新已认证卖家的店铺名称（使用<code>INSERT … ON DUPLICATE KEY UPDATE</code>）。需要有效的卖家Bearer令牌。',
+  'GET /api/seller/categories': '从MySQL按名称顺序返回商品分类完整列表，用于创建或编辑商品时的分类下拉菜单。需要有效的卖家Bearer令牌。',
 };
 
 const API_SCHEMAS = {
@@ -1783,6 +1853,12 @@ const API_SCHEMAS = {
     { name: 'nonce',         location: 'query', type: 'string', desc: 'Nonce embedded in ID token',                  desc_ja: 'IDトークンに埋め込まれるnonce',          desc_zh: '嵌入ID令牌的nonce值',              required: false, default: '' },
   ],
   'GET /api/uam/userinfo': ['__auth__'],
+  'GET /api/uam/users': [
+    '__auth__',
+    { name: 'email', location: 'query', type: 'string',  desc: 'Filter users by email (substring)', desc_ja: 'メールでユーザーを絞り込み（部分一致）', desc_zh: '按邮箱筛选用户（子串匹配）', required: false, default: '' },
+    { name: 'max',   location: 'query', type: 'integer', desc: 'Max number of users to return',      desc_ja: '返す最大ユーザー数',            desc_zh: '返回的最大用户数',       required: false, default: 20 }
+  ],
+  'GET /api/uam/roles': ['__auth__'],
   'POST /api/uam/creation/token': [
     { name: 'username', location: 'body', type: 'string', desc: 'Admin login name', desc_ja: '管理者ユーザー名', desc_zh: '管理员用户名', required: true, default: 'superadmin' },
     { name: 'password', location: 'body', type: 'string', desc: 'Admin password',   desc_ja: '管理者パスワード', desc_zh: '管理员密码',   required: true, default: 'superadmin' }
@@ -1791,6 +1867,17 @@ const API_SCHEMAS = {
     { name: 'username', location: 'body', type: 'string', desc: 'New username',    desc_ja: '新しいユーザー名',   desc_zh: '新用户名',       required: true, default: 'newuser1' },
     { name: 'email',    location: 'body', type: 'string', desc: 'Email address',   desc_ja: 'メールアドレス',    desc_zh: '电子邮件地址',   required: true, default: 'newuser1@example.com' },
     { name: 'password', location: 'body', type: 'string', desc: 'Password',        desc_ja: 'パスワード',        desc_zh: '密码',           required: true, default: 'password123' }
+  ],
+  'DELETE /api/uam/users/([^/]+)': [
+    '__auth__',
+    { name: 'userId', location: 'path', type: 'string', desc: 'Keycloak user UUID to delete (auto-filled with a real dev_user_* id)', desc_ja: '削除するKeycloakユーザーUUID（実在のdev_user_*で自動入力）', desc_zh: '要删除的Keycloak用户UUID（自动填充真实dev_user_*）', required: true, default: '__first_user_id__' }
+  ],
+  'PUT /api/uam/users/([^/]+)/execute-actions-email': [
+    '__auth__',
+    { name: 'userId',       location: 'path',  type: 'string', desc: 'Keycloak user UUID (auto-filled with a real dev_user_* id)', desc_ja: 'KeycloakユーザーUUID（実在のdev_user_*で自動入力）', desc_zh: 'Keycloak用户UUID（自动填充真实dev_user_*）', required: true,  default: '__first_user_id__' },
+    { name: 'client_id',    location: 'query', type: 'string', desc: 'Client the action email links back to', desc_ja: 'アクションメールのリンク先クライアント', desc_zh: '操作邮件链接的客户端', required: false, default: 'mockten-react-client' },
+    { name: 'redirect_uri', location: 'query', type: 'string', desc: 'Redirect URL after the user completes the action', desc_ja: 'アクション完了後のリダイレクトURL', desc_zh: '用户完成操作后的重定向URL', required: false, default: 'http://localhost' },
+    { name: 'lifespan',     location: 'query', type: 'integer', desc: 'Link validity in seconds', desc_ja: 'リンク有効期間（秒）', desc_zh: '链接有效期（秒）', required: false, default: 43200 }
   ],
   'POST /api/item/review': [
     '__auth__',
@@ -1955,6 +2042,69 @@ const API_SCHEMAS = {
   'GET /api/browsing-history/recommendations': [
     '__auth__',
     { name: 'limit', location: 'query', type: 'integer', desc: 'Max number of recommendations to return (default 8, max 50)', desc_ja: '返すレコメンド数の上限（デフォルト8、最大50）', desc_zh: '返回推荐数量上限（默认8，最多50）', required: false, default: 8 }
+  ],
+
+  // ── Seller Portal ───────────────────────────────────────────────────────────
+  '__seller_token__': { name: 'Authorization', location: 'header', type: 'string', desc: 'Bearer <seller_access_token> — auto-filled with healthcompany test account', desc_ja: 'Bearer <セラートークン> — healthcompanyテストアカウントで自動入力', desc_zh: 'Bearer <卖家令牌> — 自动填充healthcompany测试账户', required: true, default: '__seller_token__' },
+  'GET /api/seller/stats': ['__seller_token__'],
+  'GET /api/seller/categories': ['__seller_token__'],
+  'GET /api/seller/profile': ['__seller_token__'],
+  'PUT /api/seller/profile': [
+    '__seller_token__',
+    { name: 'seller_name', location: 'body', type: 'string', desc: 'Store display name', desc_ja: 'ストアの表示名', desc_zh: '店铺显示名称', required: true, default: 'Health Plus Co.' }
+  ],
+  'GET /api/seller/products': [
+    '__seller_token__',
+    { name: 'page',  location: 'query', type: 'integer', desc: 'Page number (1-based)',       desc_ja: 'ページ番号（1始まり）', desc_zh: '页码（从1开始）', required: false, default: 1 },
+    { name: 'limit', location: 'query', type: 'integer', desc: 'Number of items per page',    desc_ja: '1ページあたりの件数',  desc_zh: '每页条数',         required: false, default: 10 }
+  ],
+  'POST /api/seller/products/create': [
+    '__seller_token__',
+    { name: 'name',             location: 'body', type: 'string',  desc: 'Product name',                                            desc_ja: '商品名',                     desc_zh: '商品名称',         required: true,  default: 'Vitamin C 1000mg' },
+    { name: 'description',      location: 'body', type: 'string',  desc: 'Product description',                                     desc_ja: '商品説明',                   desc_zh: '商品描述',         required: false, default: 'High-dose vitamin C supplement.' },
+    { name: 'price',            location: 'body', type: 'number',  desc: 'Selling price in JPY',                                    desc_ja: '販売価格（円）',             desc_zh: '售价（日元）',     required: true,  default: 1980 },
+    { name: 'comparePrice',     location: 'body', type: 'number',  desc: 'Original price (> price triggers sale flag)',             desc_ja: '元の価格（priceより高いとセール扱い）', desc_zh: '原价（高于price则触发促销）', required: false, default: 0 },
+    { name: 'category_id',      location: 'body', type: 'string',  desc: 'Category ID from /api/seller/categories',                 desc_ja: '/api/seller/categoriesのカテゴリID', desc_zh: '来自/api/seller/categories的分类ID', required: true, default: '1' },
+    { name: 'product_condition',location: 'body', type: 'string',  desc: '"new" or "used" (defaults to "new")',                     desc_ja: '"new"または"used"（デフォルト: "new"）', desc_zh: '"new"或"used"（默认"new"）', required: false, default: 'new' },
+    { name: 'stock',            location: 'body', type: 'integer', desc: 'Initial stock quantity',                                  desc_ja: '初期在庫数',                 desc_zh: '初始库存数量',     required: true,  default: 100 },
+    { name: 'status',           location: 'body', type: 'boolean', desc: 'Active status (true = active)',                           desc_ja: '公開状態（true=有効）',       desc_zh: '上架状态（true=上架）', required: false, default: true }
+  ],
+  'PUT /api/seller/products/([^/]+)': [
+    '__seller_token__',
+    { name: 'id',               location: 'path', type: 'string',  desc: 'Product ID to update',                                    desc_ja: '更新する商品ID',             desc_zh: '要更新的商品ID',   required: true,  default: '__first_seller_product_id__' },
+    { name: 'product_name',     location: 'body', type: 'string',  desc: 'Updated product name',                                    desc_ja: '更新後の商品名',             desc_zh: '更新后的商品名称', required: true,  default: 'Vitamin C 2000mg' },
+    { name: 'price',            location: 'body', type: 'integer', desc: 'Updated price in JPY',                                    desc_ja: '更新後の価格（円）',         desc_zh: '更新后的价格（日元）', required: true, default: 2480 },
+    { name: 'summary',          location: 'body', type: 'string',  desc: 'Updated description',                                     desc_ja: '更新後の商品説明',           desc_zh: '更新后的商品描述', required: false, default: 'High-dose vitamin C 2000mg.' },
+    { name: 'category_id',      location: 'body', type: 'string',  desc: 'Category ID (leave empty to keep existing)',              desc_ja: 'カテゴリID（空にすると既存維持）', desc_zh: '分类ID（为空则保留现有值）', required: false, default: '' },
+    { name: 'product_condition',location: 'body', type: 'string',  desc: '"new" or "used" (leave empty to keep existing)',          desc_ja: '"new"または"used"（空にすると既存維持）', desc_zh: '"new"或"used"（为空则保留现有值）', required: false, default: '' },
+    { name: 'stock',            location: 'body', type: 'integer', desc: 'Updated stock quantity',                                  desc_ja: '更新後の在庫数',             desc_zh: '更新后的库存数量', required: false, default: 50 },
+    { name: 'is_active',        location: 'body', type: 'integer', desc: '1 = active, 0 = inactive (omit to leave unchanged)',      desc_ja: '1=有効, 0=無効（省略で変更なし）', desc_zh: '1=上架, 0=下架（省略则不变）', required: false, default: 1 }
+  ],
+  'PUT /api/seller/products/([^/]+)/status': [
+    '__seller_token__',
+    { name: 'id',        location: 'path', type: 'string',  desc: 'Product ID to toggle',       desc_ja: 'トグルする商品ID', desc_zh: '要切换的商品ID', required: true, default: '__first_seller_product_id__' },
+    { name: 'is_active', location: 'body', type: 'integer', desc: '1 = activate, 0 = deactivate', desc_ja: '1=有効化, 0=無効化', desc_zh: '1=启用, 0=禁用', required: true, default: 0 }
+  ],
+  'DELETE /api/seller/products/([^/]+)': [
+    '__seller_token__',
+    { name: 'id', location: 'path', type: 'string', desc: 'Product ID to permanently delete', desc_ja: '完全削除する商品ID', desc_zh: '要永久删除的商品ID', required: true, default: '__first_seller_product_id__' }
+  ],
+  'DELETE /api/seller/products/([^/]+)/images/([^/]+)': [
+    '__seller_token__',
+    { name: 'id',   location: 'path', type: 'string',  desc: 'Product ID whose image slot is removed', desc_ja: '画像スロットを削除する商品ID', desc_zh: '要删除图片槽位的商品ID', required: true, default: '__first_seller_product_id__' },
+    { name: 'slot', location: 'path', type: 'integer', desc: 'Image slot: 0={id}.png, 1={id}/1.png, 2={id}/2.png', desc_ja: '画像スロット: 0={id}.png, 1={id}/1.png, 2={id}/2.png', desc_zh: '图片槽位: 0={id}.png, 1={id}/1.png, 2={id}/2.png', required: true, default: 2 }
+  ],
+  'POST /api/seller/products/([^/]+)/images': [
+    '__seller_token__',
+    { name: 'id',       location: 'path',  type: 'string',  desc: 'Product ID to attach the image to',            desc_ja: '画像を添付する商品ID',          desc_zh: '要附加图片的商品ID',        required: true,  default: '__first_seller_product_id__' },
+    { name: 'slot',     location: 'query', type: 'integer', desc: 'Optional single slot 0-2 (omit to fill in order)', desc_ja: '任意の単一スロット0〜2（省略時は順に）', desc_zh: '可选单槽0-2（省略则按顺序）', required: false, default: 2 },
+    { name: 'images[]', location: 'file',  type: 'file',    desc: 'Product image file (a 1×1 test PNG is generated automatically)', desc_ja: '商品画像ファイル（1×1テストPNGを自動生成）', desc_zh: '商品图片文件（自动生成1×1测试PNG）', required: true, default: '(auto-generated test PNG)' }
+  ],
+  'GET /api/seller/orders': [
+    '__seller_token__',
+    { name: 'page',   location: 'query', type: 'integer', desc: 'Page number (1-based)',                                               desc_ja: 'ページ番号（1始まり）',       desc_zh: '页码（从1开始）', required: false, default: 1 },
+    { name: 'limit',  location: 'query', type: 'integer', desc: 'Items per page',                                                      desc_ja: '1ページあたりの件数',        desc_zh: '每页条数',         required: false, default: 10 },
+    { name: 'status', location: 'query', type: 'string',  desc: 'Status group: Pending / Processing / Completed / Canceled / (all)',   desc_ja: 'ステータスグループ: Pending / Processing / Completed / Canceled / (全件)', desc_zh: '状态组：Pending / Processing / Completed / Canceled / (全部)', required: false, default: '' }
   ],
 
   // ── Stats ───────────────────────────────────────────────────────────────────
@@ -2201,6 +2351,76 @@ const API_RESPONSE_SCHEMAS = {
     { field: 'count',                         type: 'integer', desc: 'Number of recommendations returned',                                 desc_ja: '返却されたレコメンド数',                          desc_zh: '返回的推荐数量' },
   ],
 
+  // ── Seller Portal ───────────────────────────────────────────────────────────
+  'GET /api/seller/stats': [
+    { field: 'current.revenue',   type: 'number',  desc: 'Total revenue in JPY for the last 30 days',              desc_ja: '直近30日間の収益合計（円）',          desc_zh: '最近30天的总收入（日元）' },
+    { field: 'current.orders',    type: 'integer', desc: 'Number of distinct orders in the last 30 days',          desc_ja: '直近30日間の注文件数',               desc_zh: '最近30天的独立订单数' },
+    { field: 'current.products',  type: 'integer', desc: 'Number of distinct products sold in the last 30 days',   desc_ja: '直近30日間に売れた商品種類数',       desc_zh: '最近30天已售商品种类数' },
+    { field: 'current.customers', type: 'integer', desc: 'Number of distinct customers in the last 30 days',       desc_ja: '直近30日間のユニーク顧客数',         desc_zh: '最近30天的独立客户数' },
+    { field: 'previous.revenue',  type: 'number',  desc: 'Revenue for the 31–60 day window before today',         desc_ja: '31〜60日前の収益合計（円）',          desc_zh: '31–60天前的总收入' },
+    { field: 'previous.orders',   type: 'integer', desc: 'Orders for the 31–60 day window',                        desc_ja: '31〜60日前の注文件数',               desc_zh: '31–60天前的订单数' },
+    { field: 'previous.products', type: 'integer', desc: 'Distinct products sold in the 31–60 day window',        desc_ja: '31〜60日前に売れた商品種類数',       desc_zh: '31–60天前已售商品种类数' },
+    { field: 'previous.customers',type: 'integer', desc: 'Distinct customers in the 31–60 day window',            desc_ja: '31〜60日前のユニーク顧客数',         desc_zh: '31–60天前的独立客户数' },
+    { field: 'change.revenue',    type: 'number|null', desc: 'Revenue % change vs previous period (null if prev=0)', desc_ja: '収益の変化率（前期0の場合null）', desc_zh: '收入变化百分比（前期为0时为null）' },
+    { field: 'change.orders',     type: 'number|null', desc: 'Orders % change vs previous period',                desc_ja: '注文数の変化率',                     desc_zh: '订单数变化百分比' },
+    { field: 'change.products',   type: 'number|null', desc: 'Products sold % change vs previous period',         desc_ja: '販売商品数の変化率',                 desc_zh: '已售商品数变化百分比' },
+    { field: 'change.customers',  type: 'number|null', desc: 'Customers % change vs previous period',             desc_ja: '顧客数の変化率',                     desc_zh: '客户数变化百分比' },
+  ],
+  'GET /api/seller/orders': [
+    { field: 'orders',              type: 'array',   desc: 'List of orders for this seller',                      desc_ja: '当セラーの注文リスト',               desc_zh: '该卖家的订单列表' },
+    { field: 'orders[].order_id',   type: 'string',  desc: 'Unique order UUID',                                   desc_ja: '注文UUID',                           desc_zh: '订单UUID' },
+    { field: 'orders[].user_id',    type: 'string',  desc: 'Email/ID of the buyer',                               desc_ja: '購入者のメール/ID',                  desc_zh: '买家的邮箱/ID' },
+    { field: 'orders[].amount',     type: 'number',  desc: 'Total order amount in JPY',                           desc_ja: '注文合計金額（円）',                 desc_zh: '订单总金额（日元）' },
+    { field: 'orders[].status',     type: 'string',  desc: 'Order status (created / paid / picking / shipped / delivered / canceled / refunded)', desc_ja: '注文ステータス', desc_zh: '订单状态' },
+    { field: 'orders[].created_at', type: 'string',  desc: 'Order creation timestamp (YYYY-MM-DD HH:mm:ss)',      desc_ja: '注文作成日時',                       desc_zh: '订单创建时间' },
+    { field: 'total',               type: 'integer', desc: 'Total number of matching orders',                     desc_ja: 'マッチした注文の総数',               desc_zh: '匹配订单总数' },
+    { field: 'page',                type: 'integer', desc: 'Current page number',                                  desc_ja: '現在のページ番号',                   desc_zh: '当前页码' },
+    { field: 'limit',               type: 'integer', desc: 'Page size used',                                       desc_ja: '使用されたページサイズ',             desc_zh: '使用的每页条数' },
+  ],
+  'GET /api/seller/products': [
+    { field: 'products',                   type: 'array',   desc: 'List of products for this seller',              desc_ja: '当セラーの商品リスト',               desc_zh: '该卖家的商品列表' },
+    { field: 'products[].product_id',      type: 'string',  desc: 'Unique product identifier',                     desc_ja: '商品ID',                             desc_zh: '商品唯一标识符' },
+    { field: 'products[].product_name',    type: 'string',  desc: 'Product display name',                          desc_ja: '商品表示名',                         desc_zh: '商品显示名称' },
+    { field: 'products[].price',           type: 'integer', desc: 'Price in JPY',                                  desc_ja: '価格（円）',                         desc_zh: '价格（日元）' },
+    { field: 'products[].condition',       type: 'string',  desc: '"new" or "used"',                               desc_ja: '新品（new）または中古（used）',       desc_zh: '"new"或"used"' },
+    { field: 'products[].stocks',          type: 'integer', desc: 'Current stock quantity',                        desc_ja: '現在の在庫数',                       desc_zh: '当前库存数量' },
+    { field: 'products[].status',          type: 'string',  desc: 'Computed status: active / low stock / out of stock / inactive', desc_ja: '計算済み状態: active / low stock / out of stock / inactive', desc_zh: '计算状态：active / low stock / out of stock / inactive' },
+    { field: 'products[].is_active',       type: 'integer', desc: '1 = active, 0 = manually deactivated',          desc_ja: '1=有効, 0=手動無効',                 desc_zh: '1=上架, 0=手动下架' },
+    { field: 'total',                      type: 'integer', desc: 'Total number of seller\'s products',            desc_ja: 'セラーの商品総数',                   desc_zh: '卖家商品总数' },
+    { field: 'page',                       type: 'integer', desc: 'Current page number',                            desc_ja: '現在のページ番号',                   desc_zh: '当前页码' },
+    { field: 'limit',                      type: 'integer', desc: 'Page size used',                                 desc_ja: '使用されたページサイズ',             desc_zh: '使用的每页条数' },
+  ],
+  'POST /api/seller/products/create': [
+    { field: 'product_id', type: 'string', desc: 'UUID of the newly created product', desc_ja: '新規作成された商品のUUID', desc_zh: '新创建商品的UUID' },
+  ],
+  'PUT /api/seller/products/([^/]+)': [
+    { field: 'success', type: 'boolean', desc: 'true on success', desc_ja: '成功時はtrue', desc_zh: '成功时返回true' },
+  ],
+  'PUT /api/seller/products/([^/]+)/status': [
+    { field: 'success', type: 'boolean', desc: 'true on success', desc_ja: '成功時はtrue', desc_zh: '成功时返回true' },
+  ],
+  'DELETE /api/seller/products/([^/]+)': [
+    { field: 'success', type: 'boolean', desc: 'true on success', desc_ja: '成功時はtrue', desc_zh: '成功时返回true' },
+  ],
+  'DELETE /api/seller/products/([^/]+)/images/([^/]+)': [
+    { field: 'success', type: 'boolean', desc: 'true on success', desc_ja: '成功時はtrue', desc_zh: '成功时返回true' },
+  ],
+  'POST /api/seller/products/([^/]+)/images': [
+    { field: 'success', type: 'boolean', desc: 'true when the image(s) were stored in MinIO', desc_ja: 'MinIOへ画像を保存できた場合はtrue', desc_zh: '图片成功存入MinIO时返回true' },
+  ],
+  'GET /api/seller/profile': [
+    { field: 'seller_id',   type: 'string', desc: 'Seller email (extracted from JWT)',      desc_ja: 'セラーメールアドレス（JWTから取得）', desc_zh: '卖家邮箱（从JWT提取）' },
+    { field: 'seller_name', type: 'string', desc: 'Store display name (falls back to sign-up storeName)',  desc_ja: 'ストア表示名（未設定時はサインアップのstoreName）', desc_zh: '店铺显示名称（未设置时回退到注册storeName）' },
+    { field: 'description', type: 'string', desc: 'About-the-Vendor text (empty if not set)', desc_ja: 'ベンダー説明（未設定の場合は空文字）', desc_zh: '供应商描述（未设置则为空）' },
+  ],
+  'PUT /api/seller/profile': [
+    { field: 'success', type: 'boolean', desc: 'true on success', desc_ja: '成功時はtrue', desc_zh: '成功时返回true' },
+  ],
+  'GET /api/seller/categories': [
+    { field: '[].category_id',   type: 'string', desc: 'Unique category identifier', desc_ja: 'カテゴリID', desc_zh: '分类唯一标识符' },
+    { field: '[].category_name', type: 'string', desc: 'Display name of the category', desc_ja: 'カテゴリ表示名', desc_zh: '分类显示名称' },
+  ],
+
   'GET /api/stats': [
     { field: 'topApis',                    type: 'array',   desc: 'Most requested endpoints (present when type omitted or type=top)',    desc_ja: 'リクエスト数上位エンドポイント（type省略またはtype=topの場合）',     desc_zh: '请求量最高的端点（type省略或type=top时返回）' },
     { field: 'topApis[].method',           type: 'string',  desc: 'HTTP method (GET, POST, …)',                                          desc_ja: 'HTTPメソッド（GET, POSTなど）',                                     desc_zh: 'HTTP方法（GET、POST等）' },
@@ -2245,7 +2465,7 @@ function findApiDescription(method, path) {
 
 function _expandSchema(raw) {
   if (!raw) return null;
-  return raw.map(f => f === '__auth__' ? API_SCHEMAS['__auth__'] : f);
+  return raw.map(f => f === '__auth__' ? API_SCHEMAS['__auth__'] : f === '__seller_token__' ? API_SCHEMAS['__seller_token__'] : f);
 }
 
 function findApiSchema(method, path) {
@@ -2377,7 +2597,7 @@ function selectApiRoute(sIdx, rIdx) {
         <label style="font-weight:500; margin-bottom:4px; display:block; font-size:12px; color:var(--text-secondary);">
           ${f.name} ${f.required ? '<span style="color:var(--red); font-size:10px;">*</span>' : ''} <span style="font-size:10px; color:var(--text-muted);">(${f.location}, ${f.type})</span>
         </label>
-        <input type="text" class="form-control api-gui-input" data-name="${f.name}" data-location="${f.location}" data-type="${f.type}" style="width:100%; font-family:monospace; background:var(--bg-surface); color:#e2e8f0; border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px; font-size:13px;" data-sentinel="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__'].includes(f.default) ? f.default : ''}" value="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__'].includes(f.default) ? 'Loading...' : (f.default ?? '')}" placeholder="${fd}" />
+        <input type="text" class="form-control api-gui-input" data-name="${f.name}" data-location="${f.location}" data-type="${f.type}" style="width:100%; font-family:monospace; background:var(--bg-surface); color:#e2e8f0; border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px; font-size:13px;" data-sentinel="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__', '__first_seller_product_id__', '__seller_token__', '__first_user_id__'].includes(f.default) ? f.default : ''}" value="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__', '__first_seller_product_id__', '__seller_token__', '__first_user_id__'].includes(f.default) ? 'Loading...' : (f.default ?? '')}" placeholder="${fd}" />
       </div>`;
     }).join('');
 
@@ -2405,6 +2625,33 @@ function selectApiRoute(sIdx, rIdx) {
         });
         document.querySelectorAll('.api-gui-input[data-sentinel="__first_product_id_png__"]').forEach(el => {
           el.value = _firstProductIdCache ? `${_firstProductIdCache}.png` : '';
+        });
+      });
+    }
+
+    // Async-fill __seller_token__ — uses healthcompany test account
+    if (schema.some(f => f.default === '__seller_token__')) {
+      _fetchSellerToken().then(() => {
+        document.querySelectorAll('.api-gui-input[data-sentinel="__seller_token__"]').forEach(el => {
+          el.value = _sellerTokenCache ? `Bearer ${_sellerTokenCache}` : '';
+        });
+      });
+    }
+
+    // Async-fill __first_seller_product_id__ — uses healthcompany test account
+    if (schema.some(f => f.default === '__first_seller_product_id__')) {
+      _fetchFirstSellerProductId().then(() => {
+        document.querySelectorAll('.api-gui-input[data-sentinel="__first_seller_product_id__"]').forEach(el => {
+          el.value = _firstSellerProductIdCache || '';
+        });
+      });
+    }
+
+    // Async-fill __first_user_id__ — a real Keycloak user id for uam routes
+    if (schema.some(f => f.default === '__first_user_id__')) {
+      _fetchFirstUserId().then(() => {
+        document.querySelectorAll('.api-gui-input[data-sentinel="__first_user_id__"]').forEach(el => {
+          el.value = _firstUserIdCache || '';
         });
       });
     }
@@ -2470,12 +2717,16 @@ async function sendTestRequest() {
   // Use override path when Kong route differs from actual service endpoint
   const overrideKey = `${method} ${_normalizePath(path)}`;
   if (API_TEST_PATH_OVERRIDES[overrideKey]) path = API_TEST_PATH_OVERRIDES[overrideKey];
+  // Normalize Kong regex captures (named groups like (?<id>[^/]+) or ([^/]+))
+  // and strip ~/$ so path-param substitution below works uniformly via :id.
+  path = _normalizePath(path);
   const resPanel = document.getElementById('api-test-response');
   
   resPanel.innerHTML = '<span style="color:var(--yellow)">Sending test request...</span>';
 
   try {
     let parsedBody = null;
+    let multipartBody = null; // FormData for file-upload (multipart) endpoints
     let queryParams = new URLSearchParams();
     const explicitHeaders = {};  // from schema fields with location === 'header'
 
@@ -2488,10 +2739,24 @@ async function sendTestRequest() {
         const type = input.getAttribute('data-type');
         let value = input.value.trim();
 
+        // File uploads: auto-generate a tiny valid PNG so the multipart
+        // endpoint returns a real 2xx without the user picking a file.
+        if (loc === 'file') {
+          const b64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+          const bin = atob(b64);
+          const arr = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+          const blob = new Blob([arr], { type: 'image/png' });
+          if (!multipartBody) multipartBody = new FormData();
+          multipartBody.append(name, blob, 'test.png');
+          return;
+        }
+
         let typedVal = value;
         if (value !== '') {
           if (type === 'integer') typedVal = parseInt(value, 10);
           else if (type === 'number') typedVal = parseFloat(value);
+          else if (type === 'boolean') typedVal = (value === 'true' || value === '1');
           else if (type === 'object') {
             try { typedVal = JSON.parse(value); } catch (err) {}
           }
@@ -2570,7 +2835,10 @@ async function sendTestRequest() {
 
     const headers = { ...explicitHeaders };
     let fetchBody;
-    if (parsedBody) {
+    if (multipartBody) {
+      // Do NOT set Content-Type — the browser adds the multipart boundary.
+      fetchBody = multipartBody;
+    } else if (parsedBody) {
       if (isFormEncoded) {
         headers['Content-Type'] = 'application/x-www-form-urlencoded';
         fetchBody = new URLSearchParams(parsedBody).toString();
@@ -2593,7 +2861,14 @@ async function sendTestRequest() {
     const contentType = res.headers.get('content-type') || '';
     const statusLine = `<span style="color:${res.ok ? 'var(--green)' : 'var(--red)'}">Status: ${res.status} ${res.statusText} (${latency}ms)</span>`;
 
-    if (contentType.startsWith('image/')) {
+    // Treat as an image by content-type OR by file extension — MinIO-served
+    // seed objects may report application/octet-stream yet still be images.
+    const isImageResponse = res.ok && (
+      contentType.startsWith('image/') ||
+      /\.(png|jpe?g|gif|webp|svg|avif)$/i.test(url.split('?')[0])
+    );
+
+    if (isImageResponse) {
       // Display image directly instead of garbled binary text
       resPanel.innerHTML = `${statusLine}
 <div style="margin-top:12px;">
@@ -4913,7 +5188,7 @@ const I18N = {
     'nav.keycloak': 'Access Management', 'nav.model': 'Model Performance',
     'nav.ci': 'Local CI Pipelines', 'nav.tests': 'E2E Test Runner',
     'nav.pipeline': 'Data Pipeline', 'nav.vulnerability': 'Security Scanning',
-    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(Backdoor)',
+    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(Backdoor)', 'nav.seller': 'Seller page',
     // Header
     'header.autoRefresh': 'AUTO REFRESH', 'header.systemRestart': 'System Restart',
     // Page titles
@@ -5015,7 +5290,7 @@ const I18N = {
     'nav.keycloak': 'アクセス管理', 'nav.model': 'モデル性能',
     'nav.ci': 'ローカルCIパイプライン', 'nav.tests': 'E2Eテスト',
     'nav.pipeline': 'データパイプライン', 'nav.vulnerability': 'セキュリティスキャン',
-    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(裏口)',
+    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(裏口)', 'nav.seller': 'Sellerページ',
     'header.autoRefresh': '自動更新', 'header.systemRestart': 'システム再起動',
     'title.dashboard': 'ダッシュボード', 'title.containers': 'コンテナ一覧',
     'title.logs': 'ログビューア', 'title.topology': 'サービストポロジー',
@@ -5100,7 +5375,7 @@ const I18N = {
     'nav.keycloak': '访问管理', 'nav.model': '模型性能',
     'nav.ci': '本地CI流水线', 'nav.tests': 'E2E测试',
     'nav.pipeline': '数据管道', 'nav.vulnerability': '安全扫描',
-    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(后门)',
+    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(后门)', 'nav.seller': 'Seller页面',
     'header.autoRefresh': '自动刷新', 'header.systemRestart': '重启系统',
     'title.dashboard': '仪表盘', 'title.containers': '容器列表',
     'title.logs': '日志查看器', 'title.topology': '服务拓扑',
@@ -5235,6 +5510,47 @@ async function _fetchFirstGeoId() {
     const d = await r.json();
     const first = Array.isArray(d) ? d[0] : null;
     if (first) _firstGeoIdCache = first.geo_id || '';
+  } catch {}
+}
+
+// ── Seller token cache (uses healthcompany test account) ──────────────────────
+let _sellerTokenCache = null;
+async function _fetchSellerToken() {
+  if (_sellerTokenCache) return;
+  try {
+    // Use the dashboard's server-side token proxy (reliable, no browser Origin
+    // check) instead of calling Keycloak directly from the browser.
+    const r = await fetch('/dashboard/api/seller-token');
+    if (!r.ok) return;
+    const d = await r.json();
+    _sellerTokenCache = d.token || '';
+  } catch {}
+}
+
+// First non-critical Keycloak user id, for the uam users PUT/DELETE backdoors.
+let _firstUserIdCache = null;
+async function _fetchFirstUserId() {
+  if (_firstUserIdCache) return;
+  try {
+    const r = await fetch('/dashboard/api/first-user-id');
+    if (!r.ok) return;
+    const d = await r.json();
+    _firstUserIdCache = d.id || '';
+  } catch {}
+}
+
+// ── Seller product ID cache (uses healthcompany test account) ─────────────────
+let _firstSellerProductIdCache = null;
+async function _fetchFirstSellerProductId() {
+  if (_firstSellerProductIdCache) return;
+  try {
+    await _fetchSellerToken();
+    if (!_sellerTokenCache) return;
+    const r = await fetch('/api/seller/products?limit=1', { headers: { Authorization: `Bearer ${_sellerTokenCache}` } });
+    if (!r.ok) return;
+    const d = await r.json();
+    const first = d.products?.[0];
+    if (first) _firstSellerProductIdCache = first.product_id || '';
   } catch {}
 }
 
@@ -5374,6 +5690,8 @@ function initSidebar() {
     const items = [...nav.querySelectorAll('.nav-item[data-key]')];
     const map = Object.fromEntries(items.map(el => [el.dataset.key, el]));
     _navOrder.forEach(key => { if (map[key]) nav.appendChild(map[key]); });
+    // Append new items not in stored order to the end
+    items.forEach(el => { if (!_navOrder.includes(el.dataset.key)) nav.appendChild(el); });
   }
 
   // Restore pins (visual + reorder pinned to top)

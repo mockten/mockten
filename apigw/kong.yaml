@@ -125,6 +125,62 @@ services:
           headers: ['Authorization', 'Content-Type']
           credentials: true
 
+  - name: keycloak-admin-user-delete
+    url: http://uam-service.default.svc.cluster.local/admin/realms/mockten-realm-dev/users
+    routes:
+      - name: keycloak-admin-user-delete-route
+        paths:
+          - ~/api/uam/users/(?<userId>[^/]+)$
+        strip_path: false
+        methods:
+          - DELETE
+          - OPTIONS
+    plugins:
+      - name: request-transformer
+        config:
+          replace:
+            uri: /admin/realms/mockten-realm-dev/users/$(uri_captures["userId"])
+          add:
+            headers:
+              - Authorization:$http_authorization
+          remove:
+            headers:
+              - host
+      - name: cors
+        config:
+          origins: ['*']
+          methods: ['DELETE','OPTIONS']
+          headers: ['Authorization', 'Content-Type']
+          credentials: true
+
+  - name: keycloak-execute-actions-email
+    url: http://uam-service.default.svc.cluster.local/admin/realms/mockten-realm-dev/users
+    routes:
+      - name: keycloak-execute-actions-email-route
+        paths:
+          - ~/api/uam/users/(?<userId>[^/]+)/execute-actions-email
+        strip_path: false
+        methods:
+          - PUT
+          - OPTIONS
+    plugins:
+      - name: request-transformer
+        config:
+          replace:
+            uri: /admin/realms/mockten-realm-dev/users/$(uri_captures["userId"])/execute-actions-email
+          add:
+            headers:
+              - Authorization:$http_authorization
+          remove:
+            headers:
+              - host
+      - name: cors
+        config:
+          origins: ['*']
+          methods: ['PUT','OPTIONS']
+          headers: ['Authorization', 'Content-Type']
+          credentials: true
+
   - name: keycloak-admin-roles
     url: http://uam-service.default.svc.cluster.local/admin/realms/mockten-realm-dev/roles
     routes:
@@ -409,6 +465,187 @@ services:
         methods:
           - GET
           - OPTIONS
+
+  - name: seller-stats-service
+    url: http://sale-service.default.svc.cluster.local:8080/v1/seller/stats
+    routes:
+      - name: seller-stats-route
+        paths:
+          - /api/seller/stats
+        strip_path: true
+        methods:
+          - GET
+          - OPTIONS
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - Authorization:$http_authorization
+
+  - name: seller-orders-service
+    url: http://sale-service.default.svc.cluster.local:8080/v1/seller/orders
+    routes:
+      - name: seller-orders-route
+        paths:
+          - /api/seller/orders
+        strip_path: true
+        methods:
+          - GET
+          - OPTIONS
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - Authorization:$http_authorization
+
+  - name: seller-categories
+    url: http://sale-service.default.svc.cluster.local:8080/v1/seller/categories
+    routes:
+      - name: seller-categories-route
+        paths: [/api/seller/categories]
+        methods: [GET, OPTIONS]
+        strip_path: true
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - Authorization:$http_authorization
+
+  - name: seller-create-product
+    url: http://sale-service.default.svc.cluster.local:8080/v1/seller/products/create
+    routes:
+      - name: seller-create-product-route
+        paths: [/api/seller/products/create]
+        methods: [POST, OPTIONS]
+        strip_path: true
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - Authorization:$http_authorization
+          remove:
+            headers:
+              - host
+
+  - name: seller-product-status
+    url: http://sale-service.default.svc.cluster.local:8080/v1/seller/products
+    routes:
+      - name: seller-product-status-route
+        paths:
+          - ~/api/seller/products/(?<productId>[^/]+)/status
+        strip_path: false
+        methods: [PUT, OPTIONS]
+    plugins:
+      - name: request-transformer
+        config:
+          replace:
+            uri: "/v1/seller/products/$(uri_captures['productId'])/status"
+          add:
+            headers:
+              - Authorization:$http_authorization
+          remove:
+            headers:
+              - host
+
+  - name: seller-product-image-slot
+    url: http://sale-service.default.svc.cluster.local:8080/v1/seller/products
+    routes:
+      - name: seller-product-image-slot-route
+        paths:
+          - ~/api/seller/products/(?<productId>[^/]+)/images/(?<slot>[^/]+)
+        strip_path: false
+        regex_priority: 10
+        methods: [DELETE, OPTIONS]
+    plugins:
+      - name: request-transformer
+        config:
+          replace:
+            uri: "/v1/seller/products/$(uri_captures['productId'])/images/$(uri_captures['slot'])"
+          add:
+            headers:
+              - Authorization:$http_authorization
+          remove:
+            headers:
+              - host
+
+  - name: seller-product-images
+    url: http://sale-service.default.svc.cluster.local:8080/v1/seller/products
+    routes:
+      - name: seller-product-images-route
+        paths:
+          - ~/api/seller/products/(?<productId>[^/]+)/images
+        strip_path: false
+        methods: [POST, OPTIONS]
+    plugins:
+      - name: request-transformer
+        config:
+          replace:
+            uri: "/v1/seller/products/$(uri_captures['productId'])/images"
+          add:
+            headers:
+              - Authorization:$http_authorization
+          remove:
+            headers:
+              - host
+
+  - name: seller-products-service
+    url: http://sale-service.default.svc.cluster.local:8080
+    routes:
+      - name: seller-products-list-route
+        paths:
+          - /api/seller/products
+        strip_path: false
+        methods:
+          - GET
+          - OPTIONS
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1/seller/products
+              add:
+                headers:
+                  - Authorization:$http_authorization
+      - name: seller-products-item-route
+        paths:
+          - ~/api/seller/products/([^/]+)$
+        strip_path: false
+        methods:
+          - PUT
+          - DELETE
+          - OPTIONS
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: "/v1/seller/products/$(uri_captures[1])"
+              add:
+                headers:
+                  - Authorization:$http_authorization
+
+  - name: seller-profile-service
+    url: http://sale-service.default.svc.cluster.local:8080
+    routes:
+      - name: seller-profile-route
+        paths:
+          - /api/seller/profile
+        strip_path: false
+        methods:
+          - GET
+          - PUT
+          - OPTIONS
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1/seller/profile
+              add:
+                headers:
+                  - Authorization:$http_authorization
 
   - name: recommendation-service
     url: http://recommendation-service.default.svc.cluster.local:8080

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -13,18 +13,35 @@ interface AddProductPageProps {
   onBack: () => void;
 }
 
+interface Category {
+  category_id: string;
+  category_name: string;
+}
+
 export function AddProductPage({ onBack }: AddProductPageProps) {
   const [productData, setProductData] = useState({
     name: "",
     description: "",
     price: "",
     comparePrice: "",
-    sku: "",
     stock: "",
     category: "",
+    product_condition: "",
     status: true,
   });
-  const [images, setImages] = useState<string[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/seller/categories")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setCategories(data);
+      })
+      .catch((err) => console.error("failed to load categories", err));
+  }, []);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setProductData((prev) => ({ ...prev, [field]: value }));
@@ -33,42 +50,85 @@ export function AddProductPage({ onBack }: AddProductPageProps) {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      // In a real app, you would upload these to a server
-      // For now, we'll create object URLs for preview
-      const newImages = Array.from(files).map((file) => URL.createObjectURL(file));
-      setImages((prev) => [...prev, ...newImages].slice(0, 5)); // Max 5 images
+      const newFiles = Array.from(files);
+      setImageFiles((prev) => {
+        const combined = [...prev, ...newFiles].slice(0, 3);
+        // Rebuild previews
+        const previews = combined.map((f) => URL.createObjectURL(f));
+        setImagePreviews(previews);
+        return combined;
+      });
     }
   };
 
   const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Product data:", productData, "Images:", images);
-    toast.success("Product added successfully!");
-    // Reset form
-    setProductData({
-      name: "",
-      description: "",
-      price: "",
-      comparePrice: "",
-      sku: "",
-      stock: "",
-      category: "",
-      status: true,
+    setImageFiles((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      const previews = updated.map((f) => URL.createObjectURL(f));
+      setImagePreviews(previews);
+      return updated;
     });
-    setImages([]);
-    // Navigate back after a short delay
-    setTimeout(() => {
-      onBack();
-    }, 1500);
   };
 
-  const handleSaveDraft = () => {
-    console.log("Saving draft:", productData);
-    toast.success("Draft saved!");
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const token = localStorage.getItem("seller_access_token") || "";
+
+      // Step 1: Create product
+      const createRes = await fetch("/api/seller/products/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: productData.name,
+          description: productData.description,
+          price: parseFloat(productData.price) || 0,
+          comparePrice: parseFloat(productData.comparePrice) || 0,
+          category_id: productData.category,
+          product_condition: productData.product_condition || "new",
+          stock: parseInt(productData.stock) || 0,
+          status: productData.status,
+        }),
+      });
+
+      if (!createRes.ok) {
+        const errBody = await createRes.text();
+        throw new Error(`Failed to create product: ${errBody}`);
+      }
+
+      const { product_id } = await createRes.json();
+
+      // Step 2: Upload images if any
+      if (imageFiles.length > 0) {
+        const formData = new FormData();
+        imageFiles.forEach((file) => {
+          formData.append("images[]", file);
+        });
+
+        await fetch(`/api/seller/products/${product_id}/images`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+      }
+
+      toast.success("Product added successfully!");
+      setTimeout(() => {
+        onBack();
+      }, 1000);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to add product. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -125,14 +185,14 @@ export function AddProductPage({ onBack }: AddProductPageProps) {
             <Card>
               <CardHeader>
                 <CardTitle>Product Images</CardTitle>
-                <CardDescription>Add up to 5 images</CardDescription>
+                <CardDescription>Add up to 3 images</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {/* Image Preview Grid */}
-                  {images.length > 0 && (
-                    <div className="grid grid-cols-5 gap-4">
-                      {images.map((image, index) => (
+                  {imagePreviews.length > 0 && (
+                    <div className="grid grid-cols-3 gap-4">
+                      {imagePreviews.map((image, index) => (
                         <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
                           <img src={image} alt={`Product ${index + 1}`} className="w-full h-full object-cover" />
                           <button
@@ -153,7 +213,7 @@ export function AddProductPage({ onBack }: AddProductPageProps) {
                   )}
 
                   {/* Upload Button */}
-                  {images.length < 5 && (
+                  {imagePreviews.length < 3 && (
                     <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-slate-50 transition-colors">
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
                         <Upload className="w-8 h-8 text-slate-400 mb-2" />
@@ -212,7 +272,7 @@ export function AddProductPage({ onBack }: AddProductPageProps) {
                         className="pl-8"
                       />
                     </div>
-                    <p className="text-slate-500">Original price for discount display</p>
+                    <p className="text-slate-500">Original price for discount display - will join Mockten Super Sale</p>
                   </div>
                 </div>
               </CardContent>
@@ -222,31 +282,19 @@ export function AddProductPage({ onBack }: AddProductPageProps) {
             <Card>
               <CardHeader>
                 <CardTitle>Inventory</CardTitle>
-                <CardDescription>Manage stock and SKU</CardDescription>
+                <CardDescription>Manage stock quantity</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="sku">SKU</Label>
-                    <Input
-                      id="sku"
-                      placeholder="e.g. WH-001"
-                      value={productData.sku}
-                      onChange={(e) => handleInputChange("sku", e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="stock">Stock Quantity *</Label>
-                    <Input
-                      id="stock"
-                      type="number"
-                      placeholder="0"
-                      value={productData.stock}
-                      onChange={(e) => handleInputChange("stock", e.target.value)}
-                      required
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="stock">Stock Quantity *</Label>
+                  <Input
+                    id="stock"
+                    type="number"
+                    placeholder="0"
+                    value={productData.stock}
+                    onChange={(e) => handleInputChange("stock", e.target.value)}
+                    required
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -290,14 +338,28 @@ export function AddProductPage({ onBack }: AddProductPageProps) {
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="electronics">Electronics</SelectItem>
-                      <SelectItem value="clothing">Clothing</SelectItem>
-                      <SelectItem value="accessories">Accessories</SelectItem>
-                      <SelectItem value="home">Home & Garden</SelectItem>
-                      <SelectItem value="sports">Sports & Outdoors</SelectItem>
-                      <SelectItem value="books">Books</SelectItem>
-                      <SelectItem value="toys">Toys & Games</SelectItem>
-                      <SelectItem value="beauty">Beauty & Personal Care</SelectItem>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.category_id} value={cat.category_id}>
+                          {cat.category_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="product_condition">Condition *</Label>
+                  <Select
+                    value={productData.product_condition}
+                    onValueChange={(value) => handleInputChange("product_condition", value)}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select condition" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">New</SelectItem>
+                      <SelectItem value="used">Used</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -311,9 +373,9 @@ export function AddProductPage({ onBack }: AddProductPageProps) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {images.length > 0 ? (
+                  {imagePreviews.length > 0 ? (
                     <div className="aspect-square rounded-lg overflow-hidden border border-slate-200">
-                      <img src={images[0]} alt="Preview" className="w-full h-full object-cover" />
+                      <img src={imagePreviews[0]} alt="Preview" className="w-full h-full object-cover" />
                     </div>
                   ) : (
                     <div className="aspect-square rounded-lg border-2 border-dashed border-slate-200 flex items-center justify-center">
@@ -334,14 +396,15 @@ export function AddProductPage({ onBack }: AddProductPageProps) {
 
         {/* Action Buttons - Fixed at Bottom */}
         <div className="sticky bottom-0 bg-white border-t border-slate-200 py-4 mt-6 -mx-8 px-8 flex items-center justify-end gap-3">
-          <Button type="button" variant="outline" onClick={handleSaveDraft}>
-            Save as Draft
-          </Button>
           <Button type="button" variant="outline" onClick={onBack}>
             Cancel
           </Button>
-          <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-            Add Product
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="!bg-blue-600 hover:!bg-blue-700 !text-white"
+          >
+            {isSubmitting ? "Adding..." : "Add Product"}
           </Button>
         </div>
       </form>

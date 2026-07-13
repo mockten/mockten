@@ -48,10 +48,12 @@
       "protocol": "openid-connect",
       "publicClient": true,
       "redirectUris": [
-        "http://localhost/*"
+        "http://localhost/*",
+        "http://nginx/*"
       ],
       "webOrigins": [
-        "http://localhost"
+        "http://localhost",
+        "http://nginx"
       ],
       "directAccessGrantsEnabled": false,
       "defaultClientScopes": [
@@ -159,7 +161,10 @@
   },
   "groups": [
     {
-      "name": "Seller"
+      "name": "Seller",
+      "realmRoles": [
+        "seller"
+      ]
     },
     {
       "name": "Customer"
@@ -188,7 +193,9 @@
           "value": "superadmin"
         }
       ],
-      "groups": ["admin-group"]
+      "groups": [
+        "admin-group"
+      ]
     },
     {
       "username": "Health company",
@@ -203,10 +210,16 @@
           "value": "healthcompany"
         }
       ],
-      "groups": ["Seller"],
-      "realmRoles": ["seller"],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
       "attributes": {
-        "description": ["Sells health and wellness products"]
+        "description": [
+          "Sells health and wellness products"
+        ]
       }
     },
     {
@@ -222,10 +235,16 @@
           "value": "sportscompany"
         }
       ],
-      "groups": ["Seller"],
-      "realmRoles": ["seller"],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
       "attributes": {
-        "description": ["Provider of sports and fitness gear"]
+        "description": [
+          "Provider of sports and fitness gear"
+        ]
       }
     },
     {
@@ -241,10 +260,16 @@
           "value": "toycompany"
         }
       ],
-      "groups": ["Seller"],
-      "realmRoles": ["seller"],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
       "attributes": {
-        "description": ["Distributor of children's toys and games"]
+        "description": [
+          "Distributor of children's toys and games"
+        ]
       }
     },
     {
@@ -260,10 +285,16 @@
           "value": "headphonecompany"
         }
       ],
-      "groups": ["Seller"],
-      "realmRoles": ["seller"],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
       "attributes": {
-        "description": ["Manufacturer of high-quality audio equipment"]
+        "description": [
+          "Manufacturer of high-quality audio equipment"
+        ]
       }
     },
     {
@@ -279,10 +310,16 @@
           "value": "greengrocer"
         }
       ],
-      "groups": ["Seller"],
-      "realmRoles": ["seller"],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
       "attributes": {
-        "description": ["Fresh produce and organic food supplier"]
+        "description": [
+          "Fresh produce and organic food supplier"
+        ]
       }
     },
     {
@@ -298,10 +335,16 @@
           "value": "cooking"
         }
       ],
-      "groups": ["Seller"],
-      "realmRoles": ["seller"],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
       "attributes": {
-        "description": ["Cooking ingredients and sauces"]
+        "description": [
+          "Cooking ingredients and sauces"
+        ]
       }
     },
     {
@@ -317,10 +360,16 @@
           "value": "drink"
         }
       ],
-      "groups": ["Seller"],
-      "realmRoles": ["seller"],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
       "attributes": {
-        "description": ["Beverages and canned drinks"]
+        "description": [
+          "Beverages and canned drinks"
+        ]
       }
     },
     {
@@ -336,10 +385,16 @@
           "value": "food"
         }
       ],
-      "groups": ["Seller"],
-      "realmRoles": ["seller"],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
       "attributes": {
-        "description": ["Processed food and ready-to-eat meals"]
+        "description": [
+          "Processed food and ready-to-eat meals"
+        ]
       }
     },
     {
@@ -355,10 +410,16 @@
           "value": "vegetable"
         }
       ],
-      "groups": ["Seller"],
-      "realmRoles": ["seller"],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
       "attributes": {
-        "description": ["Fresh and frozen vegetables"]
+        "description": [
+          "Fresh and frozen vegetables"
+        ]
       }
     },
     {
@@ -374,10 +435,16 @@
           "value": "fruit"
         }
       ],
-      "groups": ["Seller"],
-      "realmRoles": ["seller"],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
       "attributes": {
-        "description": ["Fresh fruit and specialty fruit items"]
+        "description": [
+          "Fresh fruit and specialty fruit items"
+        ]
       }
     },
     {
@@ -393,10 +460,16 @@
           "value": "jam"
         }
       ],
-      "groups": ["Seller"],
-      "realmRoles": ["seller"],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
       "attributes": {
-        "description": ["Handmade jams and marmalades"]
+        "description": [
+          "Handmade jams and marmalades"
+        ]
       }
     },
     {
@@ -412,10 +485,16 @@
           "value": "sweets"
         }
       ],
-      "groups": ["Seller"],
-      "realmRoles": ["seller"],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
       "attributes": {
-        "description": ["Chocolate and confectionery products"]
+        "description": [
+          "Chocolate and confectionery products"
+        ]
       }
     },
     {
@@ -431,10 +510,16 @@
           "value": "space"
         }
       ],
-      "groups": ["Seller"],
-      "realmRoles": ["seller"],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
       "attributes": {
-        "description": ["Space-themed foods and packs"]
+        "description": [
+          "Space-themed foods and packs"
+        ]
       }
     },
     {
@@ -450,11 +535,54 @@
           "value": "water"
         }
       ],
-      "groups": ["Seller"],
-      "realmRoles": ["seller"],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
       "attributes": {
-        "description": ["Bottled water and hydration items"]
+        "description": [
+          "Bottled water and hydration items"
+        ]
+      }
+    },
+    {
+      "username": "bookstore",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "bookstore@example.com",
+      "firstName": "Bookstore",
+      "lastName": "Seller",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "bookstore"
+        }
+      ],
+      "groups": [
+        "Seller"
+      ],
+      "realmRoles": [
+        "seller"
+      ],
+      "attributes": {
+        "description": [
+          "Books and literature"
+        ]
       }
     }
-  ]
+  ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "config": {
+          "kc.user.profile.config": [
+            "{\"unmanagedAttributePolicy\": \"ENABLED\", \"attributes\": [{\"name\": \"username\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}, {\"name\": \"email\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}, {\"name\": \"firstName\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}, {\"name\": \"lastName\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}]}"
+          ]
+        }
+      }
+    ]
+  }
 }

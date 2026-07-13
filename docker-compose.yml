@@ -67,7 +67,7 @@ services:
     image: minio
     build:
       context: ./minIO
-    mem_limit: 190m
+    mem_limit: 512m
     environment:
       MINIO_GOMAXPROCS: "1"
       MINIO_API_REQUESTS_MAX: "100"
