@@ -368,4 +368,4 @@ tasks:
       - (cd recommendation && docker build -t mockten-recommendation .)
       - (cd monitoring/dashboard && docker build -t mockten-dashboard .)
       - (cd airflow && docker build -t mockten-airflow .)
-      - (pip3 install -r mysql/seeder/requirements.txt || pip install -r mysql/seeder/requirements.txt)
+      - (pip3 install --break-system-packages -r mysql/seeder/requirements.txt || pip install --break-system-packages -r mysql/seeder/requirements.txt || pip3 install -r mysql/seeder/requirements.txt || pip install -r mysql/seeder/requirements.txt)

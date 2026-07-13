@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import TermsPage from './pages/TermsPage';
 import CancellationPolicyPage from './pages/CancellationPolicy';
 import AboutUsPage from './pages/AboutUsPages';
@@ -25,17 +25,61 @@ import MyCartConfirm from './pages/MyCartConfirm';
 import MyCartOrderComplete from './pages/MyCartOrderComplete';
 import MyFavoriteList from './pages/MyFavoriteList';
 import OrderHistory from './pages/OrderHistory';
-import AdminLogin from './pages/admin/AdminLogin';
-import AdminCreateUser from './pages/admin/AdminCreateUser';
 import AdminCreateSeller from './pages/admin/AdminCreateSeller';
 import AdminUpdateSeller from './pages/admin/AdminUpdateSeller';
 import AdminDeleteSeller from './pages/admin/AdminDeleteSeller';
-import Admin from './pages/admin/Admin';
+import { AdminLoginPage } from './pages/admin/AdminLoginPage';
+import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { CreateUserPage } from './pages/admin/CreateUserPage';
+import { EditUserPage } from './pages/admin/EditUserPage';
 import PrivateRoute from './PrivateRoute';
 import { AuthProvider } from './Auth';
 
 
 import './App.css';
+
+const AdminLoginPageWrapper: React.FC = () => {
+  const navigate = useNavigate();
+  return (
+    <AdminLoginPage
+      onLogin={() => navigate('/admin/dashboard')}
+      onBackToSeller={() => navigate('/seller/login')}
+    />
+  );
+};
+
+const AdminDashboardWrapper: React.FC = () => {
+  const navigate = useNavigate();
+  return (
+    <AdminDashboard
+      onLogout={() => navigate('/admin/login')}
+      onCreateUser={() => navigate('/admin/user/create')}
+      onEditUser={(userId) => navigate(`/admin/user/edit/${userId}`)}
+    />
+  );
+};
+
+const CreateUserPageWrapper: React.FC = () => {
+  const navigate = useNavigate();
+  return (
+    <CreateUserPage
+      onBack={() => navigate('/admin/dashboard')}
+      onUserCreated={() => navigate('/admin/dashboard')}
+    />
+  );
+};
+
+const EditUserPageWrapper: React.FC = () => {
+  const navigate = useNavigate();
+  const { userId } = useParams<{ userId: string }>();
+  return (
+    <EditUserPage
+      userId={Number(userId)}
+      onBack={() => navigate('/admin/dashboard')}
+      onUserUpdated={() => navigate('/admin/dashboard')}
+    />
+  );
+};
 
 const App: React.FC = () => {
   return (
@@ -69,9 +113,12 @@ const App: React.FC = () => {
           <Route path="/seller/signup" element={<SellerSignUpPage />} />
           <Route path="/seller/portal" element={<SellerPortal />} />
 
-          <Route path="/admin/" element={<Admin />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin/user/create" element={<AdminCreateUser />} />
+          <Route path="/admin" element={<AdminLoginPageWrapper />} />
+          <Route path="/admin/" element={<AdminLoginPageWrapper />} />
+          <Route path="/admin/login" element={<AdminLoginPageWrapper />} />
+          <Route path="/admin/dashboard" element={<AdminDashboardWrapper />} />
+          <Route path="/admin/user/create" element={<CreateUserPageWrapper />} />
+          <Route path="/admin/user/edit/:userId" element={<EditUserPageWrapper />} />
           <Route path="/admin/seller/create" element={<AdminCreateSeller />} />
           <Route path="/admin/seller/edit" element={<AdminUpdateSeller />} />
           <Route path="/admin/seller/delete" element={<AdminDeleteSeller />} />
