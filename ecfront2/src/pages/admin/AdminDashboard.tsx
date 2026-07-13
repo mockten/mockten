@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -39,80 +39,98 @@ import {
   Package,
   AlertTriangle,
   Activity,
-  Database,
   Server,
   MoreVertical,
   Ban,
   CheckCircle,
   XCircle,
   Clock,
-  Eye,
   UserPlus,
   Edit,
   Trash2,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
+import {
+  isAdminAuthed,
+  getAdminEmail,
+  adminLogout,
+  fetchUsers,
+  deleteUser,
+  setUserEnabled,
+  fetchAdminOrders,
+  fetchHealth,
+  fetchAudit,
+  AdminUser,
+  AdminOrder,
+  HealthResponse,
+  AuditEntry,
+} from "./adminApi";
 
 interface AdminDashboardProps {
   onLogout: () => void;
   onCreateUser?: () => void;
-  onEditUser?: (userId: number) => void;
+  onEditUser?: (userId: string) => void;
 }
-
-// Mock data for admin dashboard
-const systemStats = [
-  { title: "Total Users", value: "1,847", status: "normal", icon: Users },
-  { title: "Active Orders", value: "234", status: "normal", icon: ShoppingCart },
-  { title: "Total Products", value: "3,421", status: "normal", icon: Package },
-  { title: "System Alerts", value: "3", status: "warning", icon: AlertTriangle },
-];
-
-const systemHealth = [
-  { name: "Database", status: "operational", uptime: "99.9%", icon: Database },
-  { name: "API Server", status: "operational", uptime: "99.8%", icon: Server },
-  { name: "File Storage", status: "operational", uptime: "100%", icon: Package },
-  { name: "Payment Gateway", status: "degraded", uptime: "97.2%", icon: Activity },
-];
-
-const recentUsers = [
-  { id: 1, name: "John Seller", email: "john@example.com", role: "Seller", status: "active", joined: "2025-11-03" },
-  { id: 2, name: "Emma Store", email: "emma@example.com", role: "Seller", status: "active", joined: "2025-11-02" },
-  { id: 3, name: "Mike Shop", email: "mike@example.com", role: "Seller", status: "suspended", joined: "2025-11-01" },
-  { id: 4, name: "Sarah Market", email: "sarah@example.com", role: "Seller", status: "active", joined: "2025-10-30" },
-  { id: 5, name: "James Trading", email: "james@example.com", role: "Seller", status: "pending", joined: "2025-10-29" },
-];
-
-const activityLogs = [
-  { id: 1, action: "User Login", user: "john@example.com", timestamp: "2025-11-05 14:32:15", status: "success" },
-  { id: 2, action: "Product Added", user: "emma@example.com", timestamp: "2025-11-05 14:25:43", status: "success" },
-  { id: 3, action: "Failed Login Attempt", user: "unknown@example.com", timestamp: "2025-11-05 14:18:22", status: "failed" },
-  { id: 4, action: "Order Placed", user: "mike@example.com", timestamp: "2025-11-05 14:10:55", status: "success" },
-  { id: 5, action: "Account Suspended", user: "admin@example.com", timestamp: "2025-11-05 13:55:12", status: "warning" },
-];
-
-const flaggedOrders = [
-  { id: "#5432", customer: "suspicious@email.com", amount: "$9,999.99", reason: "High value", time: "10 min ago" },
-  { id: "#5431", customer: "test@test.com", amount: "$1,234.56", reason: "Multiple attempts", time: "25 min ago" },
-  { id: "#5429", customer: "buyer@mail.com", amount: "$567.89", reason: "Unusual location", time: "1 hour ago" },
-];
 
 export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<{ id: number; name: string } | null>(null);
+  const [userToDelete, setUserToDelete] = useState<{ id: string; name: string; email: string } | null>(null);
 
-  const handleDeleteClick = (userId: number, userName: string) => {
-    setUserToDelete({ id: userId, name: userName });
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [logs, setLogs] = useState<AuditEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Auth guard
+  useEffect(() => {
+    if (!isAdminAuthed()) onLogout();
+  }, [onLogout]);
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    const [u, o, h, l] = await Promise.allSettled([
+      fetchUsers(),
+      fetchAdminOrders(),
+      fetchHealth(),
+      fetchAudit(),
+    ]);
+    if (u.status === "fulfilled") setUsers(u.value);
+    if (o.status === "fulfilled") setOrders(o.value);
+    if (h.status === "fulfilled") setHealth(h.value);
+    if (l.status === "fulfilled") setLogs(l.value);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  const handleLogout = async () => {
+    await adminLogout();
+    onLogout();
+  };
+
+  const handleDeleteClick = (id: string, name: string, email: string) => {
+    setUserToDelete({ id, name, email });
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (userToDelete) {
-      console.log("Deleting user:", userToDelete.id);
-      // In a real app, this would call an API to delete the user
+      await deleteUser(userToDelete.id, userToDelete.email);
       setDeleteDialogOpen(false);
       setUserToDelete(null);
+      loadAll();
     }
+  };
+
+  const handleSuspend = async (u: AdminUser) => {
+    await setUserEnabled(u.id, u.status === "suspended", u.email);
+    loadAll();
   };
 
   const getStatusColor = (status: string) => {
@@ -120,13 +138,18 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
       case "active":
       case "success":
       case "operational":
+      case "delivered":
         return "bg-green-100 text-green-800";
       case "suspended":
       case "failed":
       case "degraded":
+      case "canceled":
+      case "refunded":
         return "bg-red-100 text-red-800";
       case "pending":
       case "warning":
+      case "paid":
+      case "created":
         return "bg-yellow-100 text-yellow-800";
       default:
         return "bg-slate-100 text-slate-800";
@@ -151,19 +174,33 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
     }
   };
 
+  const q = searchQuery.toLowerCase();
+  const filteredUsers = users.filter(
+    (u) => !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+  );
+  const flaggedOrders = orders.filter((o) => o.flagged);
+  const activeOrders = orders.filter((o) => o.status !== "delivered" && o.status !== "canceled").length;
+
+  const systemStats = [
+    { title: "Total Users", value: String(users.length), status: "normal", icon: Users },
+    { title: "Active Orders", value: String(activeOrders), status: "normal", icon: ShoppingCart },
+    { title: "Total Products", value: String(health?.metrics.products ?? 0), status: "normal", icon: Package },
+    { title: "System Alerts", value: String(health?.alerts.length ?? 0), status: (health?.alerts.length ?? 0) > 0 ? "warning" : "normal", icon: AlertTriangle },
+  ];
+
   return (
     <div className="min-h-screen bg-red-50">
       {/* Top Navigation Bar */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div className="flex items-center justify-between px-6 py-4">
+        <div className="flex items-center justify-between px-6 py-3">
           {/* Logo and Brand */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 bg-red-600 rounded-lg">
-              <Shield className="w-6 h-6 text-white" />
+            <div className="flex items-center justify-center w-9 h-9 bg-red-600 rounded-lg shrink-0">
+              <Shield className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-slate-900">Admin Dashboard</h1>
-              <p className="text-slate-500">System Control Panel</p>
+              <h1 className="font-bold leading-tight text-slate-900" style={{ fontSize: "1.25rem", lineHeight: 1.2 }}>Admin Dashboard</h1>
+              <p className="text-xs text-slate-500 leading-tight">System Control Panel</p>
             </div>
           </div>
 
@@ -176,30 +213,32 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                 placeholder="Search users, orders, products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-9 text-sm"
               />
             </div>
           </div>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-4">
-            <Badge variant="secondary" className="bg-red-100 text-red-800">
-              Admin
-            </Badge>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" className="gap-2" onClick={loadAll} disabled={loading}>
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+              Reload
+            </Button>
+            <Badge variant="secondary" className="bg-red-100 text-red-800">Admin</Badge>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="gap-2">
-                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                    <span className="text-red-600">AD</span>
+                <Button variant="ghost" className="gap-2 h-9 px-2">
+                  <div className="w-7 h-7 bg-red-100 rounded-full flex items-center justify-center shrink-0">
+                    <span className="text-red-600 text-xs font-semibold">AD</span>
                   </div>
-                  <span>Administrator</span>
+                  <span className="text-sm max-w-[160px] truncate">{getAdminEmail()}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>Admin Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onLogout} className="cursor-pointer">
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                   <LogOut className="w-4 h-4 mr-2" />
                   Logout
                 </DropdownMenuItem>
@@ -212,67 +251,26 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
       {/* Main Content */}
       <div className="flex">
         {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-slate-200 min-h-[calc(100vh-73px)] p-4">
-          <nav className="space-y-2">
-            <button
-              onClick={() => setActiveTab("overview")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                activeTab === "overview"
-                  ? "bg-red-50 text-red-600"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <Activity className="w-5 h-5" />
-              <span>Overview</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("users")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                activeTab === "users"
-                  ? "bg-red-50 text-red-600"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <Users className="w-5 h-5" />
-              <span>User Management</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("orders")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                activeTab === "orders"
-                  ? "bg-red-50 text-red-600"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <ShoppingCart className="w-5 h-5" />
-              <span>Order Monitoring</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("system")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                activeTab === "system"
-                  ? "bg-red-50 text-red-600"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <Server className="w-5 h-5" />
-              <span>System Health</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("logs")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                activeTab === "logs"
-                  ? "bg-red-50 text-red-600"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <Activity className="w-5 h-5" />
-              <span>Activity Logs</span>
-            </button>
+        <aside className="w-52 bg-white border-r border-slate-200 min-h-[calc(100vh-57px)] p-3">
+          <nav className="space-y-1">
+            {[
+              { key: "overview", label: "Overview", icon: Activity },
+              { key: "users", label: "User Management", icon: Users },
+              { key: "orders", label: "Order Monitoring", icon: ShoppingCart },
+              { key: "system", label: "System Health", icon: Server },
+              { key: "logs", label: "Activity Logs", icon: Activity },
+            ].map((item) => (
+              <button
+                key={item.key}
+                onClick={() => setActiveTab(item.key)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                  activeTab === item.key ? "bg-red-50 text-red-600" : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <item.icon className="w-4 h-4" />
+                <span>{item.label}</span>
+              </button>
+            ))}
           </nav>
         </aside>
 
@@ -286,14 +284,18 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                 <p className="text-slate-600">Monitor your platform's health and activity</p>
               </div>
 
-              {/* System Alerts */}
-              <Alert className="border-amber-200 bg-amber-50">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <AlertTitle className="text-amber-900">System Alert</AlertTitle>
-                <AlertDescription className="text-amber-800">
-                  Payment gateway is experiencing degraded performance. Response times increased by 15%.
-                </AlertDescription>
-              </Alert>
+              {/* System Alerts — only shown when a component is degraded */}
+              {(health?.alerts.length ?? 0) > 0 && (
+                <Alert className="border-amber-200 bg-amber-50">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertTitle className="text-amber-900">System Alert</AlertTitle>
+                  <AlertDescription className="text-amber-800">
+                    <ul className="list-disc pl-4 space-y-1">
+                      {health!.alerts.map((a, i) => <li key={i}>{a}</li>)}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
 
               {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -305,12 +307,8 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                           <p className="text-slate-600 mb-1">{stat.title}</p>
                           <p className="text-slate-900">{stat.value}</p>
                         </div>
-                        <div className={`p-2 rounded-lg ${
-                          stat.status === "warning" ? "bg-amber-100" : "bg-blue-100"
-                        }`}>
-                          <stat.icon className={`w-5 h-5 ${
-                            stat.status === "warning" ? "text-amber-600" : "text-blue-600"
-                          }`} />
+                        <div className={`p-2 rounded-lg ${stat.status === "warning" ? "bg-amber-100" : "bg-blue-100"}`}>
+                          <stat.icon className={`w-5 h-5 ${stat.status === "warning" ? "text-amber-600" : "text-blue-600"}`} />
                         </div>
                       </div>
                     </CardContent>
@@ -332,29 +330,27 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                         <TableHead>Customer</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Reason</TableHead>
-                        <TableHead>Time</TableHead>
-                        <TableHead></TableHead>
+                        <TableHead>Date</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {flaggedOrders.map((order) => (
-                        <TableRow key={order.id}>
-                          <TableCell>{order.id}</TableCell>
-                          <TableCell>{order.customer}</TableCell>
-                          <TableCell>{order.amount}</TableCell>
+                      {flaggedOrders.slice(0, 8).map((order) => (
+                        <TableRow key={order.order_id}>
+                          <TableCell className="font-mono text-xs">{order.order_id}</TableCell>
+                          <TableCell>{order.user_id}</TableCell>
+                          <TableCell>${order.amount.toFixed(2)}</TableCell>
                           <TableCell>
-                            <Badge variant="secondary" className="bg-red-100 text-red-800">
-                              {order.reason}
-                            </Badge>
+                            <Badge variant="secondary" className="bg-red-100 text-red-800">{order.reason}</Badge>
                           </TableCell>
-                          <TableCell className="text-slate-500">{order.time}</TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="icon">
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
+                          <TableCell className="text-slate-500">{order.created_at}</TableCell>
                         </TableRow>
                       ))}
+                      {loading && flaggedOrders.length === 0 && (
+                        <TableRow><TableCell colSpan={5} className="text-center text-slate-500 py-8"><span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span></TableCell></TableRow>
+                      )}
+                      {!loading && flaggedOrders.length === 0 && (
+                        <TableRow><TableCell colSpan={5} className="text-center text-slate-500 py-8">No flagged orders</TableCell></TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -368,14 +364,12 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-slate-900 mb-1">User Management</h2>
-                  <p className="text-slate-600">View and manage all platform users</p>
+                  <p className="text-slate-600">View and manage all platform users ({users.length})</p>
                 </div>
-                <div>
-                  <Button variant="outline" size="sm" onClick={onCreateUser}>
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Add User
-                  </Button>
-                </div>
+                <Button size="sm" className="!text-white gap-2" style={{ backgroundColor: "#dc2626" }} onClick={onCreateUser}>
+                  <UserPlus className="w-4 h-4" />
+                  Add User
+                </Button>
               </div>
 
               <Card>
@@ -392,7 +386,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {recentUsers.map((user) => (
+                      {filteredUsers.map((user) => (
                         <TableRow key={user.id}>
                           <TableCell>{user.name}</TableCell>
                           <TableCell>{user.email}</TableCell>
@@ -400,34 +394,26 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                           <TableCell>
                             <div className="flex items-center gap-2">
                               {getStatusIcon(user.status)}
-                              <Badge variant="secondary" className={getStatusColor(user.status)}>
-                                {user.status}
-                              </Badge>
+                              <Badge variant="secondary" className={getStatusColor(user.status)}>{user.status}</Badge>
                             </div>
                           </TableCell>
                           <TableCell className="text-slate-500">{user.joined}</TableCell>
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <MoreVertical className="w-4 h-4" />
-                                </Button>
+                                <Button variant="ghost" size="icon"><MoreVertical className="w-4 h-4" /></Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem>
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => onEditUser?.(user.id)}>
                                   <Edit className="w-4 h-4 mr-2" />
                                   Edit User
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-amber-600">
+                                <DropdownMenuItem className="text-amber-600" onClick={() => handleSuspend(user)}>
                                   <Ban className="w-4 h-4 mr-2" />
-                                  Suspend Account
+                                  {user.status === "suspended" ? "Reactivate Account" : "Suspend Account"}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteClick(user.id, user.name)}>
+                                <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteClick(user.id, user.name, user.email)}>
                                   <Trash2 className="w-4 h-4 mr-2" />
                                   Delete User
                                 </DropdownMenuItem>
@@ -436,6 +422,12 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                           </TableCell>
                         </TableRow>
                       ))}
+                      {loading && filteredUsers.length === 0 && (
+                        <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-8"><span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span></TableCell></TableRow>
+                      )}
+                      {!loading && filteredUsers.length === 0 && (
+                        <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-8">No users found</TableCell></TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -448,13 +440,13 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
             <div className="space-y-6">
               <div>
                 <h2 className="text-slate-900 mb-1">Order Monitoring</h2>
-                <p className="text-slate-600">Monitor all orders and transactions</p>
+                <p className="text-slate-600">All orders across the platform ({orders.length})</p>
               </div>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Flagged Orders</CardTitle>
-                  <CardDescription>Orders requiring immediate attention</CardDescription>
+                  <CardTitle>All Orders</CardTitle>
+                  <CardDescription>Flagged rows require investigation</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -463,30 +455,32 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                         <TableHead>Order ID</TableHead>
                         <TableHead>Customer</TableHead>
                         <TableHead>Amount</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead>Reason</TableHead>
-                        <TableHead>Time</TableHead>
-                        <TableHead></TableHead>
+                        <TableHead>Date</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {flaggedOrders.map((order) => (
-                        <TableRow key={order.id}>
-                          <TableCell>{order.id}</TableCell>
-                          <TableCell>{order.customer}</TableCell>
-                          <TableCell>{order.amount}</TableCell>
+                      {orders.map((order) => (
+                        <TableRow key={order.order_id}>
+                          <TableCell className="font-mono text-xs">{order.order_id}</TableCell>
+                          <TableCell>{order.user_id}</TableCell>
+                          <TableCell>${order.amount.toFixed(2)}</TableCell>
                           <TableCell>
-                            <Badge variant="secondary" className="bg-red-100 text-red-800">
-                              {order.reason}
-                            </Badge>
+                            <Badge variant="secondary" className={getStatusColor(order.status)}>{order.status}</Badge>
                           </TableCell>
-                          <TableCell className="text-slate-500">{order.time}</TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="sm">
-                              Investigate
-                            </Button>
+                            <Badge variant="secondary" className={order.flagged ? "bg-red-100 text-red-800" : "bg-slate-100 text-slate-700"}>{order.reason}</Badge>
                           </TableCell>
+                          <TableCell className="text-slate-500">{order.created_at}</TableCell>
                         </TableRow>
                       ))}
+                      {loading && orders.length === 0 && (
+                        <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-8"><span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span></TableCell></TableRow>
+                      )}
+                      {!loading && orders.length === 0 && (
+                        <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-8">No orders found</TableCell></TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -499,40 +493,35 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
             <div className="space-y-6">
               <div>
                 <h2 className="text-slate-900 mb-1">System Health</h2>
-                <p className="text-slate-600">Monitor system components and performance</p>
+                <p className="text-slate-600">Live component status and metrics</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {systemHealth.map((system) => (
+                {(health?.components ?? []).map((system) => (
                   <Card key={system.name}>
                     <CardContent className="pt-6">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${
-                            system.status === "operational" ? "bg-green-100" : "bg-red-100"
-                          }`}>
-                            <system.icon className={`w-5 h-5 ${
-                              system.status === "operational" ? "text-green-600" : "text-red-600"
-                            }`} />
+                          <div className={`p-2 rounded-lg ${system.status === "operational" ? "bg-green-100" : "bg-red-100"}`}>
+                            <Server className={`w-5 h-5 ${system.status === "operational" ? "text-green-600" : "text-red-600"}`} />
                           </div>
                           <div>
                             <p className="text-slate-900">{system.name}</p>
-                            <p className="text-slate-500">Uptime: {system.uptime}</p>
+                            <p className="text-slate-500">{system.detail}</p>
                           </div>
                         </div>
-                        <Badge variant="secondary" className={getStatusColor(system.status)}>
-                          {system.status}
-                        </Badge>
+                        <Badge variant="secondary" className={getStatusColor(system.status)}>{system.status}</Badge>
                       </div>
                       <div className="flex items-center gap-2">
                         {getStatusIcon(system.status)}
-                        <span className="text-slate-600">
-                          {system.status === "operational" ? "All systems normal" : "Degraded performance"}
-                        </span>
+                        <span className="text-slate-600">{system.status === "operational" ? "All systems normal" : "Degraded performance"}</span>
                       </div>
                     </CardContent>
                   </Card>
                 ))}
+                {(!health || health.components.length === 0) && (
+                  <p className="text-slate-500">{loading ? "Loading..." : "No health data"}</p>
+                )}
               </div>
             </div>
           )}
@@ -542,7 +531,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
             <div className="space-y-6">
               <div>
                 <h2 className="text-slate-900 mb-1">Activity Logs</h2>
-                <p className="text-slate-600">View all system activities and user actions</p>
+                <p className="text-slate-600">Audit trail of system activities and admin actions</p>
               </div>
 
               <Card>
@@ -551,27 +540,33 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                     <TableHeader>
                       <TableRow>
                         <TableHead>Action</TableHead>
-                        <TableHead>User</TableHead>
+                        <TableHead>Actor</TableHead>
+                        <TableHead>Target</TableHead>
                         <TableHead>Timestamp</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {activityLogs.map((log) => (
+                      {logs.map((log) => (
                         <TableRow key={log.id}>
                           <TableCell>{log.action}</TableCell>
-                          <TableCell>{log.user}</TableCell>
+                          <TableCell>{log.actor}</TableCell>
+                          <TableCell className="text-slate-500">{log.target || "—"}</TableCell>
                           <TableCell className="text-slate-500">{log.timestamp}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               {getStatusIcon(log.status)}
-                              <Badge variant="secondary" className={getStatusColor(log.status)}>
-                                {log.status}
-                              </Badge>
+                              <Badge variant="secondary" className={getStatusColor(log.status)}>{log.status}</Badge>
                             </div>
                           </TableCell>
                         </TableRow>
                       ))}
+                      {loading && logs.length === 0 && (
+                        <TableRow><TableCell colSpan={5} className="text-center text-slate-500 py-8"><span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span></TableCell></TableRow>
+                      )}
+                      {!loading && logs.length === 0 && (
+                        <TableRow><TableCell colSpan={5} className="text-center text-slate-500 py-8">No activity yet</TableCell></TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>

@@ -133,6 +133,8 @@ services:
           - ~/api/uam/users/(?<userId>[^/]+)$
         strip_path: false
         methods:
+          - GET
+          - PUT
           - DELETE
           - OPTIONS
     plugins:
@@ -149,7 +151,7 @@ services:
       - name: cors
         config:
           origins: ['*']
-          methods: ['DELETE','OPTIONS']
+          methods: ['GET','PUT','DELETE','OPTIONS']
           headers: ['Authorization', 'Content-Type']
           credentials: true
 
@@ -493,6 +495,51 @@ services:
         methods:
           - GET
           - OPTIONS
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - Authorization:$http_authorization
+
+  - name: admin-orders-service
+    url: http://sale-service.default.svc.cluster.local:8080/v1/admin/orders
+    routes:
+      - name: admin-orders-route
+        paths:
+          - /api/admin/orders
+        strip_path: true
+        methods: [GET, OPTIONS]
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - Authorization:$http_authorization
+
+  - name: admin-audit-service
+    url: http://sale-service.default.svc.cluster.local:8080/v1/admin/audit
+    routes:
+      - name: admin-audit-route
+        paths:
+          - /api/admin/audit
+        strip_path: true
+        methods: [GET, POST, OPTIONS]
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - Authorization:$http_authorization
+
+  - name: admin-health-service
+    url: http://sale-service.default.svc.cluster.local:8080/v1/admin/health
+    routes:
+      - name: admin-health-route
+        paths:
+          - /api/admin/health
+        strip_path: true
+        methods: [GET, OPTIONS]
     plugins:
       - name: request-transformer
         config:

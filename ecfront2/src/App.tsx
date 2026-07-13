@@ -43,7 +43,6 @@ const AdminLoginPageWrapper: React.FC = () => {
   return (
     <AdminLoginPage
       onLogin={() => navigate('/admin/dashboard')}
-      onBackToSeller={() => navigate('/seller/login')}
     />
   );
 };
@@ -74,7 +73,7 @@ const EditUserPageWrapper: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   return (
     <EditUserPage
-      userId={Number(userId)}
+      userId={userId || ''}
       onBack={() => navigate('/admin/dashboard')}
       onUserUpdated={() => navigate('/admin/dashboard')}
     />

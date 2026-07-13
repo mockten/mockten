@@ -4,21 +4,34 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Shield, Lock, Mail } from "lucide-react";
+import { adminLogin } from "./adminApi";
 
 interface AdminLoginPageProps {
   onLogin: () => void;
-  onBackToSeller: () => void;
 }
 
-export function AdminLoginPage({ onLogin, onBackToSeller }: AdminLoginPageProps) {
+export function AdminLoginPage({ onLogin }: AdminLoginPageProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Admin login attempt:", { email, password });
-    // Simulate successful login
-    onLogin();
+    setError("");
+    setLoading(true);
+    try {
+      const res = await adminLogin(email, password);
+      if (res.ok) {
+        onLogin();
+      } else {
+        setError(res.error || "Login failed.");
+      }
+    } catch {
+      setError("An unexpected error occurred.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -50,7 +63,7 @@ export function AdminLoginPage({ onLogin, onBackToSeller }: AdminLoginPageProps)
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <Input
                     id="admin-email"
-                    type="email"
+                    type="text"
                     placeholder="admin@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -80,33 +93,29 @@ export function AdminLoginPage({ onLogin, onBackToSeller }: AdminLoginPageProps)
               {/* Warning Message */}
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="text-amber-800">
-                  <strong>Warning:</strong> This area is for authorized personnel only. 
+                  <strong>Warning:</strong> This area is for authorized personnel only.
                   All access is logged and monitored.
                 </p>
               </div>
 
+              {error && <p className="text-red-600 text-sm">{error}</p>}
+
               {/* Login Button */}
-              <Button type="submit" className="w-full bg-red-600 hover:bg-red-700">
-                Access Admin Panel
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full !text-white"
+                style={{ backgroundColor: "#dc2626" }}
+              >
+                {loading ? "Signing in..." : "Access Admin Panel"}
               </Button>
             </form>
-
-            {/* Back to Seller Link */}
-            <div className="mt-6 text-center">
-              <button
-                type="button"
-                onClick={onBackToSeller}
-                className="text-slate-600 hover:text-slate-900 transition-colors"
-              >
-                ← Back to Seller Login
-              </button>
-            </div>
           </CardContent>
         </Card>
 
         {/* Footer */}
         <div className="mt-8 text-center text-slate-500">
-          <p>© 2025 EC Site. All rights reserved.</p>
+          <p>© 2026 EC Site. All rights reserved.</p>
         </div>
       </div>
     </div>

@@ -186,13 +186,6 @@ export function SellerLoginPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center space-y-3">
-          <button
-            type="button"
-            onClick={() => navigate("/admin/login")}
-            className="text-slate-400 hover:text-slate-600 transition-colors text-sm"
-          >
-            Admin Access
-          </button>
           <p className="text-slate-500">© 2026 EC Site. All rights reserved.</p>
         </div>
       </div>

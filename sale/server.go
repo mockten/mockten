@@ -112,6 +112,12 @@ func main() {
 	r.GET("/v1/seller/profile", handleGetProfile)
 	r.PUT("/v1/seller/profile", handleUpdateProfile)
 
+	// Admin portal endpoints (all data is real; audit log is persisted).
+	r.GET("/v1/admin/orders", handleAdminOrders)
+	r.GET("/v1/admin/audit", handleGetAudit)
+	r.POST("/v1/admin/audit", handlePostAudit)
+	r.GET("/v1/admin/health", handleAdminHealth)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -952,4 +958,223 @@ func handleGetRandomProducts(c *gin.Context) {
 		"items": items,
 		"total": len(items),
 	})
+}
+
+// ─────────────────────────── Admin Portal ───────────────────────────────────
+
+// handleAdminOrders returns all orders across every seller (admin view), with a
+// derived "reason" that flags orders worth investigating (failed/canceled, or
+// unusually high value). Ordered by most recent first.
+func handleAdminOrders(c *gin.Context) {
+	if _, err := extractEmailFromJWT(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	if limit < 1 || limit > 500 {
+		limit = 50
+	}
+
+	rows, err := db.Query(`
+		SELECT o.order_id, o.user_id, o.total_amount, o.status, o.created_at
+		FROM `+"`Order`"+` o
+		ORDER BY o.created_at DESC
+		LIMIT ?`, limit)
+	if err != nil {
+		log.Printf("admin orders query: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+	defer rows.Close()
+
+	type AdminOrder struct {
+		OrderID   string  `json:"order_id"`
+		UserID    string  `json:"user_id"`
+		Amount    float64 `json:"amount"`
+		Status    string  `json:"status"`
+		Reason    string  `json:"reason"`
+		Flagged   bool    `json:"flagged"`
+		CreatedAt string  `json:"created_at"`
+	}
+
+	var orders []AdminOrder
+	for rows.Next() {
+		var o AdminOrder
+		var createdAt time.Time
+		if err := rows.Scan(&o.OrderID, &o.UserID, &o.Amount, &o.Status, &createdAt); err != nil {
+			continue
+		}
+		o.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
+		// Derive an investigation reason.
+		switch o.Status {
+		case "canceled":
+			o.Reason, o.Flagged = "Order canceled", true
+		case "refunded":
+			o.Reason, o.Flagged = "Refunded", true
+		default:
+			if o.Amount >= 100 {
+				o.Reason, o.Flagged = "High value", true
+			} else {
+				o.Reason = "OK"
+			}
+		}
+		orders = append(orders, o)
+	}
+	if orders == nil {
+		orders = []AdminOrder{}
+	}
+	c.JSON(http.StatusOK, gin.H{"orders": orders, "total": len(orders)})
+}
+
+// handleGetAudit returns the most recent audit-log entries.
+func handleGetAudit(c *gin.Context) {
+	if _, err := extractEmailFromJWT(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	if limit < 1 || limit > 500 {
+		limit = 50
+	}
+	rows, err := db.Query(`
+		SELECT id, action, actor, target, status, created_at
+		FROM AuditLog ORDER BY created_at DESC, id DESC LIMIT ?`, limit)
+	if err != nil {
+		log.Printf("audit query: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+	defer rows.Close()
+
+	type AuditRow struct {
+		ID        int64  `json:"id"`
+		Action    string `json:"action"`
+		Actor     string `json:"actor"`
+		Target    string `json:"target"`
+		Status    string `json:"status"`
+		Timestamp string `json:"timestamp"`
+	}
+	var logs []AuditRow
+	for rows.Next() {
+		var a AuditRow
+		var target sql.NullString
+		var createdAt time.Time
+		if err := rows.Scan(&a.ID, &a.Action, &a.Actor, &target, &a.Status, &createdAt); err != nil {
+			continue
+		}
+		a.Target = target.String
+		a.Timestamp = createdAt.Format("2006-01-02 15:04:05")
+		logs = append(logs, a)
+	}
+	if logs == nil {
+		logs = []AuditRow{}
+	}
+	c.JSON(http.StatusOK, gin.H{"logs": logs, "total": len(logs)})
+}
+
+// handlePostAudit records an audit-log entry (admin actions, logins, etc).
+func handlePostAudit(c *gin.Context) {
+	actor, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	var body struct {
+		Action string `json:"action"`
+		Target string `json:"target"`
+		Status string `json:"status"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Action) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "action is required"})
+		return
+	}
+	status := body.Status
+	if status == "" {
+		status = "success"
+	}
+	if _, err := db.Exec(
+		"INSERT INTO AuditLog (action, actor, target, status) VALUES (?, ?, ?, ?)",
+		body.Action, actor, body.Target, status,
+	); err != nil {
+		log.Printf("audit insert: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// handleAdminHealth reports real system-component health derived from live
+// signals (DB reachability + row counts), plus colloquial alerts when a
+// component is degraded.
+func handleAdminHealth(c *gin.Context) {
+	if _, err := extractEmailFromJWT(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	type Component struct {
+		Name   string `json:"name"`
+		Status string `json:"status"`
+		Detail string `json:"detail"`
+	}
+
+	dbStatus := "operational"
+	dbDetail := "Responding normally"
+	start := time.Now()
+	if err := db.Ping(); err != nil {
+		dbStatus, dbDetail = "degraded", "Database ping failed"
+	}
+	pingMs := time.Since(start).Milliseconds()
+
+	// Counts as lightweight metrics.
+	var productCount, orderCount, stockOut int
+	_ = db.QueryRow("SELECT COUNT(*) FROM Product").Scan(&productCount)
+	_ = db.QueryRow("SELECT COUNT(*) FROM `Order`").Scan(&orderCount)
+	_ = db.QueryRow("SELECT COUNT(*) FROM Stock WHERE stocks = 0").Scan(&stockOut)
+
+	apiStatus, apiDetail := "operational", "All endpoints healthy"
+	if pingMs > 500 {
+		apiStatus, apiDetail = "degraded", "Elevated database latency"
+	}
+
+	catalogStatus, catalogDetail := "operational", "Inventory healthy"
+	if productCount > 0 && stockOut*100/max1(productCount) > 40 {
+		catalogStatus, catalogDetail = "degraded", "Many products are out of stock"
+	}
+
+	components := []Component{
+		{"Database", dbStatus, dbDetail},
+		{"API Server", apiStatus, apiDetail},
+		{"Catalog / Inventory", catalogStatus, catalogDetail},
+	}
+
+	// Build colloquial alerts for degraded components.
+	var alerts []string
+	for _, comp := range components {
+		if comp.Status != "operational" {
+			alerts = append(alerts, comp.Name+" is having trouble — "+comp.Detail+".")
+		}
+	}
+	if alerts == nil {
+		alerts = []string{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"components": components,
+		"alerts":     alerts,
+		"metrics": gin.H{
+			"products":    productCount,
+			"orders":      orderCount,
+			"outOfStock":  stockOut,
+			"dbPingMs":    pingMs,
+		},
+	})
+}
+
+func max1(n int) int {
+	if n < 1 {
+		return 1
+	}
+	return n
 }

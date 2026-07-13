@@ -13,6 +13,7 @@ import {
 import { Textarea } from "./ui/textarea";
 import { ArrowLeft, UserPlus, Mail, Lock, User, Building, Phone } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
+import { createUser } from "./adminApi";
 
 interface CreateUserPageProps {
   onBack: () => void;
@@ -35,6 +36,7 @@ export function CreateUserPage({ onBack, onUserCreated }: CreateUserPageProps) {
 
   const [showSuccess, setShowSuccess] = useState(false);
   const [passwordError, setPasswordError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -43,28 +45,46 @@ export function CreateUserPage({ onBack, onUserCreated }: CreateUserPageProps) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Password validation
+
     if (formData.password !== formData.confirmPassword) {
       setPasswordError("Passwords do not match");
       return;
     }
-
     if (formData.password.length < 8) {
       setPasswordError("Password must be at least 8 characters");
       return;
     }
 
-    console.log("Creating user:", formData);
-    setShowSuccess(true);
-
-    // Reset form and redirect after success message
-    setTimeout(() => {
-      setShowSuccess(false);
-      onUserCreated();
-    }, 2000);
+    setSubmitting(true);
+    setPasswordError("");
+    try {
+      const res = await createUser({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+        enabled: formData.status !== "suspended" && formData.status !== "inactive",
+        phone: formData.phone,
+        companyName: formData.companyName,
+        notes: formData.notes,
+      });
+      if (!res.ok) {
+        setPasswordError(res.error || "Failed to create user.");
+        setSubmitting(false);
+        return;
+      }
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        onUserCreated();
+      }, 1200);
+    } catch {
+      setPasswordError("An unexpected error occurred.");
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -83,12 +103,12 @@ export function CreateUserPage({ onBack, onUserCreated }: CreateUserPageProps) {
             </Button>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 bg-red-600 rounded-lg">
-              <UserPlus className="w-6 h-6 text-white" />
+            <div className="flex items-center justify-center w-9 h-9 bg-red-600 rounded-lg shrink-0">
+              <UserPlus className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-slate-900">Create New User</h1>
-              <p className="text-slate-500">Add a new user to the platform</p>
+              <h1 className="font-bold leading-tight text-slate-900" style={{ fontSize: "1.25rem", lineHeight: 1.2 }}>Create New User</h1>
+              <p className="text-xs text-slate-500 leading-tight">Add a new user to the platform</p>
             </div>
           </div>
         </div>
@@ -315,10 +335,12 @@ export function CreateUserPage({ onBack, onUserCreated }: CreateUserPageProps) {
             </Button>
             <Button
               type="submit"
-              className="bg-red-600 hover:bg-red-700"
+              disabled={submitting}
+              className="!text-white"
+              style={{ backgroundColor: "#dc2626" }}
             >
               <UserPlus className="w-4 h-4 mr-2" />
-              Create User
+              {submitting ? "Creating..." : "Create User"}
             </Button>
           </div>
         </form>

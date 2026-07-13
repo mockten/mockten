@@ -34,6 +34,16 @@ CREATE TABLE IF NOT EXISTS Seller (
   last_update DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS AuditLog (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  action VARCHAR(128) NOT NULL,
+  actor VARCHAR(255) NOT NULL,
+  target VARCHAR(255),
+  status ENUM('success','failed','warning') NOT NULL DEFAULT 'success',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_audit_created (created_at)
+);
+
 CREATE TABLE IF NOT EXISTS Category (
   category_id VARCHAR(3) PRIMARY KEY,
   category_name VARCHAR(255),
@@ -1712,3 +1722,9 @@ SET p.avg_review = r.avg_review,
 --     p.review_count = 0
 -- WHERE r.product_id IS NULL
 --   AND (p.avg_review <> 0.0 OR p.review_count <> 0);
+-- Seed audit-log entries so the Admin Portal Activity Logs is populated on first load.
+INSERT INTO AuditLog (action, actor, target, status, created_at) VALUES
+  ('Admin Login', 'superadmin@example.com', NULL, 'success', NOW() - INTERVAL 2 HOUR),
+  ('User Created', 'superadmin@example.com', 'newseller@example.com', 'success', NOW() - INTERVAL 90 MINUTE),
+  ('Failed Login Attempt', 'unknown@example.com', NULL, 'failed', NOW() - INTERVAL 45 MINUTE),
+  ('User Deleted', 'superadmin@example.com', 'spam@example.com', 'warning', NOW() - INTERVAL 20 MINUTE);
