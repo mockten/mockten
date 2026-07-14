@@ -1,14 +1,23 @@
 # redis
 
-In-memory cache and cart backing store (Redis).
+In-memory cache and cart/ranking backing store (Redis).
 
-`redis` provides low-latency key/value storage for the platform. Its primary consumer is the [`cart`](../cart) service, which persists each user's shopping cart here so it survives between sessions.
+`redis` provides low-latency key/value storage for the platform. Its main consumers are [`cart`](../cart) (persists each user's shopping cart so it survives between sessions) and [`ranking`](../ranking) (monthly sorted sets of product scores updated on each purchase).
 
-## Contents
+## Layout
 
-- `Dockerfile` — Redis image with any mockten-specific configuration.
+```
+redis/
+├── redis.conf   # mockten-specific Redis configuration
+└── Dockerfile   # Redis image
+```
 
 ## Usage
 
-- Cart items are stored keyed by user with a configurable TTL (see `cart`'s `getenvDurationSeconds`).
+- **Cart** — cart items are stored keyed by user id with a configurable TTL (see `cart`'s `getenvDurationSeconds`).
+- **Ranking** — best-seller rankings live in sorted sets keyed `ranking:<month>:<category>` (and `…:all`).
 - Reached in-cluster at `redis-service.default.svc.cluster.local:6379`.
+
+## Configuration
+
+Tune persistence, memory limits, and eviction policy in `redis.conf`; the value is applied when the container starts.

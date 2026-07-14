@@ -2,16 +2,27 @@
 
 S3-compatible object storage ([MinIO](https://min.io/)).
 
-`minIO` stores the platform's binary assets:
+`minIO` stores the platform's binary assets and the ML lakehouse data.
 
-- **Product images** — uploaded by sellers and served to the storefront (via the `/api/storage/*` paths).
-- **ML model artifacts** — the trained recommendation model published by the [`airflow`](../airflow) pipeline and loaded by [`recommendation`](../recommendation).
+## Layout
 
-## Contents
+```
+minIO/
+├── init.sh    # creates buckets and sets access policies at startup
+├── photos/    # local seed product images (gitignored contents)
+└── Dockerfile # MinIO image with mockten bucket configuration
+```
 
-- `Dockerfile` — MinIO image with mockten bucket configuration.
+## What's stored
+
+| Asset | Location | Producer → Consumer |
+|-------|----------|---------------------|
+| Product images | `photos/<product_id>.png` (+ `<product_id>/1.png`, `/2.png`) | Sellers upload via [`sale`](../sale) → storefront serves via `/api/storage/*` |
+| Category placeholders | `photos/category_<category_id>.png` | fallback images for recommendations |
+| ETL data | `mockten-bronze` / `mockten-silver` / `mockten-gold` buckets (Parquet) | [`airflow`](../airflow) pipeline stages |
+| ML model | `models/` bucket (`svd_model.pkl`, `metrics.json`) | [`airflow`](../airflow) trains → [`recommendation`](../recommendation) hot-reloads |
 
 ## Usage
 
-- Reached in-cluster at `minio-service.default.svc.cluster.local:9000`.
-- Product images are stored as `<product_id>.png`; category placeholders as `category_<category_id>.png`.
+- `init.sh` creates the buckets and applies access policies when the container starts.
+- Reached in-cluster at `minio-service.default.svc.cluster.local:9000`; the storefront reaches product images through the Kong `/api/storage` proxy so MinIO credentials are never exposed to the browser.

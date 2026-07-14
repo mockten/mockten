@@ -1701,6 +1701,25 @@ const API_DESCRIPTIONS = {
 
   'GET /api/seller/categories':
     'Returns the complete list of product categories from MySQL, ordered by name. Used by the seller portal to populate the category dropdown when creating or editing products. Requires a valid seller Bearer token.',
+
+  // Admin Portal
+  'GET /api/admin/orders':
+    'Returns the paginated list of <em>flagged</em> orders for the Admin Portal\'s Order Monitoring view. The <code>sale</code> Go service scans recent orders and flags each one with a derived reason: <code>Failed / canceled</code> (status canceled/refunded/failed), <code>Unusual location</code> (shipping destination in an EU country, resolved via the <code>Geo</code> table), <code>Multiple rapid orders</code> (≥3 orders by the same user within 15 minutes), or <code>High value</code> (amount ≥ $200). Only flagged orders are returned. Requires an admin Bearer token.',
+
+  'GET /api/admin/audit':
+    'Returns the paginated platform audit trail (most recent first) for the Admin Portal\'s Activity Logs view. Each entry records an action, the actor (email from the JWT), an optional target, a status (success/failure/warning), and a timestamp, read from the <code>AuditLog</code> MySQL table. Supports <code>page</code> / <code>limit</code> query params. Requires an admin Bearer token.',
+
+  'POST /api/admin/audit':
+    'Appends an entry to the platform audit trail (<code>AuditLog</code> table). The actor is taken from the caller\'s JWT; the body supplies the <code>action</code> (required), an optional <code>target</code>, and an optional <code>status</code> (defaults to <code>success</code>). Used across the platform to record security-relevant events such as logins, order placement, and admin operations. Requires any valid Bearer token.',
+
+  'GET /api/admin/health':
+    'Returns live system-health for the Admin Portal\'s System Health / System Alerts panels. The <code>sale</code> Go service derives each component\'s status from real signals — database reachability and table row counts (e.g. the Catalog/Inventory component reflects the out-of-stock ratio) — and emits colloquial alerts when a component is degraded, plus summary metrics. Requires an admin Bearer token.',
+
+  'GET /api/uam/users/([^/]+)':
+    'Fetches a single Keycloak user by UUID via the Admin REST API (the <code>userId</code> path segment is the Keycloak user id). Used by the Admin Portal\'s Edit User screen to prefill the form, including custom attributes such as <code>storeName</code>. Kong forwards the admin Bearer token and rewrites the URI to the Keycloak admin endpoint.',
+
+  'PUT /api/uam/users/([^/]+)':
+    'Updates a single Keycloak user by UUID via the Admin REST API. Used by the Admin Portal\'s Edit User screen to save changes to name, email, enabled state, and custom attributes (e.g. <code>storeName</code>). The <code>userId</code> path segment is the Keycloak user id. Requires an admin Bearer token forwarded by Kong.',
 };
 
 const API_DESCRIPTIONS_JA = {
@@ -1768,6 +1787,14 @@ const API_DESCRIPTIONS_JA = {
   'GET /api/seller/profile': 'JWTから取得したセラーのメールアドレスをキーに<code>Seller</code>テーブルからストア名とベンダー説明を返します。未設定の場合はサインアップ時のstoreName属性をフォールバックとして返します。有効なセラーJWTが必要です。',
   'PUT /api/seller/profile': '認証済みセラーのストア名を作成または更新します（<code>INSERT … ON DUPLICATE KEY UPDATE</code>）。有効なセラーJWTが必要です。',
   'GET /api/seller/categories': 'MySQLから商品カテゴリの全リストを名前順で返します。商品作成・編集時のカテゴリドロップダウンに使用されます。有効なセラーJWTが必要です。',
+
+  // Admin Portal
+  'GET /api/admin/orders': 'Admin PortalのOrder Monitoring用に、<em>フラグ付き</em>注文のページネーションリストを返します。<code>sale</code>サービスが最近の注文を走査し、理由を付与します: <code>Failed / canceled</code>（キャンセル/返金/失敗）、<code>Unusual location</code>（EU圏への配送、<code>Geo</code>テーブルで判定）、<code>Multiple rapid orders</code>（同一ユーザーが15分以内に3件以上）、<code>High value</code>（金額200ドル以上）。フラグ付きの注文のみ返します。管理者Bearerトークンが必要です。',
+  'GET /api/admin/audit': 'Admin PortalのActivity Logs用に、プラットフォーム監査ログ（新しい順）をページネーションで返します。各エントリはaction、actor（JWTのメール）、target（任意）、status（success/failure/warning）、タイムスタンプを<code>AuditLog</code>テーブルから読み取ります。<code>page</code>/<code>limit</code>クエリに対応。管理者Bearerトークンが必要です。',
+  'POST /api/admin/audit': 'プラットフォーム監査ログ（<code>AuditLog</code>テーブル）にエントリを追加します。actorは呼び出し元のJWTから取得。ボディで<code>action</code>（必須）、<code>target</code>（任意）、<code>status</code>（省略時<code>success</code>）を指定します。ログイン・注文確定・管理操作などのセキュリティ関連イベントの記録に使用します。有効なBearerトークンが必要です。',
+  'GET /api/admin/health': 'Admin PortalのSystem Health / System Alertsパネル用に、リアルタイムのシステムヘルスを返します。<code>sale</code>サービスが各コンポーネントの状態を実シグナル（DB到達性・テーブル行数。例: Catalog/Inventoryは在庫切れ比率を反映）から算出し、劣化時には口語的なアラートとサマリメトリクスを出力します。管理者Bearerトークンが必要です。',
+  'GET /api/uam/users/([^/]+)': 'Admin REST APIでKeycloakユーザーをUUID指定で1件取得します（<code>userId</code>パスがKeycloakユーザーID）。Admin PortalのEdit User画面で、<code>storeName</code>などのカスタム属性を含むフォームの事前入力に使用します。Kongが管理者Bearerトークンを転送しURIを書き換えます。',
+  'PUT /api/uam/users/([^/]+)': 'Admin REST APIでKeycloakユーザーをUUID指定で1件更新します。Admin PortalのEdit User画面で、氏名・メール・有効状態・カスタム属性（例<code>storeName</code>）の変更保存に使用します。<code>userId</code>パスがKeycloakユーザーID。管理者Bearerトークンが必要です。',
 };
 
 const API_DESCRIPTIONS_ZH = {
@@ -1835,6 +1862,14 @@ const API_DESCRIPTIONS_ZH = {
   'GET /api/seller/profile': '从<code>Seller</code>表返回已认证卖家的店铺名称和供应商描述。若尚未设置，则回退到注册时的storeName属性。需要有效的卖家Bearer令牌。',
   'PUT /api/seller/profile': '创建或更新已认证卖家的店铺名称（使用<code>INSERT … ON DUPLICATE KEY UPDATE</code>）。需要有效的卖家Bearer令牌。',
   'GET /api/seller/categories': '从MySQL按名称顺序返回商品分类完整列表，用于创建或编辑商品时的分类下拉菜单。需要有效的卖家Bearer令牌。',
+
+  // Admin Portal
+  'GET /api/admin/orders': '为Admin Portal的订单监控视图返回分页的<em>已标记</em>订单列表。<code>sale</code>服务扫描近期订单并为每个订单附加原因：<code>Failed / canceled</code>（已取消/退款/失败）、<code>Unusual location</code>（配送目的地为欧盟国家，通过<code>Geo</code>表判定）、<code>Multiple rapid orders</code>（同一用户15分钟内≥3单）、<code>High value</code>（金额≥200美元）。仅返回已标记订单。需要管理员Bearer令牌。',
+  'GET /api/admin/audit': '为Admin Portal的活动日志视图返回分页的平台审计记录（最新优先）。每条记录包含action、actor（JWT中的邮箱）、可选target、status（success/failure/warning）和时间戳，读取自<code>AuditLog</code>表。支持<code>page</code>/<code>limit</code>查询参数。需要管理员Bearer令牌。',
+  'POST /api/admin/audit': '向平台审计记录（<code>AuditLog</code>表）追加一条记录。actor取自调用方JWT；请求体提供<code>action</code>（必填）、可选<code>target</code>、可选<code>status</code>（默认<code>success</code>）。用于记录登录、下单、管理操作等安全相关事件。需要有效的Bearer令牌。',
+  'GET /api/admin/health': '为Admin Portal的系统健康/系统告警面板返回实时系统健康状态。<code>sale</code>服务根据真实信号（数据库可达性与表行数，例如Catalog/Inventory反映缺货比例）推导各组件状态，组件劣化时输出口语化告警及汇总指标。需要管理员Bearer令牌。',
+  'GET /api/uam/users/([^/]+)': '通过Admin REST API按UUID获取单个Keycloak用户（<code>userId</code>路径段为Keycloak用户ID）。用于Admin Portal的编辑用户界面预填表单，包括<code>storeName</code>等自定义属性。Kong转发管理员Bearer令牌并重写URI。',
+  'PUT /api/uam/users/([^/]+)': '通过Admin REST API按UUID更新单个Keycloak用户。用于Admin Portal的编辑用户界面保存姓名、邮箱、启用状态及自定义属性（如<code>storeName</code>）。<code>userId</code>路径段为Keycloak用户ID。需要管理员Bearer令牌。',
 };
 
 const API_SCHEMAS = {
@@ -2115,6 +2150,36 @@ const API_SCHEMAS = {
   // ── Storage ─────────────────────────────────────────────────────────────────
   'GET /api/storage': [
     { name: 'path', location: 'path', type: 'string', desc: 'Photo filename (appended to URL)', desc_ja: '画像ファイル名（URLに付加）', desc_zh: '图片文件名（附加到URL）', required: true, default: '__first_product_id_png__' }
+  ],
+
+  // ── Admin Portal ────────────────────────────────────────────────────────────
+  'GET /api/admin/orders': [
+    '__auth__',
+    { name: 'page',  location: 'query', type: 'integer', desc: 'Page number (1-based)', desc_ja: 'ページ番号（1始まり）', desc_zh: '页码（从1开始）', required: false, default: 1 },
+    { name: 'limit', location: 'query', type: 'integer', desc: 'Flagged orders per page (max 100)', desc_ja: '1ページあたりのフラグ付き注文数（最大100）', desc_zh: '每页已标记订单数（最多100）', required: false, default: 10 }
+  ],
+  'GET /api/admin/audit': [
+    '__auth__',
+    { name: 'page',  location: 'query', type: 'integer', desc: 'Page number (1-based)', desc_ja: 'ページ番号（1始まり）', desc_zh: '页码（从1开始）', required: false, default: 1 },
+    { name: 'limit', location: 'query', type: 'integer', desc: 'Audit entries per page', desc_ja: '1ページあたりの監査エントリ数', desc_zh: '每页审计条数', required: false, default: 10 }
+  ],
+  'POST /api/admin/audit': [
+    '__auth__',
+    { name: 'action', location: 'body', type: 'string', desc: 'Action name to record (required)', desc_ja: '記録するアクション名（必須）', desc_zh: '要记录的操作名称（必填）', required: true,  default: 'Manual Test Event' },
+    { name: 'target', location: 'body', type: 'string', desc: 'Optional target the action applies to', desc_ja: 'アクション対象（任意）', desc_zh: '操作作用的目标（可选）', required: false, default: 'order:demo-0001' },
+    { name: 'status', location: 'body', type: 'string', desc: 'Outcome: success / failure / warning (defaults to success)', desc_ja: '結果: success / failure / warning（省略時success）', desc_zh: '结果：success / failure / warning（默认success）', required: false, default: 'success' }
+  ],
+  'GET /api/admin/health': [
+    '__auth__'
+  ],
+  'GET /api/uam/users/([^/]+)': [
+    '__auth__',
+    { name: 'userId', location: 'path', type: 'string', desc: 'Keycloak user UUID (auto-filled with a real dev_user_* id)', desc_ja: 'KeycloakユーザーUUID（実在のdev_user_*で自動入力）', desc_zh: 'Keycloak用户UUID（自动填充真实dev_user_*）', required: true, default: '__first_user_id__' }
+  ],
+  'PUT /api/uam/users/([^/]+)': [
+    '__auth__',
+    { name: 'userId',  location: 'path', type: 'string',  desc: 'Keycloak user UUID (auto-filled with a real dev_user_* id)', desc_ja: 'KeycloakユーザーUUID（実在のdev_user_*で自動入力）', desc_zh: 'Keycloak用户UUID（自动填充真实dev_user_*）', required: true, default: '__first_user_id__' },
+    { name: 'enabled', location: 'body', type: 'boolean', desc: 'Whether the account is enabled (partial update)', desc_ja: 'アカウント有効フラグ（部分更新）', desc_zh: '账号是否启用（部分更新）', required: false, default: true }
   ]
 };
 
@@ -2431,6 +2496,57 @@ const API_RESPONSE_SCHEMAS = {
     { field: 'slowApis[].path',            type: 'string',  desc: 'Normalized request path',                                             desc_ja: '正規化リクエストパス',                                             desc_zh: '标准化请求路径' },
     { field: 'slowApis[].avgMs',           type: 'integer', desc: 'Average response time in milliseconds',                               desc_ja: '平均レスポンス時間（ミリ秒）',                                     desc_zh: '平均响应时间（毫秒）' },
     { field: 'slowApis[].sampleCount',     type: 'integer', desc: 'Number of samples used for the average',                              desc_ja: '平均算出に使用したサンプル数',                                     desc_zh: '用于计算平均值的样本数量' },
+  ],
+
+  // ── Admin Portal ────────────────────────────────────────────────────────────
+  'GET /api/admin/orders': [
+    { field: 'orders',              type: 'array',   desc: 'Flagged orders for the current page',        desc_ja: '現在ページのフラグ付き注文',        desc_zh: '当前页的已标记订单' },
+    { field: 'orders[].order_id',   type: 'string',  desc: 'Order UUID',                                 desc_ja: '注文UUID',                          desc_zh: '订单UUID' },
+    { field: 'orders[].user_id',    type: 'string',  desc: 'Buyer identifier (email)',                   desc_ja: '購入者識別子（メール）',            desc_zh: '买家标识（邮箱）' },
+    { field: 'orders[].amount',     type: 'number',  desc: 'Order total amount',                         desc_ja: '注文合計金額',                      desc_zh: '订单总金额' },
+    { field: 'orders[].status',     type: 'string',  desc: 'Order status (paid / canceled / …)',         desc_ja: '注文ステータス（paid / canceled など）', desc_zh: '订单状态（paid / canceled 等）' },
+    { field: 'orders[].country',    type: 'string',  desc: 'Shipping destination country code (if any)', desc_ja: '配送先国コード（あれば）',          desc_zh: '配送目的地国家代码（如有）' },
+    { field: 'orders[].reason',     type: 'string',  desc: 'Why the order was flagged',                  desc_ja: 'フラグ付けの理由',                  desc_zh: '被标记的原因' },
+    { field: 'orders[].flagged',    type: 'boolean', desc: 'Always true in this list',                   desc_ja: 'このリストでは常にtrue',            desc_zh: '此列表中始终为true' },
+    { field: 'orders[].created_at', type: 'string',  desc: 'Order creation timestamp',                   desc_ja: '注文作成日時',                      desc_zh: '订单创建时间' },
+    { field: 'total',               type: 'integer', desc: 'Total number of flagged orders',             desc_ja: 'フラグ付き注文の総数',              desc_zh: '已标记订单总数' },
+    { field: 'page',                type: 'integer', desc: 'Current page number',                        desc_ja: '現在のページ番号',                  desc_zh: '当前页码' },
+    { field: 'limit',               type: 'integer', desc: 'Page size',                                  desc_ja: 'ページサイズ',                      desc_zh: '每页大小' },
+  ],
+  'GET /api/admin/audit': [
+    { field: 'logs',              type: 'array',   desc: 'Audit entries, newest first',   desc_ja: '監査エントリ（新しい順）',   desc_zh: '审计条目（最新优先）' },
+    { field: 'logs[].id',         type: 'integer', desc: 'Audit row id',                  desc_ja: '監査行ID',                   desc_zh: '审计行ID' },
+    { field: 'logs[].action',     type: 'string',  desc: 'Recorded action name',          desc_ja: '記録されたアクション名',      desc_zh: '记录的操作名称' },
+    { field: 'logs[].actor',      type: 'string',  desc: 'Who performed the action (email)', desc_ja: '実行者（メール）',          desc_zh: '执行者（邮箱）' },
+    { field: 'logs[].target',     type: 'string',  desc: 'Target the action applied to',  desc_ja: 'アクション対象',             desc_zh: '操作作用的目标' },
+    { field: 'logs[].status',     type: 'string',  desc: 'success / failure / warning',   desc_ja: 'success / failure / warning', desc_zh: 'success / failure / warning' },
+    { field: 'logs[].created_at', type: 'string',  desc: 'When the event occurred',       desc_ja: 'イベント発生日時',           desc_zh: '事件发生时间' },
+    { field: 'total',             type: 'integer', desc: 'Total audit entries',           desc_ja: '監査エントリ総数',           desc_zh: '审计条目总数' },
+    { field: 'page',              type: 'integer', desc: 'Current page number',           desc_ja: '現在のページ番号',           desc_zh: '当前页码' },
+    { field: 'limit',             type: 'integer', desc: 'Page size',                     desc_ja: 'ページサイズ',               desc_zh: '每页大小' },
+  ],
+  'POST /api/admin/audit': [
+    { field: 'success', type: 'boolean', desc: 'true when the audit entry was recorded', desc_ja: '監査エントリ記録成功時にtrue', desc_zh: '审计条目记录成功时为true' },
+  ],
+  'GET /api/admin/health': [
+    { field: 'components',          type: 'array',   desc: 'Per-component health',                       desc_ja: 'コンポーネント別ヘルス',    desc_zh: '各组件健康状态' },
+    { field: 'components[].name',   type: 'string',  desc: 'Component name (Database / API Server / Catalog-Inventory)', desc_ja: 'コンポーネント名（Database / API Server / Catalog-Inventory）', desc_zh: '组件名称（Database / API Server / Catalog-Inventory）' },
+    { field: 'components[].status', type: 'string',  desc: 'healthy / degraded / down',                  desc_ja: 'healthy / degraded / down', desc_zh: 'healthy / degraded / down' },
+    { field: 'components[].detail', type: 'string',  desc: 'Human-readable detail for the component',    desc_ja: 'コンポーネントの詳細説明',  desc_zh: '组件的可读详情' },
+    { field: 'alerts',              type: 'array',   desc: 'Colloquial alert messages for degraded components', desc_ja: '劣化コンポーネントの口語的アラート', desc_zh: '劣化组件的口语化告警' },
+    { field: 'metrics',             type: 'object',  desc: 'Summary metrics (counts / ratios)',          desc_ja: 'サマリメトリクス（件数・比率）', desc_zh: '汇总指标（数量/比例）' },
+  ],
+  'GET /api/uam/users/([^/]+)': [
+    { field: 'id',         type: 'string',  desc: 'Keycloak user UUID',                 desc_ja: 'KeycloakユーザーUUID',      desc_zh: 'Keycloak用户UUID' },
+    { field: 'username',   type: 'string',  desc: 'Login username',                     desc_ja: 'ログインユーザー名',        desc_zh: '登录用户名' },
+    { field: 'email',      type: 'string',  desc: 'User email address',                 desc_ja: 'メールアドレス',            desc_zh: '电子邮件地址' },
+    { field: 'firstName',  type: 'string',  desc: 'First name',                         desc_ja: '名',                        desc_zh: '名字' },
+    { field: 'lastName',   type: 'string',  desc: 'Last name',                          desc_ja: '姓',                        desc_zh: '姓氏' },
+    { field: 'enabled',    type: 'boolean', desc: 'Whether the account is enabled',     desc_ja: 'アカウント有効フラグ',      desc_zh: '账号是否启用' },
+    { field: 'attributes', type: 'object',  desc: 'Custom attributes (e.g. storeName, status)', desc_ja: 'カスタム属性（storeName, statusなど）', desc_zh: '自定义属性（如storeName、status）' },
+  ],
+  'PUT /api/uam/users/([^/]+)': [
+    { field: '(204)', type: 'No Content', desc: 'Keycloak returns 204 with an empty body on success', desc_ja: '成功時Keycloakは204（本文なし）を返す', desc_zh: '成功时Keycloak返回204（无正文）' },
   ],
 };
 
