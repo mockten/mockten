@@ -74,7 +74,7 @@ Where sellers manage their store, all backed by live data.
 Platform governance for administrators, backed by live Keycloak and backend data. Sign in with an administrator account (e.g. `superadmin` / `superadmin` in local dev).
 
 - **User Management**: lists all Keycloak users with All / Active / Pending / Suspended filter tabs and pagination; create users (`/admin/user/create`), edit (name, email, enabled state, store name), approve pending sellers, suspend, and delete.
-- **Order Monitoring**: shows only *flagged* orders with a derived reason — Failed/canceled, Unusual location (EU destination), Multiple rapid orders (≥3 in 15 min), or High value (≥ $200) — with pagination and an Investigate view.
+- **Order Monitoring**: shows only *flagged* orders with a derived reason — Failed/canceled, Unusual location (EU destination), Multiple rapid orders (≥3 in 15 min), or High value (a statistical outlier: above this store's mean + 3σ) — with pagination and an Investigate view.
 - **System Health**: live component health (Database, API Server, Catalog/Inventory) and colloquial System Alerts derived from real backend metrics.
 - **Activity Logs**: the platform-wide audit trail (logins, order placement, admin actions), paginated.
 
