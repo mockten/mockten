@@ -1626,6 +1626,9 @@ const API_DESCRIPTIONS = {
   'GET /api/ranking':
     'Returns top-ranked products ordered by total purchase count. The <code>ranking</code> Go service reads a sorted set from Redis that is updated in real-time on each purchase event. Supports optional category filter.',
 
+  'POST /api/ranking':
+    'Increments a product\'s score in the current month\'s Redis ranking sorted sets (both the per-category set and the cross-category "all" set) by <code>quantity</code>. Called on each purchase to keep best-seller rankings live. The backend handler lives at <code>/api/ranking/update</code> (Kong prefix-matches <code>/api/ranking</code>). No authentication required.',
+
   // Shipment
   'GET /api/shipment':
     'Returns shipment records for the given user from MySQL. Each record includes order ID, recipient, address, current status (preparing / in_transit / delivered), and estimated delivery date simulated by the <code>shipment</code> Go service.',
@@ -1765,6 +1768,7 @@ const API_DESCRIPTIONS_JA = {
   'GET /api/payment': '認証済みユーザーの注文・支払い履歴をMySQLから返します。',
   'POST /api/payment': 'Stripe APIで支払いを実行します。注文をMySQLに記録し、配送・ランキングサービスを非同期で起動します。',
   'GET /api/ranking': '購入数順の上位商品を返します。RedisのソートセットをリアルタイムでP更新します。カテゴリフィルターをサポートします。',
+  'POST /api/ranking': '当月のRedisランキング（カテゴリ別セットと全体「all」セット）で商品スコアを<code>quantity</code>だけ加算します。購入ごとに呼ばれ、ベストセラーをリアルタイム更新します。バックエンドの実体は<code>/api/ranking/update</code>（Kongが<code>/api/ranking</code>を前方一致）。認証不要。',
   'GET /api/shipment': 'MySQLからユーザーの配送記録を返します。注文ID、受取人、住所、配送状況（準備中/輸送中/配達済み）を含みます。',
   'POST /api/shipment': 'MySQLに新しい配送記録を作成し、配送ステートマシンを開始します。「準備中」→「輸送中」→「配達済み」の順に進行します。',
   'GET /api/sale': 'MeiliSearchから現在有効なセール商品を返します。割引メタデータ付きで索引化されています。',
@@ -1842,6 +1846,7 @@ const API_DESCRIPTIONS_ZH = {
   'GET /api/payment': '从MySQL返回已认证用户的订单/支付历史。',
   'POST /api/payment': '通过Stripe API执行支付，将订单记录到MySQL，并异步触发配送和排名服务。',
   'GET /api/ranking': '按购买量返回排名靠前的商品。Redis有序集合实时更新。支持可选的类别过滤器。',
+  'POST /api/ranking': '在当月的Redis排名有序集合（类别集合与跨类别"all"集合）中，将商品分数增加<code>quantity</code>。每次购买时调用以实时更新畅销榜。后端实体位于<code>/api/ranking/update</code>（Kong前缀匹配<code>/api/ranking</code>）。无需认证。',
   'GET /api/shipment': '从MySQL返回用户的配送记录，包含订单ID、收件人、地址和配送状态。',
   'POST /api/shipment': '在MySQL中创建新的配送记录并启动配送状态机：准备中→运输中→已送达。',
   'GET /api/sale': '从MeiliSearch返回当前有效的促销商品，带有折扣元数据。',
@@ -2052,6 +2057,11 @@ const API_SCHEMAS = {
   // ── Ranking ─────────────────────────────────────────────────────────────────
   'GET /api/ranking': [
     { name: 'category', location: 'query', type: 'string', desc: 'Filter by category slug (optional)', desc_ja: 'カテゴリスラグでフィルター（任意）', desc_zh: '按分类标识过滤（可选）', required: false, default: '' }
+  ],
+  'POST /api/ranking': [
+    { name: 'product_id',  location: 'body', type: 'string',  desc: 'Product whose ranking score to increment', desc_ja: 'スコアを加算する商品ID', desc_zh: '要增加排名分数的商品ID', required: true, default: '__first_product_id__' },
+    { name: 'category_id', location: 'body', type: 'integer', desc: 'Numeric category id of the product',       desc_ja: '商品の数値カテゴリID',   desc_zh: '商品的数字类别ID',       required: true, default: 1 },
+    { name: 'quantity',    location: 'body', type: 'integer', desc: 'Amount to add to the score (units bought)', desc_ja: 'スコアに加算する数量（購入数）', desc_zh: '要增加的分数（购买数量）', required: true, default: 1 }
   ],
 
   // ── Shipment ────────────────────────────────────────────────────────────────
@@ -2332,6 +2342,9 @@ const API_RESPONSE_SCHEMAS = {
     { field: 'ranking[].price',        type: 'integer', desc: 'Price in JPY',                           desc_ja: '価格（円）',                   desc_zh: '价格（日元）' },
     { field: 'ranking[].rating',       type: 'number',  desc: 'Average review rating (0–5)',            desc_ja: 'レビュー平均評価（0〜5）',       desc_zh: '平均评分（0–5）' },
   ],
+  'POST /api/ranking': [
+    { field: 'message', type: 'string', desc: 'Confirmation that the ranking score was updated', desc_ja: 'ランキングスコア更新の確認メッセージ', desc_zh: '排名分数已更新的确认消息' },
+  ],
   'GET /api/shipment': [
     { field: '[].transaction_id', type: 'string', desc: 'Shipment transaction identifier',           desc_ja: '配送トランザクションID',          desc_zh: '配送交易标识符' },
     { field: '[].product_id',     type: 'string', desc: 'Shipped product identifier',                desc_ja: '配送商品ID',                      desc_zh: '已配送商品标识符' },
@@ -2580,6 +2593,8 @@ const API_RESPONSE_SCHEMAS = {
 // differs from the actual service endpoint (e.g. Kong /api/sale → /api/sale/active).
 const API_TEST_PATH_OVERRIDES = {
   'GET /api/sale': '/api/sale/active',
+  // The ranking-update handler lives at /api/ranking/update (Kong prefix-matches /api/ranking).
+  'POST /api/ranking': '/api/ranking/update',
 };
 
 function _normalizePath(path) {

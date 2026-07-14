@@ -44,7 +44,7 @@ Every route below is declared in `kong.yaml`. This is the same catalog rendered 
 | GET, POST, PUT, DELETE | `/api/cart`, `/api/cart/items`, `/api/cart/items/:id` | cart |
 | GET, POST, PUT | `/api/profile`, `/api/geo`, `/api/shipping` | geocoding |
 | GET, POST, PUT, DELETE | `/api/payment`, `/api/payment-method` | ecpay |
-| GET | `/api/ranking` | ranking |
+| GET, POST | `/api/ranking` | ranking (POST → `/api/ranking/update`, increments a product's score) |
 | GET, POST | `/api/shipment` | shipment |
 | GET | `/api/sale` | sale |
 | GET | `/api/recommendation`, `/api/recommendation/similar`, `/api/recommendation/also-bought`, `/api/co-purchase`, `/api/recommendation/model/status` | recommendation |
