@@ -23,6 +23,52 @@ export function isAdminAuthed(): boolean {
   return !!getAdminToken();
 }
 
+// Refresh the admin access token using the stored refresh token. Keycloak
+// access tokens are short-lived, so this keeps the session alive instead of
+// the dashboard silently emptying out when the token expires.
+async function refreshAdminToken(): Promise<boolean> {
+  const refresh = localStorage.getItem("admin_refresh_token");
+  if (!refresh) return false;
+  try {
+    const res = await fetch(TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refresh }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (!data.access_token) return false;
+    localStorage.setItem("admin_access_token", data.access_token);
+    if (data.refresh_token) localStorage.setItem("admin_refresh_token", data.refresh_token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * fetch wrapper that always sends the admin bearer and transparently refreshes
+ * it once on 401/403 (expired token). If refresh fails, the admin tokens are
+ * cleared so the route guard sends the user back to /admin/login.
+ */
+export async function adminFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  const withAuth = (): RequestInit => ({
+    ...init,
+    headers: { ...(init.headers || {}), ...adminHeaders() },
+  });
+  let res = await fetch(input, withAuth());
+  if (res.status === 401 || res.status === 403) {
+    if (await refreshAdminToken()) {
+      res = await fetch(input, withAuth());
+    }
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem("admin_access_token");
+      localStorage.removeItem("admin_refresh_token");
+    }
+  }
+  return res;
+}
+
 /** Fire-and-forget audit log entry. */
 export async function postAudit(action: string, target = "", status = "success"): Promise<void> {
   try {
@@ -108,7 +154,9 @@ function mapUser(u: KcUser): AdminUser {
   let role = "User";
   if ((u.username || "").toLowerCase() === "superadmin") role = "Admin";
   else if (attrs.storeName || attrs.description) role = "Seller";
-  const status = u.enabled === false ? "suspended" : "active";
+  // enabled=false + status=pending → awaiting approval; enabled=false otherwise → suspended.
+  const isPending = (attrs.status || []).includes("pending");
+  const status = u.enabled === false ? (isPending ? "pending" : "suspended") : "active";
   const joined = u.createdTimestamp
     ? new Date(u.createdTimestamp).toISOString().slice(0, 10)
     : "";
@@ -116,12 +164,24 @@ function mapUser(u: KcUser): AdminUser {
 }
 
 export async function fetchUsers(): Promise<AdminUser[]> {
-  const res = await fetch("/api/uam/users?max=200&briefRepresentation=false", {
-    headers: adminHeaders(),
-  });
+  const res = await adminFetch("/api/uam/users?max=500&briefRepresentation=false");
   if (!res.ok) throw new Error(`users ${res.status}`);
   const users: KcUser[] = await res.json();
   return users.map(mapUser);
+}
+
+/** Approve a pending account: enable it and clear the pending marker. */
+export async function approveUser(userId: string, target: string): Promise<boolean> {
+  const current = await getUser(userId);
+  const attrs = current?.attributes || {};
+  delete attrs.status;
+  const res = await adminFetch(`/api/uam/users/${encodeURIComponent(userId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled: true, attributes: attrs }),
+  });
+  await postAudit("Seller Approved", target, res.ok ? "success" : "failed");
+  return res.ok;
 }
 
 export interface CreateUserInput {
@@ -130,7 +190,7 @@ export interface CreateUserInput {
   email: string;
   password: string;
   role: string; // seller | admin | user
-  enabled: boolean;
+  status: string; // active | pending | suspended
   phone?: string;
   companyName?: string;
   notes?: string;
@@ -146,11 +206,14 @@ export async function createUser(input: CreateUserInput): Promise<{ ok: boolean;
   if (input.phone) attributes.phonenum = [input.phone];
   if (input.companyName) attributes.storeName = [input.companyName];
   if (input.notes) attributes.notes = [input.notes];
+  // "pending" accounts are created disabled and marked; "suspended" is disabled.
+  const enabled = input.status === "active";
+  if (input.status === "pending") attributes.status = ["pending"];
 
   const body = {
     username: input.email,
     email: input.email,
-    enabled: input.enabled,
+    enabled,
     emailVerified: true,
     firstName: input.firstName,
     lastName: input.lastName,
@@ -159,9 +222,9 @@ export async function createUser(input: CreateUserInput): Promise<{ ok: boolean;
     attributes,
   };
 
-  const res = await fetch("/api/uam/users", {
+  const res = await adminFetch("/api/uam/users", {
     method: "POST",
-    headers: { ...adminHeaders(), "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -174,20 +237,38 @@ export async function createUser(input: CreateUserInput): Promise<{ ok: boolean;
 }
 
 export async function getUser(userId: string): Promise<KcUser | null> {
-  const res = await fetch(`/api/uam/users/${encodeURIComponent(userId)}`, { headers: adminHeaders() });
+  const res = await adminFetch(`/api/uam/users/${encodeURIComponent(userId)}`);
   if (!res.ok) return null;
   return res.json();
 }
 
+/** Store name lives in the Keycloak `storeName` user attribute. */
+export function getStoreName(u: KcUser | null): string {
+  return u?.attributes?.storeName?.[0] || "";
+}
+
 export async function updateUser(
   userId: string,
-  fields: { firstName?: string; lastName?: string; email?: string; enabled?: boolean },
+  fields: { firstName?: string; lastName?: string; email?: string; enabled?: boolean; storeName?: string },
   target: string
 ): Promise<{ ok: boolean; error?: string }> {
-  const res = await fetch(`/api/uam/users/${encodeURIComponent(userId)}`, {
+  const body: Record<string, unknown> = {
+    firstName: fields.firstName,
+    lastName: fields.lastName,
+    email: fields.email,
+    enabled: fields.enabled,
+  };
+  // Merge storeName into the existing attributes so we don't wipe others.
+  if (fields.storeName !== undefined) {
+    const current = await getUser(userId);
+    const attrs = current?.attributes || {};
+    attrs.storeName = [fields.storeName];
+    body.attributes = attrs;
+  }
+  const res = await adminFetch(`/api/uam/users/${encodeURIComponent(userId)}`, {
     method: "PUT",
-    headers: { ...adminHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify(fields),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
   await postAudit("User Updated", target, res.ok ? "success" : "failed");
   if (!res.ok) return { ok: false, error: (await res.text()) || `Error ${res.status}` };
@@ -195,18 +276,15 @@ export async function updateUser(
 }
 
 export async function deleteUser(userId: string, target: string): Promise<boolean> {
-  const res = await fetch(`/api/uam/users/${encodeURIComponent(userId)}`, {
-    method: "DELETE",
-    headers: adminHeaders(),
-  });
+  const res = await adminFetch(`/api/uam/users/${encodeURIComponent(userId)}`, { method: "DELETE" });
   await postAudit("User Deleted", target, res.ok ? "warning" : "failed");
   return res.ok;
 }
 
 export async function setUserEnabled(userId: string, enabled: boolean, target: string): Promise<boolean> {
-  const res = await fetch(`/api/uam/users/${encodeURIComponent(userId)}`, {
+  const res = await adminFetch(`/api/uam/users/${encodeURIComponent(userId)}`, {
     method: "PUT",
-    headers: { ...adminHeaders(), "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ enabled }),
   });
   await postAudit(enabled ? "Account Reactivated" : "Account Suspended", target, res.ok ? "warning" : "failed");
@@ -220,16 +298,22 @@ export interface AdminOrder {
   user_id: string;
   amount: number;
   status: string;
+  country: string;
   reason: string;
   flagged: boolean;
   created_at: string;
 }
 
-export async function fetchAdminOrders(): Promise<AdminOrder[]> {
-  const res = await fetch("/api/admin/orders?limit=100", { headers: adminHeaders() });
+export interface Paged<T> {
+  items: T[];
+  total: number;
+}
+
+export async function fetchAdminOrders(page = 1, limit = 10): Promise<Paged<AdminOrder>> {
+  const res = await adminFetch(`/api/admin/orders?page=${page}&limit=${limit}`);
   if (!res.ok) throw new Error(`orders ${res.status}`);
   const data = await res.json();
-  return data.orders || [];
+  return { items: data.orders || [], total: data.total || 0 };
 }
 
 export interface HealthComponent {
@@ -245,7 +329,7 @@ export interface HealthResponse {
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
-  const res = await fetch("/api/admin/health", { headers: adminHeaders() });
+  const res = await adminFetch("/api/admin/health");
   if (!res.ok) throw new Error(`health ${res.status}`);
   return res.json();
 }
@@ -259,9 +343,9 @@ export interface AuditEntry {
   timestamp: string;
 }
 
-export async function fetchAudit(): Promise<AuditEntry[]> {
-  const res = await fetch("/api/admin/audit?limit=100", { headers: adminHeaders() });
+export async function fetchAudit(page = 1, limit = 10): Promise<Paged<AuditEntry>> {
+  const res = await adminFetch(`/api/admin/audit?page=${page}&limit=${limit}`);
   if (!res.ok) throw new Error(`audit ${res.status}`);
   const data = await res.json();
-  return data.logs || [];
+  return { items: data.logs || [], total: data.total || 0 };
 }

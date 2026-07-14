@@ -66,7 +66,7 @@ export function CreateUserPage({ onBack, onUserCreated }: CreateUserPageProps) {
         email: formData.email,
         password: formData.password,
         role: formData.role,
-        enabled: formData.status !== "suspended" && formData.status !== "inactive",
+        status: formData.status || "active",
         phone: formData.phone,
         companyName: formData.companyName,
         notes: formData.notes,
@@ -235,8 +235,7 @@ export function CreateUserPage({ onBack, onUserCreated }: CreateUserPageProps) {
                     <SelectContent>
                       <SelectItem value="seller">Seller</SelectItem>
                       <SelectItem value="admin">Administrator</SelectItem>
-                      <SelectItem value="support">Support Staff</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
+                      <SelectItem value="user">Customer</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -253,9 +252,8 @@ export function CreateUserPage({ onBack, onUserCreated }: CreateUserPageProps) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="pending">Pending (awaiting approval)</SelectItem>
                       <SelectItem value="suspended">Suspended</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

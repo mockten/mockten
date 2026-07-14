@@ -24,6 +24,7 @@ export function SellerSignUpPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [legalDoc, setLegalDoc] = useState<null | "terms" | "privacy">(null);
+  const [pendingReview, setPendingReview] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -56,10 +57,12 @@ export function SellerSignUpPage() {
     try {
       const adminToken = await getAdminToken();
 
+      // New seller accounts start disabled ("pending") until an administrator
+      // approves them. They cannot sign in until approval.
       const userData = {
         username: formData.email,
         email: formData.email,
-        enabled: true,
+        enabled: false,
         emailVerified: true,
         firstName: formData.fullName,
         lastName: "Seller",
@@ -70,6 +73,7 @@ export function SellerSignUpPage() {
         attributes: {
           storeName: [formData.storeName],
           phonenum: [formData.phone],
+          status: ["pending"],
         },
       };
 
@@ -87,8 +91,7 @@ export function SellerSignUpPage() {
         throw new Error(body || `Error ${res.status}`);
       }
 
-      alert("Account created! Please sign in.");
-      navigate("/seller/login");
+      setPendingReview(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign up failed.");
     } finally {
@@ -117,6 +120,23 @@ export function SellerSignUpPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-sky-100 p-8">
+      {pendingReview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl text-center">
+            <h3 className="text-lg font-semibold mb-3">Application received</h3>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Thank you for registering your store. Your seller account is now
+              pending review. Our team will verify your details — please try
+              signing in again in about 24 hours once your account is approved.
+            </p>
+            <div className="mt-5">
+              <Button className="!bg-blue-600 hover:!bg-blue-700 !text-white" onClick={() => navigate("/seller/login")}>
+                Back to Sign In
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       {legalDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setLegalDoc(null)}>
           <div className="bg-white rounded-lg p-6 w-full max-w-lg shadow-xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -321,7 +341,7 @@ export function SellerSignUpPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-slate-500">
-          <p>© 2026 EC Site. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} EC Site. All rights reserved.</p>
         </div>
       </div>
     </div>

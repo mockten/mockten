@@ -965,22 +965,53 @@ func handleGetRandomProducts(c *gin.Context) {
 // handleAdminOrders returns all orders across every seller (admin view), with a
 // derived "reason" that flags orders worth investigating (failed/canceled, or
 // unusually high value). Ordered by most recent first.
+// euCountries is the set of country codes that count as an "unusual location"
+// for this JP/SG-based store (a real signal — some services block EU traffic).
+var euCountries = map[string]bool{
+	"AT": true, "BE": true, "BG": true, "HR": true, "CY": true, "CZ": true,
+	"DK": true, "EE": true, "FI": true, "FR": true, "DE": true, "GR": true,
+	"HU": true, "IE": true, "IT": true, "LV": true, "LT": true, "LU": true,
+	"MT": true, "NL": true, "PL": true, "PT": true, "RO": true, "SK": true,
+	"SI": true, "ES": true, "SE": true,
+}
+
+// handleAdminOrders returns only *flagged* orders that warrant investigation,
+// with a real derived reason. Reasons (priority order):
+//   - "Failed / canceled"       — order status is canceled/refunded/failed
+//   - "Unusual location (EU)"    — shipping address country is in the EU
+//   - "Multiple rapid orders"    — same customer placed >= 3 orders within 15 min
+//   - "High value"               — order total is unusually large
 func handleAdminOrders(c *gin.Context) {
 	if _, err := extractEmailFromJWT(c); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
-	if limit < 1 || limit > 500 {
-		limit = 50
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 10
 	}
 
+	// Scan a recent window; flag + paginate in-process.
 	rows, err := db.Query(`
-		SELECT o.order_id, o.user_id, o.total_amount, o.status, o.created_at
-		FROM `+"`Order`"+` o
+		SELECT o.order_id, o.user_id, o.total_amount, o.status, o.created_at,
+			COALESCE((
+				SELECT g.country_code FROM ` + "`Transaction`" + ` t
+				JOIN Geo g ON t.geo_id = g.geo_id
+				WHERE JSON_CONTAINS(o.transactions_json, JSON_QUOTE(t.transaction_id))
+				LIMIT 1), '') AS country,
+			(
+				SELECT COUNT(*) FROM ` + "`Order`" + ` o2
+				WHERE o2.user_id = o.user_id
+				  AND ABS(TIMESTAMPDIFF(MINUTE, o2.created_at, o.created_at)) <= 15
+			) AS rapid_count
+		FROM ` + "`Order`" + ` o
 		ORDER BY o.created_at DESC
-		LIMIT ?`, limit)
+		LIMIT 1000`)
 	if err != nil {
 		log.Printf("admin orders query: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
@@ -993,38 +1024,53 @@ func handleAdminOrders(c *gin.Context) {
 		UserID    string  `json:"user_id"`
 		Amount    float64 `json:"amount"`
 		Status    string  `json:"status"`
+		Country   string  `json:"country"`
 		Reason    string  `json:"reason"`
 		Flagged   bool    `json:"flagged"`
 		CreatedAt string  `json:"created_at"`
 	}
 
-	var orders []AdminOrder
+	var flagged []AdminOrder
 	for rows.Next() {
 		var o AdminOrder
 		var createdAt time.Time
-		if err := rows.Scan(&o.OrderID, &o.UserID, &o.Amount, &o.Status, &createdAt); err != nil {
+		var country string
+		var rapidCount int
+		if err := rows.Scan(&o.OrderID, &o.UserID, &o.Amount, &o.Status, &createdAt, &country, &rapidCount); err != nil {
 			continue
 		}
 		o.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
-		// Derive an investigation reason.
-		switch o.Status {
-		case "canceled":
-			o.Reason, o.Flagged = "Order canceled", true
-		case "refunded":
-			o.Reason, o.Flagged = "Refunded", true
-		default:
-			if o.Amount >= 100 {
-				o.Reason, o.Flagged = "High value", true
-			} else {
-				o.Reason = "OK"
-			}
+		o.Country = country
+
+		switch {
+		case o.Status == "canceled" || o.Status == "refunded" || o.Status == "failed":
+			o.Reason, o.Flagged = "Failed / canceled", true
+		case euCountries[country]:
+			o.Reason, o.Flagged = "Unusual location ("+country+", EU)", true
+		case rapidCount >= 3:
+			o.Reason, o.Flagged = "Multiple rapid orders", true
+		case o.Amount >= 200:
+			o.Reason, o.Flagged = "High value", true
 		}
-		orders = append(orders, o)
+		if o.Flagged {
+			flagged = append(flagged, o)
+		}
 	}
-	if orders == nil {
-		orders = []AdminOrder{}
+
+	total := len(flagged)
+	start := (page - 1) * limit
+	if start > total {
+		start = total
 	}
-	c.JSON(http.StatusOK, gin.H{"orders": orders, "total": len(orders)})
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	pageItems := flagged[start:end]
+	if pageItems == nil {
+		pageItems = []AdminOrder{}
+	}
+	c.JSON(http.StatusOK, gin.H{"orders": pageItems, "total": total, "page": page, "limit": limit})
 }
 
 // handleGetAudit returns the most recent audit-log entries.
@@ -1033,13 +1079,22 @@ func handleGetAudit(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
-	if limit < 1 || limit > 500 {
-		limit = 50
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	if page < 1 {
+		page = 1
 	}
+	if limit < 1 || limit > 200 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+
+	var total int
+	_ = db.QueryRow("SELECT COUNT(*) FROM AuditLog").Scan(&total)
+
 	rows, err := db.Query(`
 		SELECT id, action, actor, target, status, created_at
-		FROM AuditLog ORDER BY created_at DESC, id DESC LIMIT ?`, limit)
+		FROM AuditLog ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`, limit, offset)
 	if err != nil {
 		log.Printf("audit query: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
@@ -1070,7 +1125,7 @@ func handleGetAudit(c *gin.Context) {
 	if logs == nil {
 		logs = []AuditRow{}
 	}
-	c.JSON(http.StatusOK, gin.H{"logs": logs, "total": len(logs)})
+	c.JSON(http.StatusOK, gin.H{"logs": logs, "total": total, "page": page, "limit": limit})
 }
 
 // handlePostAudit records an audit-log entry (admin actions, logins, etc).

@@ -1728,3 +1728,21 @@ INSERT INTO AuditLog (action, actor, target, status, created_at) VALUES
   ('User Created', 'superadmin@example.com', 'newseller@example.com', 'success', NOW() - INTERVAL 90 MINUTE),
   ('Failed Login Attempt', 'unknown@example.com', NULL, 'failed', NOW() - INTERVAL 45 MINUTE),
   ('User Deleted', 'superadmin@example.com', 'spam@example.com', 'warning', NOW() - INTERVAL 20 MINUTE);
+
+-- Seed a flagged order shipping to an EU country so Admin Order Monitoring's
+-- "Unusual location (EU)" detection demonstrably fires on real data.
+INSERT INTO Geo (geo_id, user_id, country_code, prefecture, city, is_primary) VALUES
+  ('eu-geo-de-0001', 'eu_shopper@example.com', 'DE', 'Bavaria', 'Munich', 1);
+INSERT INTO `Transaction` (transaction_id, product_id, geo_id, status, leg_type, quantity, created_at) VALUES
+  ('eu-txn-0001', (SELECT product_id FROM Product LIMIT 1), 'eu-geo-de-0001', 'booked', 'air', 1, NOW() - INTERVAL 35 MINUTE);
+INSERT INTO `Order` (order_id, user_id, currency, subtotal_amount, shipping_amount, total_amount, quantity, status, transactions_json, created_at) VALUES
+  ('eu-order-de-0001', 'eu_shopper@example.com', 'USD', 18.00, 6.00, 24.00, 1, 'paid', '["eu-txn-0001"]', NOW() - INTERVAL 35 MINUTE);
+
+-- Seed a canceled order (→ "Failed / canceled") and a burst of 3 rapid orders
+-- from one customer within 15 minutes (→ "Multiple rapid orders") so Order
+-- Monitoring demonstrates the full range of real detection reasons.
+INSERT INTO `Order` (order_id, user_id, currency, subtotal_amount, shipping_amount, total_amount, quantity, status, transactions_json, created_at) VALUES
+  ('flag-canceled-0001', 'refund_case@example.com', 'USD', 30.00, 5.00, 35.00, 1, 'canceled', '[]', NOW() - INTERVAL 40 MINUTE),
+  ('flag-rapid-0001', 'rapid_buyer@example.com', 'USD', 8.00, 2.00, 10.00, 1, 'paid', '[]', NOW() - INTERVAL 12 MINUTE),
+  ('flag-rapid-0002', 'rapid_buyer@example.com', 'USD', 9.00, 2.00, 11.00, 1, 'paid', '[]', NOW() - INTERVAL 10 MINUTE),
+  ('flag-rapid-0003', 'rapid_buyer@example.com', 'USD', 7.00, 2.00, 9.00, 1, 'paid', '[]', NOW() - INTERVAL 8 MINUTE);

@@ -93,6 +93,12 @@ const MyCartConfirm: React.FC = () => {
       });
       if (res.status === 200) {
         console.log('Payment successful:', res.data);
+        // Record the purchase in the platform audit trail (best-effort).
+        apiClient.post('/api/admin/audit', {
+          action: 'Order Placed',
+          target: res.data.order_id || res.data.payment_id || '',
+          status: 'success',
+        }).catch(() => {});
         try {
           if (isFromCart) {
             await apiClient.delete('/api/cart');

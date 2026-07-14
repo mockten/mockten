@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
-import { getUser, updateUser, deleteUser } from "./adminApi";
+import { getUser, updateUser, deleteUser, getStoreName } from "./adminApi";
 
 interface EditUserPageProps {
   onBack: () => void;
@@ -36,6 +36,7 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
     firstName: "",
     lastName: "",
     email: "",
+    storeName: "",
     status: "active",
   });
   const [loading, setLoading] = useState(true);
@@ -58,6 +59,7 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
         firstName: u.firstName || "",
         lastName: u.lastName || "",
         email: u.email || u.username || "",
+        storeName: getStoreName(u),
         status: u.enabled === false ? "suspended" : "active",
       });
       setLoading(false);
@@ -79,6 +81,7 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
+        storeName: formData.storeName,
         enabled: formData.status === "active",
       },
       formData.email
@@ -156,6 +159,10 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <Input id="email" type="email" value={formData.email} onChange={(e) => handleInputChange("email", e.target.value)} className="pl-10" />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="storeName">Store Name</Label>
+                  <Input id="storeName" value={formData.storeName} onChange={(e) => handleInputChange("storeName", e.target.value)} placeholder="Shown to buyers on this seller's products" />
                 </div>
               </CardContent>
             </Card>

@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   Table,
   TableBody,
@@ -36,7 +37,6 @@ import {
   Search,
   Users,
   ShoppingCart,
-  Package,
   AlertTriangle,
   Activity,
   Server,
@@ -58,6 +58,7 @@ import {
   fetchUsers,
   deleteUser,
   setUserEnabled,
+  approveUser,
   fetchAdminOrders,
   fetchHealth,
   fetchAudit,
@@ -73,50 +74,72 @@ interface AdminDashboardProps {
   onEditUser?: (userId: string) => void;
 }
 
+const PAGE = 10;
+
 export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [investigateOrder, setInvestigateOrder] = useState<AdminOrder | null>(null);
 
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [userStatusFilter, setUserStatusFilter] = useState("All");
+  const [userPage, setUserPage] = useState(1);
+
   const [orders, setOrders] = useState<AdminOrder[]>([]);
-  const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [ordersTotal, setOrdersTotal] = useState(0);
+  const [ordersPage, setOrdersPage] = useState(1);
+
   const [logs, setLogs] = useState<AuditEntry[]>([]);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [logsPage, setLogsPage] = useState(1);
+
+  const [health, setHealth] = useState<HealthResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Auth guard
   useEffect(() => {
     if (!isAdminAuthed()) onLogout();
   }, [onLogout]);
 
-  const loadAll = useCallback(async () => {
-    setLoading(true);
-    const [u, o, h, l] = await Promise.allSettled([
-      fetchUsers(),
-      fetchAdminOrders(),
-      fetchHealth(),
-      fetchAudit(),
-    ]);
-    if (u.status === "fulfilled") setUsers(u.value);
-    if (o.status === "fulfilled") setOrders(o.value);
-    if (h.status === "fulfilled") setHealth(h.value);
-    if (l.status === "fulfilled") setLogs(l.value);
-    setLoading(false);
+  const loadUsers = useCallback(async () => {
+    try { setUsers(await fetchUsers()); } catch { /* token/redirect handled in adminFetch */ }
+    if (!isAdminAuthed()) onLogout();
+  }, [onLogout]);
+
+  const loadOrders = useCallback(async (page: number) => {
+    try {
+      const p = await fetchAdminOrders(page, PAGE);
+      setOrders(p.items);
+      setOrdersTotal(p.total);
+    } catch { /* handled */ }
   }, []);
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  const loadLogs = useCallback(async (page: number) => {
+    try {
+      const p = await fetchAudit(page, PAGE);
+      setLogs(p.items);
+      setLogsTotal(p.total);
+    } catch { /* handled */ }
+  }, []);
+
+  const loadHealth = useCallback(async () => {
+    try { setHealth(await fetchHealth()); } catch { /* handled */ }
+  }, []);
+
+  const reloadAll = useCallback(async () => {
+    setLoading(true);
+    await Promise.allSettled([loadUsers(), loadOrders(ordersPage), loadLogs(logsPage), loadHealth()]);
+    setLoading(false);
+  }, [loadUsers, loadOrders, loadLogs, loadHealth, ordersPage, logsPage]);
+
+  useEffect(() => { reloadAll(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { loadOrders(ordersPage); }, [ordersPage, loadOrders]);
+  useEffect(() => { loadLogs(logsPage); }, [logsPage, loadLogs]);
 
   const handleLogout = async () => {
     await adminLogout();
     onLogout();
-  };
-
-  const handleDeleteClick = (id: string, name: string, email: string) => {
-    setUserToDelete({ id, name, email });
-    setDeleteDialogOpen(true);
   };
 
   const handleConfirmDelete = async () => {
@@ -124,32 +147,27 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
       await deleteUser(userToDelete.id, userToDelete.email);
       setDeleteDialogOpen(false);
       setUserToDelete(null);
-      loadAll();
+      loadUsers();
     }
   };
 
   const handleSuspend = async (u: AdminUser) => {
     await setUserEnabled(u.id, u.status === "suspended", u.email);
-    loadAll();
+    loadUsers();
+  };
+
+  const handleApprove = async (u: AdminUser) => {
+    await approveUser(u.id, u.email);
+    loadUsers();
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "active":
-      case "success":
-      case "operational":
-      case "delivered":
+      case "active": case "success": case "operational": case "delivered":
         return "bg-green-100 text-green-800";
-      case "suspended":
-      case "failed":
-      case "degraded":
-      case "canceled":
-      case "refunded":
+      case "suspended": case "failed": case "degraded": case "canceled": case "refunded":
         return "bg-red-100 text-red-800";
-      case "pending":
-      case "warning":
-      case "paid":
-      case "created":
+      case "pending": case "warning": case "paid": case "created":
         return "bg-yellow-100 text-yellow-800";
       default:
         return "bg-slate-100 text-slate-800";
@@ -158,16 +176,11 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "active":
-      case "success":
-      case "operational":
+      case "active": case "success": case "operational":
         return <CheckCircle className="w-4 h-4 text-green-600" />;
-      case "suspended":
-      case "failed":
-      case "degraded":
+      case "suspended": case "failed": case "degraded":
         return <XCircle className="w-4 h-4 text-red-600" />;
-      case "pending":
-      case "warning":
+      case "pending": case "warning":
         return <Clock className="w-4 h-4 text-yellow-600" />;
       default:
         return null;
@@ -175,25 +188,41 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
   };
 
   const q = searchQuery.toLowerCase();
-  const filteredUsers = users.filter(
-    (u) => !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
-  );
-  const flaggedOrders = orders.filter((o) => o.flagged);
-  const activeOrders = orders.filter((o) => o.status !== "delivered" && o.status !== "canceled").length;
+  const filteredUsers = users.filter((u) => {
+    if (userStatusFilter !== "All" && u.status !== userStatusFilter.toLowerCase()) return false;
+    return !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+  });
+  const userTotalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE));
+  const pagedUsers = filteredUsers.slice((userPage - 1) * PAGE, userPage * PAGE);
+
+  const ordersTotalPages = Math.max(1, Math.ceil(ordersTotal / PAGE));
+  const logsTotalPages = Math.max(1, Math.ceil(logsTotal / PAGE));
+  const pendingCount = users.filter((u) => u.status === "pending").length;
 
   const systemStats = [
     { title: "Total Users", value: String(users.length), status: "normal", icon: Users },
-    { title: "Active Orders", value: String(activeOrders), status: "normal", icon: ShoppingCart },
-    { title: "Total Products", value: String(health?.metrics.products ?? 0), status: "normal", icon: Package },
+    { title: "Pending Approvals", value: String(pendingCount), status: pendingCount > 0 ? "warning" : "normal", icon: Clock },
+    { title: "Flagged Orders", value: String(ordersTotal), status: ordersTotal > 0 ? "warning" : "normal", icon: ShoppingCart },
     { title: "System Alerts", value: String(health?.alerts.length ?? 0), status: (health?.alerts.length ?? 0) > 0 ? "warning" : "normal", icon: AlertTriangle },
   ];
+
+  const Pagination = ({ page, totalPages, total, onPrev, onNext }: { page: number; totalPages: number; total: number; onPrev: () => void; onNext: () => void }) => (
+    totalPages > 1 ? (
+      <div className="flex items-center justify-between mt-4">
+        <span className="text-sm text-slate-500">Page {page} of {totalPages} ({total} total)</span>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" disabled={page <= 1} onClick={onPrev}>Previous</Button>
+          <Button variant="ghost" size="sm" disabled={page >= totalPages} onClick={onNext}>Next</Button>
+        </div>
+      </div>
+    ) : null
+  );
 
   return (
     <div className="min-h-screen bg-red-50">
       {/* Top Navigation Bar */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="flex items-center justify-between px-6 py-3">
-          {/* Logo and Brand */}
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-9 h-9 bg-red-600 rounded-lg shrink-0">
               <Shield className="w-5 h-5 text-white" />
@@ -204,28 +233,19 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
             </div>
           </div>
 
-          {/* Search Bar */}
           <div className="flex-1 max-w-md mx-8">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                type="search"
-                placeholder="Search users, orders, products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-9 text-sm"
-              />
+              <Input type="search" placeholder="Search users..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setUserPage(1); }} className="pl-10 h-9 text-sm" />
             </div>
           </div>
 
-          {/* Right Actions */}
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" className="gap-2" onClick={loadAll} disabled={loading}>
+            <Button variant="outline" size="sm" className="gap-2" onClick={reloadAll} disabled={loading}>
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
               Reload
             </Button>
             <Badge variant="secondary" className="bg-red-100 text-red-800">Admin</Badge>
-
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2 h-9 px-2">
@@ -248,7 +268,6 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
         </div>
       </header>
 
-      {/* Main Content */}
       <div className="flex">
         {/* Sidebar */}
         <aside className="w-52 bg-white border-r border-slate-200 min-h-[calc(100vh-57px)] p-3">
@@ -263,9 +282,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
               <button
                 key={item.key}
                 onClick={() => setActiveTab(item.key)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                  activeTab === item.key ? "bg-red-50 text-red-600" : "text-slate-600 hover:bg-slate-50"
-                }`}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeTab === item.key ? "bg-red-50 text-red-600" : "text-slate-600 hover:bg-slate-50"}`}
               >
                 <item.icon className="w-4 h-4" />
                 <span>{item.label}</span>
@@ -274,9 +291,8 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
           </nav>
         </aside>
 
-        {/* Main Content Area */}
         <main className="flex-1 p-8">
-          {/* Overview Tab */}
+          {/* Overview */}
           {activeTab === "overview" && (
             <div className="space-y-6">
               <div>
@@ -284,7 +300,6 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                 <p className="text-slate-600">Monitor your platform's health and activity</p>
               </div>
 
-              {/* System Alerts — only shown when a component is degraded */}
               {(health?.alerts.length ?? 0) > 0 && (
                 <Alert className="border-amber-200 bg-amber-50">
                   <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -297,7 +312,6 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                 </Alert>
               )}
 
-              {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {systemStats.map((stat) => (
                   <Card key={stat.title}>
@@ -316,7 +330,6 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                 ))}
               </div>
 
-              {/* Flagged Orders */}
               <Card>
                 <CardHeader>
                   <CardTitle>Flagged Orders</CardTitle>
@@ -334,21 +347,16 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {flaggedOrders.slice(0, 8).map((order) => (
+                      {orders.slice(0, 5).map((order) => (
                         <TableRow key={order.order_id}>
                           <TableCell className="font-mono text-xs">{order.order_id}</TableCell>
                           <TableCell>{order.user_id}</TableCell>
                           <TableCell>${order.amount.toFixed(2)}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="bg-red-100 text-red-800">{order.reason}</Badge>
-                          </TableCell>
+                          <TableCell><Badge variant="secondary" className="bg-red-100 text-red-800">{order.reason}</Badge></TableCell>
                           <TableCell className="text-slate-500">{order.created_at}</TableCell>
                         </TableRow>
                       ))}
-                      {loading && flaggedOrders.length === 0 && (
-                        <TableRow><TableCell colSpan={5} className="text-center text-slate-500 py-8"><span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span></TableCell></TableRow>
-                      )}
-                      {!loading && flaggedOrders.length === 0 && (
+                      {!loading && orders.length === 0 && (
                         <TableRow><TableCell colSpan={5} className="text-center text-slate-500 py-8">No flagged orders</TableCell></TableRow>
                       )}
                     </TableBody>
@@ -358,7 +366,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
             </div>
           )}
 
-          {/* Users Tab */}
+          {/* User Management */}
           {activeTab === "users" && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
@@ -366,10 +374,20 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                   <h2 className="text-slate-900 mb-1">User Management</h2>
                   <p className="text-slate-600">View and manage all platform users ({users.length})</p>
                 </div>
-                <Button size="sm" className="!text-white gap-2" style={{ backgroundColor: "#dc2626" }} onClick={onCreateUser}>
-                  <UserPlus className="w-4 h-4" />
-                  Add User
-                </Button>
+                <div className="flex items-center gap-3">
+                  <Tabs value={userStatusFilter} onValueChange={(v) => { setUserStatusFilter(v); setUserPage(1); }}>
+                    <TabsList>
+                      <TabsTrigger value="All">All</TabsTrigger>
+                      <TabsTrigger value="Active">Active</TabsTrigger>
+                      <TabsTrigger value="Pending">Pending</TabsTrigger>
+                      <TabsTrigger value="Suspended">Suspended</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  <Button size="sm" className="!text-white gap-2" style={{ backgroundColor: "#dc2626" }} onClick={onCreateUser}>
+                    <UserPlus className="w-4 h-4" />
+                    Add User
+                  </Button>
+                </div>
               </div>
 
               <Card>
@@ -386,7 +404,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredUsers.map((user) => (
+                      {pagedUsers.map((user) => (
                         <TableRow key={user.id}>
                           <TableCell>{user.name}</TableCell>
                           <TableCell>{user.email}</TableCell>
@@ -404,6 +422,12 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                                 <Button variant="ghost" size="icon"><MoreVertical className="w-4 h-4" /></Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                {user.status === "pending" && (
+                                  <DropdownMenuItem className="text-green-600" onClick={() => handleApprove(user)}>
+                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                    Approve
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem onClick={() => onEditUser?.(user.id)}>
                                   <Edit className="w-4 h-4 mr-2" />
                                   Edit User
@@ -413,7 +437,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                                   <Ban className="w-4 h-4 mr-2" />
                                   {user.status === "suspended" ? "Reactivate Account" : "Suspend Account"}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteClick(user.id, user.name, user.email)}>
+                                <DropdownMenuItem className="text-red-600" onClick={() => { setUserToDelete({ id: user.id, name: user.name, email: user.email }); setDeleteDialogOpen(true); }}>
                                   <Trash2 className="w-4 h-4 mr-2" />
                                   Delete User
                                 </DropdownMenuItem>
@@ -422,30 +446,31 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                           </TableCell>
                         </TableRow>
                       ))}
-                      {loading && filteredUsers.length === 0 && (
+                      {loading && pagedUsers.length === 0 && (
                         <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-8"><span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span></TableCell></TableRow>
                       )}
-                      {!loading && filteredUsers.length === 0 && (
+                      {!loading && pagedUsers.length === 0 && (
                         <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-8">No users found</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
+                  <Pagination page={userPage} totalPages={userTotalPages} total={filteredUsers.length} onPrev={() => setUserPage((p) => p - 1)} onNext={() => setUserPage((p) => p + 1)} />
                 </CardContent>
               </Card>
             </div>
           )}
 
-          {/* Orders Tab */}
+          {/* Order Monitoring */}
           {activeTab === "orders" && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-slate-900 mb-1">Order Monitoring</h2>
-                <p className="text-slate-600">All orders across the platform ({orders.length})</p>
+                <p className="text-slate-600">Flagged orders that require investigation ({ordersTotal})</p>
               </div>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>All Orders</CardTitle>
+                  <CardTitle>Flagged Orders</CardTitle>
                   <CardDescription>Flagged rows require investigation</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -458,6 +483,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                         <TableHead>Status</TableHead>
                         <TableHead>Reason</TableHead>
                         <TableHead>Date</TableHead>
+                        <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -466,29 +492,29 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                           <TableCell className="font-mono text-xs">{order.order_id}</TableCell>
                           <TableCell>{order.user_id}</TableCell>
                           <TableCell>${order.amount.toFixed(2)}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className={getStatusColor(order.status)}>{order.status}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className={order.flagged ? "bg-red-100 text-red-800" : "bg-slate-100 text-slate-700"}>{order.reason}</Badge>
-                          </TableCell>
+                          <TableCell><Badge variant="secondary" className={getStatusColor(order.status)}>{order.status}</Badge></TableCell>
+                          <TableCell><Badge variant="secondary" className="bg-red-100 text-red-800">{order.reason}</Badge></TableCell>
                           <TableCell className="text-slate-500">{order.created_at}</TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm" onClick={() => setInvestigateOrder(order)}>Investigate</Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                       {loading && orders.length === 0 && (
-                        <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-8"><span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span></TableCell></TableRow>
+                        <TableRow><TableCell colSpan={7} className="text-center text-slate-500 py-8"><span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span></TableCell></TableRow>
                       )}
                       {!loading && orders.length === 0 && (
-                        <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-8">No orders found</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={7} className="text-center text-slate-500 py-8">No flagged orders</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
+                  <Pagination page={ordersPage} totalPages={ordersTotalPages} total={ordersTotal} onPrev={() => setOrdersPage((p) => p - 1)} onNext={() => setOrdersPage((p) => p + 1)} />
                 </CardContent>
               </Card>
             </div>
           )}
 
-          {/* System Health Tab */}
+          {/* System Health */}
           {activeTab === "system" && (
             <div className="space-y-6">
               <div>
@@ -526,12 +552,12 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
             </div>
           )}
 
-          {/* Activity Logs Tab */}
+          {/* Activity Logs */}
           {activeTab === "logs" && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-slate-900 mb-1">Activity Logs</h2>
-                <p className="text-slate-600">Audit trail of system activities and admin actions</p>
+                <p className="text-slate-600">Audit trail across all users — admins, sellers and customers ({logsTotal})</p>
               </div>
 
               <Card>
@@ -569,6 +595,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                       )}
                     </TableBody>
                   </Table>
+                  <Pagination page={logsPage} totalPages={logsTotalPages} total={logsTotal} onPrev={() => setLogsPage((p) => p - 1)} onNext={() => setLogsPage((p) => p + 1)} />
                 </CardContent>
               </Card>
             </div>
@@ -587,10 +614,33 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete}>Delete</AlertDialogAction>
+            <AlertDialogAction onClick={handleConfirmDelete} className="!text-white" style={{ backgroundColor: "#dc2626" }}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Investigate Order Modal */}
+      {investigateOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setInvestigateOrder(null)}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold mb-4">Investigate Order</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-slate-500">Order ID</span><span className="font-mono">{investigateOrder.order_id}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Customer</span><span>{investigateOrder.user_id}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Amount</span><span>${investigateOrder.amount.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Status</span><span>{investigateOrder.status}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Shipping country</span><span>{investigateOrder.country || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Placed</span><span>{investigateOrder.created_at}</span></div>
+              <div className="mt-3 rounded-md bg-red-50 border border-red-200 p-3 text-red-800">
+                <strong>Flag reason:</strong> {investigateOrder.reason}
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end">
+              <Button variant="outline" onClick={() => setInvestigateOrder(null)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

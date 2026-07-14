@@ -115,7 +115,7 @@ export function AdminLoginPage({ onLogin }: AdminLoginPageProps) {
 
         {/* Footer */}
         <div className="mt-8 text-center text-slate-500">
-          <p>© 2026 EC Site. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} EC Site. All rights reserved.</p>
         </div>
       </div>
     </div>

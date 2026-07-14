@@ -85,13 +85,42 @@ test.describe.serial('Seller Portal', () => {
 
     await page.getByLabel(/I agree/).click();
 
-    page.once('dialog', dialog => dialog.accept());
     await page.getByRole('button', { name: 'Create Account' }).click();
 
-    await expect(page).toHaveURL(SELLER_LOGIN_URL, { timeout: 15000 });
+    // New sellers are created "pending" and shown a review modal (no auto sign-in).
+    await expect(page.getByText('Application received')).toBeVisible({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Back to Sign In' }).click();
+    await expect(page).toHaveURL(SELLER_LOGIN_URL, { timeout: 10000 });
   });
 
-  test('3. New seller login', async ({ page }) => {
+  test('3. New seller login', async ({ page, request }) => {
+    // The new seller is pending approval; approve (enable) them as an admin
+    // would, then they can sign in.
+    try {
+      const tokenRes = await request.post('/api/uam/creation/token', {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        data: '',
+      });
+      if (tokenRes.ok()) {
+        const { access_token } = await tokenRes.json();
+        const searchRes = await request.get(
+          `/api/uam/users?email=${encodeURIComponent(NEW_SELLER.email)}`,
+          { headers: { Authorization: `Bearer ${access_token}` } }
+        );
+        if (searchRes.ok()) {
+          const users = await searchRes.json();
+          if (users.length > 0) {
+            await request.put(`/api/uam/users/${users[0].id}`, {
+              headers: { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' },
+              data: JSON.stringify({ enabled: true }),
+            });
+          }
+        }
+      }
+    } catch {
+      // non-fatal
+    }
+
     await loginAs(page, NEW_SELLER.email, NEW_SELLER.password);
   });
 

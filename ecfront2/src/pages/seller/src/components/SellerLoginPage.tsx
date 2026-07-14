@@ -50,6 +50,13 @@ export function SellerLoginPage() {
       localStorage.setItem("seller_access_token", accessToken);
       localStorage.setItem("seller_refresh_token", refreshToken);
 
+      // Record the login in the platform audit trail (best-effort).
+      fetch("/api/admin/audit", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "Seller Login", status: "success" }),
+      }).catch(() => {});
+
       navigate("/seller/portal");
     } catch (err) {
       if (axios.isAxiosError(err)) {
@@ -186,7 +193,7 @@ export function SellerLoginPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center space-y-3">
-          <p className="text-slate-500">© 2026 EC Site. All rights reserved.</p>
+          <p className="text-slate-500">© {new Date().getFullYear()} EC Site. All rights reserved.</p>
         </div>
       </div>
 
