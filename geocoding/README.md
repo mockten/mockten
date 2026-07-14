@@ -11,7 +11,6 @@ geocoding/
 ├── main.go        # entrypoint, HTTP handlers, Nominatim query building, JWT verification
 ├── main_test.go   # unit tests (UUID generation)
 ├── config.json    # service configuration
-├── test.sh        # manual test helper
 ├── go.mod / go.sum
 └── Dockerfile
 ```

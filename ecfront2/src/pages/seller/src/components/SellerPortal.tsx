@@ -323,11 +323,18 @@ export function SellerPortal() {
     }
   };
 
-  // Filtered products/orders for search
+  // Filtered products/orders for search. Orders are filtered client-side too so
+  // the global search box also works on the Overview tab (whose Recent Orders
+  // list is loaded without the server-side search param).
   const filteredProducts = products.filter(p =>
     !searchQuery || p.product_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  const filteredOrders = orders;
+  const orderQuery = searchQuery.toLowerCase();
+  const filteredOrders = orders.filter(o =>
+    !orderQuery ||
+    o.order_id.toLowerCase().includes(orderQuery) ||
+    (o.user_id || "").toLowerCase().includes(orderQuery)
+  );
 
   const totalOrderPages = Math.ceil(ordersTotal / ordersLimit);
   const totalProductPages = Math.ceil(productsTotal / productsLimit);

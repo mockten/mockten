@@ -38,6 +38,10 @@ export function CreateUserPage({ onBack, onUserCreated }: CreateUserPageProps) {
   const [passwordError, setPasswordError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Administrators have no store and are always active, so store name, phone and
+  // account-status fields are hidden and forced when the Admin role is chosen.
+  const isAdmin = formData.role === "admin";
+
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (field === "password" || field === "confirmPassword") {
@@ -48,6 +52,10 @@ export function CreateUserPage({ onBack, onUserCreated }: CreateUserPageProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!formData.role) {
+      setPasswordError("Please choose a role");
+      return;
+    }
     if (formData.password !== formData.confirmPassword) {
       setPasswordError("Passwords do not match");
       return;
@@ -66,9 +74,9 @@ export function CreateUserPage({ onBack, onUserCreated }: CreateUserPageProps) {
         email: formData.email,
         password: formData.password,
         role: formData.role,
-        status: formData.status || "active",
-        phone: formData.phone,
-        companyName: formData.companyName,
+        status: isAdmin ? "active" : (formData.status || "active"),
+        phone: isAdmin ? "" : formData.phone,
+        companyName: isAdmin ? "" : formData.companyName,
         notes: formData.notes,
       });
       if (!res.ok) {
@@ -125,6 +133,33 @@ export function CreateUserPage({ onBack, onUserCreated }: CreateUserPageProps) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Role — chosen first; it decides which fields apply below */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Role</CardTitle>
+              <CardDescription>Choose the type of account to create</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-w-sm">
+                <Label htmlFor="role">Role *</Label>
+                <Select
+                  value={formData.role}
+                  onValueChange={(value: string) => handleInputChange("role", value)}
+                  required
+                >
+                  <SelectTrigger id="role">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="seller">Seller</SelectItem>
+                    <SelectItem value="admin">Administrator</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-slate-500 text-sm">Customers register themselves from the storefront and aren't created here.</p>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Personal Information */}
           <Card>
             <CardHeader>
@@ -182,35 +217,39 @@ export function CreateUserPage({ onBack, onUserCreated }: CreateUserPageProps) {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+1 (555) 000-0000"
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange("phone", e.target.value)}
-                    className="pl-10"
-                  />
+              {!isAdmin && (
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="+1 (555) 000-0000"
+                      value={formData.phone}
+                      onChange={(e) => handleInputChange("phone", e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name</Label>
-                <div className="relative">
-                  <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input
-                    id="companyName"
-                    type="text"
-                    placeholder="Acme Corporation"
-                    value={formData.companyName}
-                    onChange={(e) => handleInputChange("companyName", e.target.value)}
-                    className="pl-10"
-                  />
+              {!isAdmin && (
+                <div className="space-y-2">
+                  <Label htmlFor="companyName">Store Name</Label>
+                  <div className="relative">
+                    <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                      id="companyName"
+                      type="text"
+                      placeholder="Shown to buyers on this seller's products"
+                      value={formData.companyName}
+                      onChange={(e) => handleInputChange("companyName", e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
@@ -221,26 +260,8 @@ export function CreateUserPage({ onBack, onUserCreated }: CreateUserPageProps) {
               <CardDescription>Configure user access and permissions</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="role">Role *</Label>
-                  <Select
-                    value={formData.role}
-                    onValueChange={(value: string) => handleInputChange("role", value)}
-                    required
-                  >
-                    <SelectTrigger id="role">
-                      <SelectValue placeholder="Select a role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="seller">Seller</SelectItem>
-                      <SelectItem value="admin">Administrator</SelectItem>
-                      <SelectItem value="user">Customer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
+              {!isAdmin && (
+                <div className="space-y-2 max-w-xs">
                   <Label htmlFor="status">Account Status *</Label>
                   <Select
                     value={formData.status}
@@ -257,7 +278,7 @@ export function CreateUserPage({ onBack, onUserCreated }: CreateUserPageProps) {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="password">Password *</Label>

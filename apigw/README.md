@@ -20,7 +20,7 @@ apigw/
 
 ## Public API surface
 
-Every route below is declared in `kong.yaml`. This is the same catalog rendered — with per-endpoint Description (EN/JA/ZH), Input Schema (including which parameters are Mandatory), Response Schema, and a runnable **Test Request** form — in the Developer Dashboard's **API Specifications** panel (http://localhost/dashboard). The Dashboard builds that view by parsing this file live, so keeping `kong.yaml` correct keeps the spec correct.
+Every route below is declared in `kong.yaml`. This is the same catalog rendered — with per-endpoint Description (EN/JA/ZH), Input Schema (including which parameters are Mandatory), Response Schema, and a runnable **Test Request** form — in the Developer Dashboard's **API Specifications** panel (`http://localhost/dashboard`). The Dashboard builds that view by parsing this file live, so keeping `kong.yaml` correct keeps the spec correct.
 
 ### Auth / UAM (Keycloak)
 | Method(s) | Path | Backend |
@@ -66,8 +66,9 @@ Every route below is declared in `kong.yaml`. This is the same catalog rendered 
 | Method(s) | Path | Backend |
 |-----------|------|---------|
 | GET | `/api/admin/orders` | sale (flagged orders) |
-| GET, POST | `/api/admin/audit` | sale (audit log) |
+| GET, POST | `/api/admin/audit` | sale (read / append the audit log) |
 | GET | `/api/admin/health` | sale (system health) |
+| GET, PUT | `/api/admin/seller` | sale (read / update a seller's store name) |
 
 ## Editing routes
 

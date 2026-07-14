@@ -547,6 +547,21 @@ services:
             headers:
               - Authorization:$http_authorization
 
+  - name: admin-seller-service
+    url: http://sale-service.default.svc.cluster.local:8080/v1/admin/seller
+    routes:
+      - name: admin-seller-route
+        paths:
+          - /api/admin/seller
+        strip_path: true
+        methods: [GET, PUT, OPTIONS]
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - Authorization:$http_authorization
+
   - name: seller-categories
     url: http://sale-service.default.svc.cluster.local:8080/v1/seller/categories
     routes:

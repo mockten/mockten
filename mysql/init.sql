@@ -38,10 +38,12 @@ CREATE TABLE IF NOT EXISTS AuditLog (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   action VARCHAR(128) NOT NULL,
   actor VARCHAR(255) NOT NULL,
+  actor_type VARCHAR(16) NOT NULL DEFAULT 'system',
   target VARCHAR(255),
   status ENUM('success','failed','warning') NOT NULL DEFAULT 'success',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_audit_created (created_at)
+  INDEX idx_audit_created (created_at),
+  INDEX idx_audit_actor_type (actor_type)
 );
 
 CREATE TABLE IF NOT EXISTS Category (
@@ -1723,11 +1725,14 @@ SET p.avg_review = r.avg_review,
 -- WHERE r.product_id IS NULL
 --   AND (p.avg_review <> 0.0 OR p.review_count <> 0);
 -- Seed audit-log entries so the Admin Portal Activity Logs is populated on first load.
-INSERT INTO AuditLog (action, actor, target, status, created_at) VALUES
-  ('Admin Login', 'superadmin@example.com', NULL, 'success', NOW() - INTERVAL 2 HOUR),
-  ('User Created', 'superadmin@example.com', 'newseller@example.com', 'success', NOW() - INTERVAL 90 MINUTE),
-  ('Failed Login Attempt', 'unknown@example.com', NULL, 'failed', NOW() - INTERVAL 45 MINUTE),
-  ('User Deleted', 'superadmin@example.com', 'spam@example.com', 'warning', NOW() - INTERVAL 20 MINUTE);
+INSERT INTO AuditLog (action, actor, actor_type, target, status, created_at) VALUES
+  ('Admin Login', 'superadmin@example.com', 'admin', NULL, 'success', NOW() - INTERVAL 2 HOUR),
+  ('User Created', 'superadmin@example.com', 'admin', 'newseller@example.com', 'success', NOW() - INTERVAL 90 MINUTE),
+  ('Seller Login', 'auto_parts@example.com', 'seller', NULL, 'success', NOW() - INTERVAL 70 MINUTE),
+  ('Product Created', 'auto_parts@example.com', 'seller', 'Brake Pad Set', 'success', NOW() - INTERVAL 65 MINUTE),
+  ('Failed Login Attempt', 'unknown@example.com', 'customer', NULL, 'failed', NOW() - INTERVAL 45 MINUTE),
+  ('Order Placed', 'shopper@example.com', 'customer', 'order-demo-0001', 'success', NOW() - INTERVAL 30 MINUTE),
+  ('User Deleted', 'superadmin@example.com', 'admin', 'spam@example.com', 'warning', NOW() - INTERVAL 20 MINUTE);
 
 -- Seed a flagged order shipping to an EU country so Admin Order Monitoring's
 -- "Unusual location (EU)" detection demonstrably fires on real data.

@@ -11,14 +11,14 @@ mockten exposes four distinct web surfaces. All run locally behind the same ngin
 
 | Surface | URL | Who it's for |
 |---------|-----|--------------|
-| **Mockten storefront** | http://localhost/ | Buyers — browse, search, cart, checkout |
-| **Developer Dashboard** | http://localhost/dashboard | Operators/developers — monitoring & ops |
-| **Seller Portal** | http://localhost/seller/login | Sellers — manage a store |
-| **Admin Portal** | http://localhost/admin | Administrators — platform governance |
+| **Mockten storefront** | `http://localhost/` | Buyers — browse, search, cart, checkout |
+| **Developer Dashboard** | `http://localhost/dashboard` | Operators/developers — monitoring & ops |
+| **Seller Portal** | `http://localhost/seller/login` | Sellers — manage a store |
+| **Admin Portal** | `http://localhost/admin` | Administrators — platform governance |
 
 ---
 
-### 🛒 Mockten storefront — http://localhost/
+### 🛒 Mockten storefront — `http://localhost/`
 
 The buyer-facing shop. Sign in at `/user/login` (or via Google/Facebook SSO — see [Authentication](#google-authentication-setup)).
 
@@ -32,9 +32,9 @@ The buyer-facing shop. Sign in at `/user/login` (or via Google/Facebook SSO — 
 
 ---
 
-### 📊 Developer Dashboard — http://localhost/dashboard
+### 📊 Developer Dashboard — `http://localhost/dashboard`
 
-A real-time internal portal for monitoring and operating the platform (introduced in [PR #195](https://github.com/mockten/mockten/pull/195)).
+A real-time internal portal for monitoring and operating the platform.
 
 | Panel | Description |
 |-------|-------------|
@@ -55,9 +55,9 @@ A real-time internal portal for monitoring and operating the platform (introduce
 
 ---
 
-### 🏪 Seller Portal — http://localhost/seller/login
+### 🏪 Seller Portal — `http://localhost/seller/login`
 
-Where sellers manage their store, all backed by live data (introduced in [PR #198](https://github.com/mockten/mockten/pull/198)).
+Where sellers manage their store, all backed by live data.
 
 - **Auth**: sign-up creates a Keycloak user in the **Seller** group (store name & phone saved as attributes); sign-in verifies the `seller` role. New sellers start **pending** until an administrator approves them.
 - **Overview**: Total Revenue / Orders / Products Sold / Customers cards with month-over-month change, plus a Recent Orders table.
@@ -69,7 +69,7 @@ Where sellers manage their store, all backed by live data (introduced in [PR #19
 
 ---
 
-### 🛡️ Admin Portal — http://localhost/admin
+### 🛡️ Admin Portal — `http://localhost/admin`
 
 Platform governance for administrators, backed by live Keycloak and backend data. Sign in with an administrator account (e.g. `superadmin` / `superadmin` in local dev).
 
@@ -143,7 +143,8 @@ The versions below are what the project is currently built and tested against (C
 | Go | 1.23+ (CI pins `1.23`; service images build on `golang:1.26`, modules target 1.24–1.25) |
 | Node.js | 20+ (Dashboard image uses `node:22`) |
 | [act](https://github.com/nektos/act) | 0.2.88 (runs the CI workflow locally) |
-| Docker | Docker Desktop / Engine with Compose v2 |
+| Docker Engine / CLI | 24+ (developed on 29.x); the `docker` CLI drives image builds and `docker compose` |
+| Docker Compose | v2 (developed on Compose v2.x, invoked as `docker compose`) |
 | [gotask](https://taskfile.dev/#/installation) | latest (the `task` runner drives every workflow) |
 
 ## Google Authentication Setup
@@ -152,7 +153,7 @@ To use Goole SignUp/SignIn, please create Google auth client like below.
 | Setting                   | Value                                                |
 |---------------------------|------------------------------------------------------|
 | Application type          | Web application                                    |
-| Authorized Redirect URIs | http://localhost/api/uam/broker/google/endpoint     |
+| Authorized Redirect URIs | `http://localhost/api/uam/broker/google/endpoint`     |
 
 Once you get Client ID/secret, please replace the value in uam/config.json
 <img width="1186" height="508" alt="CleanShot 2025-07-22 at 16 42 09@2x" src="https://github.com/user-attachments/assets/cd983364-6a7e-443f-909c-3f29277d6ad9" />
@@ -184,7 +185,7 @@ task -v
     task build
     ```
 
-3. Open the storefront at http://localhost and explore. The other surfaces are at
+3. Open the storefront at `http://localhost` and explore. The other surfaces are at
    `/dashboard`, `/seller/login`, and `/admin`.
 
     ![CleanShot 2025-02-14 at 13 23 37@2x](https://github.com/user-attachments/assets/32157356-2d52-4583-90f8-0469ad32765e)

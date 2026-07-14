@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
-import { getUser, updateUser, deleteUser, getStoreName } from "./adminApi";
+import { getUser, updateUser, deleteUser, getStoreName, getSellerStoreName, updateSellerStoreName } from "./adminApi";
 
 interface EditUserPageProps {
   onBack: () => void;
@@ -44,6 +44,8 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [isSeller, setIsSeller] = useState(false);
+  const [initialStoreName, setInitialStoreName] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -55,12 +57,26 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
         setLoading(false);
         return;
       }
+      const email = u.email || u.username || "";
+      const attrs = u.attributes || {};
+      const seller = !!(attrs.storeName || attrs.description);
+      // Prefer the buyer-facing store name from the Seller table (what the
+      // storefront/Seller Portal show); fall back to the Keycloak attribute.
+      const sellerTableName = await getSellerStoreName(email);
+      if (cancelled) return;
+      const storeName = sellerTableName || getStoreName(u);
+      const isSellerAcct = seller || !!sellerTableName;
+      // active | pending | suspended — pending is disabled + a `status` marker.
+      const isPending = (attrs.status || []).includes("pending");
+      const status = u.enabled === false ? (isPending ? "pending" : "suspended") : "active";
+      setIsSeller(isSellerAcct);
+      setInitialStoreName(storeName);
       setFormData({
         firstName: u.firstName || "",
         lastName: u.lastName || "",
-        email: u.email || u.username || "",
-        storeName: getStoreName(u),
-        status: u.enabled === false ? "suspended" : "active",
+        email,
+        storeName,
+        status,
       });
       setLoading(false);
     })();
@@ -81,8 +97,8 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
-        storeName: formData.storeName,
-        enabled: formData.status === "active",
+        status: formData.status,
+        ...(isSeller ? { storeName: formData.storeName } : {}),
       },
       formData.email
     );
@@ -90,6 +106,11 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
       setError(res.error || "Failed to update user.");
       setSaving(false);
       return;
+    }
+    // Persist the buyer-facing store name to the Seller table so the change is
+    // reflected on the storefront, not just in Keycloak.
+    if (isSeller && formData.storeName !== initialStoreName) {
+      await updateSellerStoreName(formData.email, formData.storeName, formData.email);
     }
     setSuccess(true);
     setTimeout(() => onUserUpdated(), 1000);
@@ -160,10 +181,12 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
                     <Input id="email" type="email" value={formData.email} onChange={(e) => handleInputChange("email", e.target.value)} className="pl-10" />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="storeName">Store Name</Label>
-                  <Input id="storeName" value={formData.storeName} onChange={(e) => handleInputChange("storeName", e.target.value)} placeholder="Shown to buyers on this seller's products" />
-                </div>
+                {isSeller && (
+                  <div className="space-y-2">
+                    <Label htmlFor="storeName">Store Name</Label>
+                    <Input id="storeName" value={formData.storeName} onChange={(e) => handleInputChange("storeName", e.target.value)} placeholder="Shown to buyers on this seller's products" />
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -179,6 +202,7 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
                     <SelectTrigger id="status"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="suspended">Suspended</SelectItem>
                     </SelectContent>
                   </Select>

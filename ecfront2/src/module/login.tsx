@@ -26,6 +26,14 @@ export const login = async (userID: string, password: string): Promise<LoginResp
     // Save tokens here as a backup
     setTokens(accessToken, refreshToken);
 
+    // Record the login in the platform audit trail (best-effort). The actor
+    // type (customer/seller/admin) is derived server-side from the token roles.
+    fetch('/api/admin/audit', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'Customer Login', status: 'success' }),
+    }).catch(() => {});
+
     const userInfoResponse = await axios.get(USER_INFO_URL, {
       headers: {
         Authorization: `Bearer ${accessToken}`,

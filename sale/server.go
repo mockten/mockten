@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"net/http"
 	"os"
@@ -117,6 +118,8 @@ func main() {
 	r.GET("/v1/admin/audit", handleGetAudit)
 	r.POST("/v1/admin/audit", handlePostAudit)
 	r.GET("/v1/admin/health", handleAdminHealth)
+	r.GET("/v1/admin/seller", handleAdminGetSeller)
+	r.PUT("/v1/admin/seller", handleAdminPutSeller)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -168,6 +171,62 @@ func extractEmailFromJWT(c *gin.Context) (string, error) {
 		return "", fmt.Errorf("email claim not found in JWT")
 	}
 	return email, nil
+}
+
+// actorTypeFromJWT classifies the caller as admin, seller or customer based on
+// the realm roles carried in their token. Used to tag audit entries so the
+// Admin Portal can filter the activity log by user type.
+func actorTypeFromJWT(c *gin.Context) string {
+	authHeader := c.GetHeader("Authorization")
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 {
+		return "system"
+	}
+	tokenParts := strings.Split(parts[1], ".")
+	if len(tokenParts) < 2 {
+		return "system"
+	}
+	payload := tokenParts[1]
+	switch len(payload) % 4 {
+	case 2:
+		payload += "=="
+	case 3:
+		payload += "="
+	}
+	decoded, err := base64.URLEncoding.DecodeString(payload)
+	if err != nil {
+		decoded, err = base64.RawURLEncoding.DecodeString(tokenParts[1])
+		if err != nil {
+			return "system"
+		}
+	}
+	var claims map[string]interface{}
+	if err := json.Unmarshal(decoded, &claims); err != nil {
+		return "system"
+	}
+	// Collect roles from either the flat "roles" claim or realm_access.roles.
+	roleSet := map[string]bool{}
+	collect := func(v interface{}) {
+		if arr, ok := v.([]interface{}); ok {
+			for _, r := range arr {
+				if s, ok := r.(string); ok {
+					roleSet[strings.ToLower(s)] = true
+				}
+			}
+		}
+	}
+	collect(claims["roles"])
+	if ra, ok := claims["realm_access"].(map[string]interface{}); ok {
+		collect(ra["roles"])
+	}
+	switch {
+	case roleSet["admin"]:
+		return "admin"
+	case roleSet["seller"]:
+		return "seller"
+	default:
+		return "customer"
+	}
 }
 
 func handleSellerStats(c *gin.Context) {
@@ -1030,7 +1089,17 @@ func handleAdminOrders(c *gin.Context) {
 		CreatedAt string  `json:"created_at"`
 	}
 
-	var flagged []AdminOrder
+	// First pass: scan every order in the window and accumulate amount
+	// statistics so "high value" can be a *relative* anomaly (a statistical
+	// outlier for this store) rather than an arbitrary fixed dollar amount —
+	// $200 is unremarkable for many catalogs, so we flag orders that are far
+	// above this store's own norm instead.
+	type scanned struct {
+		o          AdminOrder
+		rapidCount int
+	}
+	var all []scanned
+	var sum, sumSq float64
 	for rows.Next() {
 		var o AdminOrder
 		var createdAt time.Time
@@ -1041,16 +1110,36 @@ func handleAdminOrders(c *gin.Context) {
 		}
 		o.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
 		o.Country = country
+		all = append(all, scanned{o, rapidCount})
+		sum += o.Amount
+		sumSq += o.Amount * o.Amount
+	}
 
+	// High-value threshold = mean + 3σ (the classic ~99.7th-percentile outlier
+	// cutoff). Only applied when there is enough data for the statistic to be
+	// meaningful; otherwise high-value flagging is skipped entirely.
+	n := len(all)
+	highThreshold := math.MaxFloat64
+	if n >= 20 {
+		mean := sum / float64(n)
+		variance := (sumSq - sum*sum/float64(n)) / float64(n-1)
+		if variance > 0 {
+			highThreshold = mean + 3*math.Sqrt(variance)
+		}
+	}
+
+	var flagged []AdminOrder
+	for _, s := range all {
+		o := s.o
 		switch {
 		case o.Status == "canceled" || o.Status == "refunded" || o.Status == "failed":
 			o.Reason, o.Flagged = "Failed / canceled", true
-		case euCountries[country]:
-			o.Reason, o.Flagged = "Unusual location ("+country+", EU)", true
-		case rapidCount >= 3:
+		case euCountries[o.Country]:
+			o.Reason, o.Flagged = "Unusual location ("+o.Country+", EU)", true
+		case s.rapidCount >= 3:
 			o.Reason, o.Flagged = "Multiple rapid orders", true
-		case o.Amount >= 200:
-			o.Reason, o.Flagged = "High value", true
+		case o.Amount >= highThreshold:
+			o.Reason, o.Flagged = fmt.Sprintf("High value (outlier, ≥ $%.0f)", highThreshold), true
 		}
 		if o.Flagged {
 			flagged = append(flagged, o)
@@ -1089,12 +1178,22 @@ func handleGetAudit(c *gin.Context) {
 	}
 	offset := (page - 1) * limit
 
-	var total int
-	_ = db.QueryRow("SELECT COUNT(*) FROM AuditLog").Scan(&total)
+	// Optional filter by actor type (admin | seller | customer).
+	typeFilter := strings.ToLower(strings.TrimSpace(c.Query("type")))
+	where := ""
+	var args []interface{}
+	if typeFilter == "admin" || typeFilter == "seller" || typeFilter == "customer" {
+		where = "WHERE actor_type = ?"
+		args = append(args, typeFilter)
+	}
 
+	var total int
+	_ = db.QueryRow("SELECT COUNT(*) FROM AuditLog "+where, args...).Scan(&total)
+
+	pagedArgs := append(append([]interface{}{}, args...), limit, offset)
 	rows, err := db.Query(`
-		SELECT id, action, actor, target, status, created_at
-		FROM AuditLog ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`, limit, offset)
+		SELECT id, action, actor, COALESCE(actor_type,'system'), target, status, created_at
+		FROM AuditLog `+where+` ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`, pagedArgs...)
 	if err != nil {
 		log.Printf("audit query: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
@@ -1106,6 +1205,7 @@ func handleGetAudit(c *gin.Context) {
 		ID        int64  `json:"id"`
 		Action    string `json:"action"`
 		Actor     string `json:"actor"`
+		ActorType string `json:"actor_type"`
 		Target    string `json:"target"`
 		Status    string `json:"status"`
 		Timestamp string `json:"timestamp"`
@@ -1115,7 +1215,7 @@ func handleGetAudit(c *gin.Context) {
 		var a AuditRow
 		var target sql.NullString
 		var createdAt time.Time
-		if err := rows.Scan(&a.ID, &a.Action, &a.Actor, &target, &a.Status, &createdAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Action, &a.Actor, &a.ActorType, &target, &a.Status, &createdAt); err != nil {
 			continue
 		}
 		a.Target = target.String
@@ -1148,9 +1248,10 @@ func handlePostAudit(c *gin.Context) {
 	if status == "" {
 		status = "success"
 	}
+	actorType := actorTypeFromJWT(c)
 	if _, err := db.Exec(
-		"INSERT INTO AuditLog (action, actor, target, status) VALUES (?, ?, ?, ?)",
-		body.Action, actor, body.Target, status,
+		"INSERT INTO AuditLog (action, actor, actor_type, target, status) VALUES (?, ?, ?, ?, ?)",
+		body.Action, actor, actorType, body.Target, status,
 	); err != nil {
 		log.Printf("audit insert: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
@@ -1193,9 +1294,19 @@ func handleAdminHealth(c *gin.Context) {
 		apiStatus, apiDetail = "degraded", "Elevated database latency"
 	}
 
-	catalogStatus, catalogDetail := "operational", "Inventory healthy"
-	if productCount > 0 && stockOut*100/max1(productCount) > 40 {
-		catalogStatus, catalogDetail = "degraded", "Many products are out of stock"
+	// Catalog / Inventory tracks how much of the catalog is out of stock.
+	// It goes "degraded" once more than 40% of products have zero stock — a
+	// signal that buyers are hitting too many unavailable listings.
+	const outOfStockThresholdPct = 40
+	outOfStockPct := 0
+	if productCount > 0 {
+		outOfStockPct = stockOut * 100 / productCount
+	}
+	catalogStatus := "operational"
+	catalogDetail := fmt.Sprintf("%d%% of catalog out of stock (%d/%d)", outOfStockPct, stockOut, productCount)
+	if outOfStockPct > outOfStockThresholdPct {
+		catalogStatus = "degraded"
+		catalogDetail = fmt.Sprintf("%d%% of catalog out of stock (%d/%d) — over the %d%% threshold", outOfStockPct, stockOut, productCount, outOfStockThresholdPct)
 	}
 
 	components := []Component{
@@ -1232,4 +1343,51 @@ func max1(n int) int {
 		return 1
 	}
 	return n
+}
+
+// handleAdminGetSeller returns a seller's store profile (store name +
+// description) by email, from the same `Seller` table the storefront and Seller
+// Portal read. Lets the Admin Portal show/prefill the real store name instead of
+// only the Keycloak attribute (which is empty for pre-seeded sellers).
+func handleAdminGetSeller(c *gin.Context) {
+	if _, err := extractEmailFromJWT(c); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	email := strings.TrimSpace(c.Query("email"))
+	if email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email is required"})
+		return
+	}
+	var name, desc sql.NullString
+	_ = db.QueryRow("SELECT seller_name, description FROM Seller WHERE seller_id = ?", email).Scan(&name, &desc)
+	c.JSON(http.StatusOK, gin.H{"email": email, "seller_name": name.String, "description": desc.String})
+}
+
+// handleAdminPutSeller upserts a seller's store name (the buyer-facing "vendor"
+// name) in the `Seller` table so an admin edit actually changes what buyers see.
+func handleAdminPutSeller(c *gin.Context) {
+	actor, err := extractEmailFromJWT(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	var body struct {
+		Email      string `json:"email"`
+		SellerName string `json:"seller_name"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Email) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email is required"})
+		return
+	}
+	if _, err := db.Exec(
+		"INSERT INTO Seller (seller_id, seller_name) VALUES (?, ?) ON DUPLICATE KEY UPDATE seller_name = VALUES(seller_name)",
+		body.Email, body.SellerName,
+	); err != nil {
+		log.Printf("admin update seller: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+	_, _ = db.Exec("INSERT INTO AuditLog (action, actor, actor_type, target, status) VALUES (?, ?, 'admin', ?, 'success')", "Store Name Updated", actor, body.Email)
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }

@@ -247,24 +247,59 @@ export function getStoreName(u: KcUser | null): string {
   return u?.attributes?.storeName?.[0] || "";
 }
 
+/**
+ * The buyer-facing store name lives in the backend `Seller` table (keyed by the
+ * seller's email), which the storefront and Seller Portal read. Prefer this over
+ * the Keycloak attribute so the Admin Portal shows the same value buyers see.
+ */
+export async function getSellerStoreName(email: string): Promise<string> {
+  try {
+    const res = await adminFetch(`/api/admin/seller?email=${encodeURIComponent(email)}`);
+    if (!res.ok) return "";
+    const data = await res.json();
+    return data.seller_name || "";
+  } catch {
+    return "";
+  }
+}
+
+/** Update the buyer-facing store name (Seller table) for a seller by email. */
+export async function updateSellerStoreName(email: string, sellerName: string, target: string): Promise<boolean> {
+  const res = await adminFetch(`/api/admin/seller`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, seller_name: sellerName }),
+  });
+  await postAudit("Store Name Updated", target, res.ok ? "success" : "failed");
+  return res.ok;
+}
+
 export async function updateUser(
   userId: string,
-  fields: { firstName?: string; lastName?: string; email?: string; enabled?: boolean; storeName?: string },
+  fields: { firstName?: string; lastName?: string; email?: string; status?: string; storeName?: string },
   target: string
 ): Promise<{ ok: boolean; error?: string }> {
   const body: Record<string, unknown> = {
     firstName: fields.firstName,
     lastName: fields.lastName,
     email: fields.email,
-    enabled: fields.enabled,
   };
-  // Merge storeName into the existing attributes so we don't wipe others.
-  if (fields.storeName !== undefined) {
+  // Status (active | pending | suspended) maps to Keycloak enabled + the
+  // `status` attribute so "pending" survives as a distinct, meaningful state.
+  const needsAttrMerge = fields.status !== undefined || fields.storeName !== undefined;
+  let attrs: Record<string, string[]> = {};
+  if (needsAttrMerge) {
     const current = await getUser(userId);
-    const attrs = current?.attributes || {};
-    attrs.storeName = [fields.storeName];
-    body.attributes = attrs;
+    attrs = current?.attributes || {};
   }
+  if (fields.status !== undefined) {
+    body.enabled = fields.status === "active";
+    if (fields.status === "pending") attrs.status = ["pending"];
+    else delete attrs.status;
+  }
+  if (fields.storeName !== undefined) attrs.storeName = [fields.storeName];
+  if (needsAttrMerge) body.attributes = attrs;
+
   const res = await adminFetch(`/api/uam/users/${encodeURIComponent(userId)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -338,13 +373,15 @@ export interface AuditEntry {
   id: number;
   action: string;
   actor: string;
+  actor_type: string; // admin | seller | customer | system
   target: string;
   status: string;
   timestamp: string;
 }
 
-export async function fetchAudit(page = 1, limit = 10): Promise<Paged<AuditEntry>> {
-  const res = await adminFetch(`/api/admin/audit?page=${page}&limit=${limit}`);
+export async function fetchAudit(page = 1, limit = 10, type = "All"): Promise<Paged<AuditEntry>> {
+  const typeQ = type && type !== "All" ? `&type=${encodeURIComponent(type)}` : "";
+  const res = await adminFetch(`/api/admin/audit?page=${page}&limit=${limit}${typeQ}`);
   if (!res.ok) throw new Error(`audit ${res.status}`);
   const data = await res.json();
   return { items: data.logs || [], total: data.total || 0 };

@@ -60,7 +60,15 @@ export function SellerLoginPage() {
       navigate("/seller/portal");
     } catch (err) {
       if (axios.isAxiosError(err)) {
-        setError("Login failed. Please check your credentials.");
+        // Keycloak returns "Account disabled" for accounts that are pending
+        // approval (or suspended). Show a review-in-progress message instead of
+        // a generic credentials error so new sellers aren't confused.
+        const desc = String(err.response?.data?.error_description || "").toLowerCase();
+        if (err.response?.status === 400 && (desc.includes("disabled") || desc.includes("not fully set up"))) {
+          setError("Your seller account is still under review. Please try signing in again in about 24 hours once it's approved.");
+        } else {
+          setError("Login failed. Please check your credentials.");
+        }
       } else {
         setError("An unexpected error occurred.");
       }

@@ -1720,6 +1720,11 @@ const API_DESCRIPTIONS = {
 
   'PUT /api/uam/users/([^/]+)':
     'Updates a single Keycloak user by UUID via the Admin REST API. Used by the Admin Portal\'s Edit User screen to save changes to name, email, enabled state, and custom attributes (e.g. <code>storeName</code>). The <code>userId</code> path segment is the Keycloak user id. Requires an admin Bearer token forwarded by Kong.',
+
+  'GET /api/admin/seller':
+    'Returns a seller\'s store profile (store name + description) by <code>email</code>, read from the same <code>Seller</code> table the storefront and Seller Portal use. Lets the Admin Portal show the real buyer-facing store name instead of only the Keycloak attribute (which is empty for pre-seeded sellers). Requires an admin Bearer token.',
+  'PUT /api/admin/seller':
+    'Updates a seller\'s buyer-facing store name in the <code>Seller</code> table, so an admin edit actually changes what buyers see on the storefront (not just the Keycloak attribute). Body: <code>email</code> + <code>seller_name</code>. Requires an admin Bearer token.',
 };
 
 const API_DESCRIPTIONS_JA = {
@@ -1795,6 +1800,8 @@ const API_DESCRIPTIONS_JA = {
   'GET /api/admin/health': 'Admin PortalのSystem Health / System Alertsパネル用に、リアルタイムのシステムヘルスを返します。<code>sale</code>サービスが各コンポーネントの状態を実シグナル（DB到達性・テーブル行数。例: Catalog/Inventoryは在庫切れ比率を反映）から算出し、劣化時には口語的なアラートとサマリメトリクスを出力します。管理者Bearerトークンが必要です。',
   'GET /api/uam/users/([^/]+)': 'Admin REST APIでKeycloakユーザーをUUID指定で1件取得します（<code>userId</code>パスがKeycloakユーザーID）。Admin PortalのEdit User画面で、<code>storeName</code>などのカスタム属性を含むフォームの事前入力に使用します。Kongが管理者Bearerトークンを転送しURIを書き換えます。',
   'PUT /api/uam/users/([^/]+)': 'Admin REST APIでKeycloakユーザーをUUID指定で1件更新します。Admin PortalのEdit User画面で、氏名・メール・有効状態・カスタム属性（例<code>storeName</code>）の変更保存に使用します。<code>userId</code>パスがKeycloakユーザーID。管理者Bearerトークンが必要です。',
+  'GET /api/admin/seller': '<code>email</code>でセラーのストアプロフィール（ストア名・説明）を返します。ストアフロントやSeller Portalが参照するのと同じ<code>Seller</code>テーブルから読み取り、Admin Portalが（事前投入セラーでは空になる）Keycloak属性ではなく実際の店名を表示できるようにします。管理者Bearerトークンが必要です。',
+  'PUT /api/admin/seller': '<code>Seller</code>テーブルのセラーの店名（購入者に見える店名）を更新します。管理者の編集がKeycloak属性だけでなくストアフロント表示にも反映されます。ボディ: <code>email</code> + <code>seller_name</code>。管理者Bearerトークンが必要です。',
 };
 
 const API_DESCRIPTIONS_ZH = {
@@ -1870,6 +1877,8 @@ const API_DESCRIPTIONS_ZH = {
   'GET /api/admin/health': '为Admin Portal的系统健康/系统告警面板返回实时系统健康状态。<code>sale</code>服务根据真实信号（数据库可达性与表行数，例如Catalog/Inventory反映缺货比例）推导各组件状态，组件劣化时输出口语化告警及汇总指标。需要管理员Bearer令牌。',
   'GET /api/uam/users/([^/]+)': '通过Admin REST API按UUID获取单个Keycloak用户（<code>userId</code>路径段为Keycloak用户ID）。用于Admin Portal的编辑用户界面预填表单，包括<code>storeName</code>等自定义属性。Kong转发管理员Bearer令牌并重写URI。',
   'PUT /api/uam/users/([^/]+)': '通过Admin REST API按UUID更新单个Keycloak用户。用于Admin Portal的编辑用户界面保存姓名、邮箱、启用状态及自定义属性（如<code>storeName</code>）。<code>userId</code>路径段为Keycloak用户ID。需要管理员Bearer令牌。',
+  'GET /api/admin/seller': '按<code>email</code>返回卖家的店铺资料（店铺名+简介），读取自店面和卖家门户使用的同一<code>Seller</code>表，使Admin Portal显示真实的面向买家店铺名，而非（预置卖家为空的）Keycloak属性。需要管理员Bearer令牌。',
+  'PUT /api/admin/seller': '更新<code>Seller</code>表中卖家的面向买家店铺名，使管理员的修改真正改变买家在店面看到的名称（而不仅是Keycloak属性）。请求体：<code>email</code> + <code>seller_name</code>。需要管理员Bearer令牌。',
 };
 
 const API_SCHEMAS = {
@@ -2180,6 +2189,15 @@ const API_SCHEMAS = {
     '__auth__',
     { name: 'userId',  location: 'path', type: 'string',  desc: 'Keycloak user UUID (auto-filled with a real dev_user_* id)', desc_ja: 'KeycloakユーザーUUID（実在のdev_user_*で自動入力）', desc_zh: 'Keycloak用户UUID（自动填充真实dev_user_*）', required: true, default: '__first_user_id__' },
     { name: 'enabled', location: 'body', type: 'boolean', desc: 'Whether the account is enabled (partial update)', desc_ja: 'アカウント有効フラグ（部分更新）', desc_zh: '账号是否启用（部分更新）', required: false, default: true }
+  ],
+  'GET /api/admin/seller': [
+    '__auth__',
+    { name: 'email', location: 'query', type: 'string', desc: "Seller's email (= their Seller table id)", desc_ja: 'セラーのメール（＝Sellerテーブルのid）', desc_zh: '卖家邮箱（= Seller表的id）', required: true, default: 'auto_parts@example.com' }
+  ],
+  'PUT /api/admin/seller': [
+    '__auth__',
+    { name: 'email',       location: 'body', type: 'string', desc: "Seller's email (= their Seller table id)", desc_ja: 'セラーのメール（＝Sellerテーブルのid）', desc_zh: '卖家邮箱（= Seller表的id）', required: true, default: 'auto_parts@example.com' },
+    { name: 'seller_name', location: 'body', type: 'string', desc: 'New buyer-facing store name', desc_ja: '新しい購入者向け店名', desc_zh: '新的面向买家店铺名', required: true, default: 'Auto Parts Shop' }
   ]
 };
 
@@ -2548,6 +2566,14 @@ const API_RESPONSE_SCHEMAS = {
   'PUT /api/uam/users/([^/]+)': [
     { field: '(204)', type: 'No Content', desc: 'Keycloak returns 204 with an empty body on success', desc_ja: '成功時Keycloakは204（本文なし）を返す', desc_zh: '成功时Keycloak返回204（无正文）' },
   ],
+  'GET /api/admin/seller': [
+    { field: 'email',       type: 'string', desc: "The seller's email (echoed back)", desc_ja: 'セラーのメール（エコー）',   desc_zh: '卖家邮箱（回显）' },
+    { field: 'seller_name', type: 'string', desc: 'Buyer-facing store name',          desc_ja: '購入者向け店名',           desc_zh: '面向买家店铺名' },
+    { field: 'description', type: 'string', desc: 'About-the-vendor description',      desc_ja: 'ベンダー説明',             desc_zh: '关于卖家的描述' },
+  ],
+  'PUT /api/admin/seller': [
+    { field: 'success', type: 'boolean', desc: 'true when the store name was saved', desc_ja: '店名保存成功時にtrue', desc_zh: '店铺名保存成功时为true' },
+  ],
 };
 
 // Overrides the path used in the Test Request form when the Kong route path
@@ -2624,20 +2650,34 @@ async function initApiView() {
     let html = '';
     apiSpecs.forEach((svc, sIdx) => {
       svc.routes.forEach((route, rIdx) => {
-        const method = route.methods[0] || 'ANY';
         const path = route.paths[0] || '';
-        const methodColor = method === 'GET' ? 'var(--green)' : method === 'POST' ? 'var(--blue)' : method === 'DELETE' ? 'var(--red)' : method === 'PUT' ? '#d97706' : 'var(--text-muted)';
-        const methodBg = method === 'GET' ? '#16a34a22' : method === 'POST' ? 'var(--blue-bg)' : method === 'DELETE' ? '#dc262622' : method === 'PUT' ? '#d9770622' : 'var(--bg-secondary)';
-        html += `
-          <div class="db-list-item" id="api-item-${sIdx}-${rIdx}" onclick="selectApiRoute(${sIdx}, ${rIdx})">
-            <span class="badge" style="padding:1px 6px; font-size:10px; background:${methodBg}; color:${methodColor}; flex-shrink:0;">
-              ${method}
-            </span>
-            <span class="db-item-name" style="font-family:monospace; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-              ${path}
-            </span>
-          </div>
-        `;
+        const primary = route.methods[0] || 'ANY';
+        // List the primary method, plus any other method on the same route that
+        // is documented (so e.g. POST on a GET,POST route gets its own entry).
+        // Non-primary body methods are only listed when they have an input
+        // schema, so every listed request-bearing route shows a proper form.
+        const methodsToShow = [];
+        (route.methods || []).forEach((m) => {
+          if (m === 'OPTIONS' || methodsToShow.includes(m)) return;
+          const documented = !!findApiDescription(m, path);
+          const bodySafe = m === 'GET' || m === 'DELETE' || !!findApiSchema(m, path);
+          if (m === primary || (documented && bodySafe)) methodsToShow.push(m);
+        });
+        if (methodsToShow.length === 0) methodsToShow.push(primary);
+        methodsToShow.forEach((method) => {
+          const methodColor = method === 'GET' ? 'var(--green)' : method === 'POST' ? 'var(--blue)' : method === 'DELETE' ? 'var(--red)' : method === 'PUT' ? '#d97706' : 'var(--text-muted)';
+          const methodBg = method === 'GET' ? '#16a34a22' : method === 'POST' ? 'var(--blue-bg)' : method === 'DELETE' ? '#dc262622' : method === 'PUT' ? '#d9770622' : 'var(--bg-secondary)';
+          html += `
+            <div class="db-list-item" id="api-item-${sIdx}-${rIdx}-${method}" onclick="selectApiRoute(${sIdx}, ${rIdx}, '${method}')">
+              <span class="badge" style="padding:1px 6px; font-size:10px; background:${methodBg}; color:${methodColor}; flex-shrink:0;">
+                ${method}
+              </span>
+              <span class="db-item-name" style="font-family:monospace; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                ${path}
+              </span>
+            </div>
+          `;
+        });
       });
     });
     list.innerHTML = html || '<div class="db-error">No routes defined</div>';
@@ -2646,17 +2686,19 @@ async function initApiView() {
   }
 }
 
-let selectedSIdx = null, selectedRIdx = null;
+let selectedSIdx = null, selectedRIdx = null, selectedMethod = null;
 let _currentApiRoute = null; // {method, path} for language-switch re-render
-function selectApiRoute(sIdx, rIdx) {
+function selectApiRoute(sIdx, rIdx, methodOverride) {
   selectedSIdx = sIdx;
   selectedRIdx = rIdx;
-  document.querySelectorAll('#api-list-ul .db-list-item').forEach(el => el.classList.remove('active'));
-  document.getElementById(`api-item-${sIdx}-${rIdx}`).classList.add('active');
-
   const svc = apiSpecs[sIdx];
   const route = svc.routes[rIdx];
-  const method = route.methods[0] || 'GET';
+  const method = methodOverride || route.methods[0] || 'GET';
+  selectedMethod = method;
+  document.querySelectorAll('#api-list-ul .db-list-item').forEach(el => el.classList.remove('active'));
+  const activeItem = document.getElementById(`api-item-${sIdx}-${rIdx}-${method}`);
+  if (activeItem) activeItem.classList.add('active');
+
   const path = route.paths[0];
 
   document.getElementById('api-placeholder').style.display = 'none';
@@ -2828,7 +2870,7 @@ function selectApiRoute(sIdx, rIdx) {
 async function sendTestRequest() {
   const svc = apiSpecs[selectedSIdx];
   const route = svc.routes[selectedRIdx];
-  const method = route.methods[0] || 'GET';
+  const method = selectedMethod || route.methods[0] || 'GET';
   let path = route.paths[0];
   // Use override path when Kong route differs from actual service endpoint
   const overrideKey = `${method} ${_normalizePath(path)}`;
@@ -5788,7 +5830,7 @@ function applyLang() {
 
   // Re-render API spec panel with current language
   if (selectedSIdx !== null && selectedRIdx !== null) {
-    selectApiRoute(selectedSIdx, selectedRIdx);
+    selectApiRoute(selectedSIdx, selectedRIdx, selectedMethod);
   }
 }
 

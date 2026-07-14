@@ -74,7 +74,9 @@ interface AdminDashboardProps {
   onEditUser?: (userId: string) => void;
 }
 
-const PAGE = 10;
+const PAGE_SIZES = [10, 25, 50, 100];
+// How often the dashboard auto-refreshes (ms). Manual Reload still works.
+const AUTO_RELOAD_MS = 60_000;
 
 export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState("overview");
@@ -82,18 +84,24 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<{ id: string; name: string; email: string } | null>(null);
   const [investigateOrder, setInvestigateOrder] = useState<AdminOrder | null>(null);
+  const [pendingModalOpen, setPendingModalOpen] = useState(false);
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [userStatusFilter, setUserStatusFilter] = useState("All");
+  const [userRoleFilter, setUserRoleFilter] = useState("All");
   const [userPage, setUserPage] = useState(1);
+  const [usersLimit, setUsersLimit] = useState(10);
 
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [ordersTotal, setOrdersTotal] = useState(0);
   const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersLimit, setOrdersLimit] = useState(10);
 
   const [logs, setLogs] = useState<AuditEntry[]>([]);
   const [logsTotal, setLogsTotal] = useState(0);
   const [logsPage, setLogsPage] = useState(1);
+  const [logsLimit, setLogsLimit] = useState(10);
+  const [logsType, setLogsType] = useState("All");
 
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -107,17 +115,17 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
     if (!isAdminAuthed()) onLogout();
   }, [onLogout]);
 
-  const loadOrders = useCallback(async (page: number) => {
+  const loadOrders = useCallback(async (page: number, limit: number) => {
     try {
-      const p = await fetchAdminOrders(page, PAGE);
+      const p = await fetchAdminOrders(page, limit);
       setOrders(p.items);
       setOrdersTotal(p.total);
     } catch { /* handled */ }
   }, []);
 
-  const loadLogs = useCallback(async (page: number) => {
+  const loadLogs = useCallback(async (page: number, limit: number, type: string) => {
     try {
-      const p = await fetchAudit(page, PAGE);
+      const p = await fetchAudit(page, limit, type);
       setLogs(p.items);
       setLogsTotal(p.total);
     } catch { /* handled */ }
@@ -129,13 +137,19 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
 
   const reloadAll = useCallback(async () => {
     setLoading(true);
-    await Promise.allSettled([loadUsers(), loadOrders(ordersPage), loadLogs(logsPage), loadHealth()]);
+    await Promise.allSettled([loadUsers(), loadOrders(ordersPage, ordersLimit), loadLogs(logsPage, logsLimit, logsType), loadHealth()]);
     setLoading(false);
-  }, [loadUsers, loadOrders, loadLogs, loadHealth, ordersPage, logsPage]);
+  }, [loadUsers, loadOrders, loadLogs, loadHealth, ordersPage, ordersLimit, logsPage, logsLimit, logsType]);
 
   useEffect(() => { reloadAll(); /* eslint-disable-next-line */ }, []);
-  useEffect(() => { loadOrders(ordersPage); }, [ordersPage, loadOrders]);
-  useEffect(() => { loadLogs(logsPage); }, [logsPage, loadLogs]);
+  useEffect(() => { loadOrders(ordersPage, ordersLimit); }, [ordersPage, ordersLimit, loadOrders]);
+  useEffect(() => { loadLogs(logsPage, logsLimit, logsType); }, [logsPage, logsLimit, logsType, loadLogs]);
+
+  // Auto-refresh every minute so the dashboard stays live without a manual Reload.
+  useEffect(() => {
+    const id = setInterval(() => { reloadAll(); }, AUTO_RELOAD_MS);
+    return () => clearInterval(id);
+  }, [reloadAll]);
 
   const handleLogout = async () => {
     await adminLogout();
@@ -190,32 +204,45 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
   const q = searchQuery.toLowerCase();
   const filteredUsers = users.filter((u) => {
     if (userStatusFilter !== "All" && u.status !== userStatusFilter.toLowerCase()) return false;
+    if (userRoleFilter !== "All" && u.role !== userRoleFilter) return false;
     return !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
   });
-  const userTotalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE));
-  const pagedUsers = filteredUsers.slice((userPage - 1) * PAGE, userPage * PAGE);
+  const userTotalPages = Math.max(1, Math.ceil(filteredUsers.length / usersLimit));
+  const pagedUsers = filteredUsers.slice((userPage - 1) * usersLimit, userPage * usersLimit);
 
-  const ordersTotalPages = Math.max(1, Math.ceil(ordersTotal / PAGE));
-  const logsTotalPages = Math.max(1, Math.ceil(logsTotal / PAGE));
-  const pendingCount = users.filter((u) => u.status === "pending").length;
+  const ordersTotalPages = Math.max(1, Math.ceil(ordersTotal / ordersLimit));
+  const logsTotalPages = Math.max(1, Math.ceil(logsTotal / logsLimit));
+  const pendingUsers = users.filter((u) => u.status === "pending");
+  const pendingCount = pendingUsers.length;
 
   const systemStats = [
-    { title: "Total Users", value: String(users.length), status: "normal", icon: Users },
-    { title: "Pending Approvals", value: String(pendingCount), status: pendingCount > 0 ? "warning" : "normal", icon: Clock },
-    { title: "Flagged Orders", value: String(ordersTotal), status: ordersTotal > 0 ? "warning" : "normal", icon: ShoppingCart },
-    { title: "System Alerts", value: String(health?.alerts.length ?? 0), status: (health?.alerts.length ?? 0) > 0 ? "warning" : "normal", icon: AlertTriangle },
+    { title: "Total Users", value: String(users.length), status: "normal", icon: Users, onClick: () => setActiveTab("users") },
+    { title: "Pending Approvals", value: String(pendingCount), status: pendingCount > 0 ? "warning" : "normal", icon: Clock, onClick: () => setPendingModalOpen(true) },
+    { title: "Flagged Orders", value: String(ordersTotal), status: ordersTotal > 0 ? "warning" : "normal", icon: ShoppingCart, onClick: () => setActiveTab("orders") },
+    { title: "System Alerts", value: String(health?.alerts.length ?? 0), status: (health?.alerts.length ?? 0) > 0 ? "warning" : "normal", icon: AlertTriangle, onClick: () => setActiveTab("system") },
   ];
 
+  const PageSize = ({ value, onChange }: { value: number; onChange: (n: number) => void }) => (
+    <div className="flex items-center gap-2 text-sm text-slate-500">
+      <span>Rows:</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="border border-slate-200 rounded-md px-2 py-1 text-sm bg-white"
+      >
+        {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+      </select>
+    </div>
+  );
+
   const Pagination = ({ page, totalPages, total, onPrev, onNext }: { page: number; totalPages: number; total: number; onPrev: () => void; onNext: () => void }) => (
-    totalPages > 1 ? (
-      <div className="flex items-center justify-between mt-4">
-        <span className="text-sm text-slate-500">Page {page} of {totalPages} ({total} total)</span>
-        <div className="flex gap-2">
-          <Button variant="ghost" size="sm" disabled={page <= 1} onClick={onPrev}>Previous</Button>
-          <Button variant="ghost" size="sm" disabled={page >= totalPages} onClick={onNext}>Next</Button>
-        </div>
+    <div className="flex items-center justify-between mt-4">
+      <span className="text-sm text-slate-500">Page {page} of {totalPages} ({total} total)</span>
+      <div className="flex gap-2">
+        <Button variant="ghost" size="sm" disabled={page <= 1} onClick={onPrev}>Previous</Button>
+        <Button variant="ghost" size="sm" disabled={page >= totalPages} onClick={onNext}>Next</Button>
       </div>
-    ) : null
+    </div>
   );
 
   return (
@@ -314,7 +341,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {systemStats.map((stat) => (
-                  <Card key={stat.title}>
+                  <Card key={stat.title} onClick={stat.onClick} className="cursor-pointer hover:shadow-md transition-shadow">
                     <CardContent className="pt-6">
                       <div className="flex items-start justify-between">
                         <div>
@@ -383,6 +410,17 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                       <TabsTrigger value="Suspended">Suspended</TabsTrigger>
                     </TabsList>
                   </Tabs>
+                  <select
+                    value={userRoleFilter}
+                    onChange={(e) => { setUserRoleFilter(e.target.value); setUserPage(1); }}
+                    className="border border-slate-200 rounded-md px-3 py-1.5 text-sm bg-white"
+                    aria-label="Filter by role"
+                  >
+                    <option value="All">All roles</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Seller">Seller</option>
+                    <option value="User">Customer</option>
+                  </select>
                   <Button size="sm" className="!text-white gap-2" style={{ backgroundColor: "#dc2626" }} onClick={onCreateUser}>
                     <UserPlus className="w-4 h-4" />
                     Add User
@@ -392,6 +430,9 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
 
               <Card>
                 <CardContent className="pt-6">
+                  <div className="flex justify-end mb-3">
+                    <PageSize value={usersLimit} onChange={(n) => { setUsersLimit(n); setUserPage(1); }} />
+                  </div>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -470,8 +511,13 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Flagged Orders</CardTitle>
-                  <CardDescription>Flagged rows require investigation</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Flagged Orders</CardTitle>
+                      <CardDescription>Flagged rows require investigation</CardDescription>
+                    </div>
+                    <PageSize value={ordersLimit} onChange={(n) => { setOrdersLimit(n); setOrdersPage(1); }} />
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -555,18 +601,35 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
           {/* Activity Logs */}
           {activeTab === "logs" && (
             <div className="space-y-6">
-              <div>
-                <h2 className="text-slate-900 mb-1">Activity Logs</h2>
-                <p className="text-slate-600">Audit trail across all users — admins, sellers and customers ({logsTotal})</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-slate-900 mb-1">Activity Logs</h2>
+                  <p className="text-slate-600">Audit trail across all users — admins, sellers and customers ({logsTotal})</p>
+                </div>
+                <select
+                  value={logsType}
+                  onChange={(e) => { setLogsType(e.target.value); setLogsPage(1); }}
+                  className="border border-slate-200 rounded-md px-3 py-1.5 text-sm bg-white"
+                  aria-label="Filter by user type"
+                >
+                  <option value="All">All user types</option>
+                  <option value="admin">Admin</option>
+                  <option value="seller">Seller</option>
+                  <option value="customer">Customer</option>
+                </select>
               </div>
 
               <Card>
                 <CardContent className="pt-6">
+                  <div className="flex justify-end mb-3">
+                    <PageSize value={logsLimit} onChange={(n) => { setLogsLimit(n); setLogsPage(1); }} />
+                  </div>
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Action</TableHead>
                         <TableHead>Actor</TableHead>
+                        <TableHead>Type</TableHead>
                         <TableHead>Target</TableHead>
                         <TableHead>Timestamp</TableHead>
                         <TableHead>Status</TableHead>
@@ -577,6 +640,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                         <TableRow key={log.id}>
                           <TableCell>{log.action}</TableCell>
                           <TableCell>{log.actor}</TableCell>
+                          <TableCell><Badge variant="secondary" className="bg-slate-100 text-slate-700 capitalize">{log.actor_type || "system"}</Badge></TableCell>
                           <TableCell className="text-slate-500">{log.target || "—"}</TableCell>
                           <TableCell className="text-slate-500">{log.timestamp}</TableCell>
                           <TableCell>
@@ -588,10 +652,10 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                         </TableRow>
                       ))}
                       {loading && logs.length === 0 && (
-                        <TableRow><TableCell colSpan={5} className="text-center text-slate-500 py-8"><span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span></TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-8"><span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span></TableCell></TableRow>
                       )}
                       {!loading && logs.length === 0 && (
-                        <TableRow><TableCell colSpan={5} className="text-center text-slate-500 py-8">No activity yet</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-8">No activity yet</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -637,6 +701,40 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
             </div>
             <div className="mt-5 flex justify-end">
               <Button variant="outline" onClick={() => setInvestigateOrder(null)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Approvals Modal */}
+      {pendingModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setPendingModalOpen(false)}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold mb-1">Pending Approvals</h3>
+            <p className="text-sm text-slate-500 mb-4">Seller accounts awaiting review ({pendingCount})</p>
+            {pendingUsers.length === 0 ? (
+              <p className="text-slate-500 py-8 text-center">No pending requests.</p>
+            ) : (
+              <div className="space-y-3">
+                {pendingUsers.map((u) => (
+                  <div key={u.id} className="flex items-center justify-between border border-slate-200 rounded-lg p-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900 truncate">{u.name}</p>
+                      <p className="text-sm text-slate-500 truncate">{u.email}</p>
+                      <p className="text-xs text-slate-400">{u.role} · requested {u.joined}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button variant="outline" size="sm" onClick={() => { setPendingModalOpen(false); onEditUser?.(u.id); }}>Details</Button>
+                      <Button size="sm" className="!text-white gap-1" style={{ backgroundColor: "#16a34a" }} onClick={async () => { await handleApprove(u); }}>
+                        <CheckCircle className="w-4 h-4" /> Approve
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-5 flex justify-end">
+              <Button variant="outline" onClick={() => setPendingModalOpen(false)}>Close</Button>
             </div>
           </div>
         </div>

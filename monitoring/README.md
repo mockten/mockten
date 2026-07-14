@@ -2,7 +2,7 @@
 
 Observability stack and the **Developer Dashboard** for mockten.
 
-`monitoring` collects metrics and logs from the running services, provides Grafana dashboards, and hosts the Developer Dashboard — the web operations portal at **http://localhost/dashboard** (introduced in [PR #195](https://github.com/mockten/mockten/pull/195)).
+`monitoring` collects metrics and logs from the running services, provides Grafana dashboards, and hosts the Developer Dashboard — the web operations portal at **`http://localhost/dashboard`**.
 
 ## Layout
 
