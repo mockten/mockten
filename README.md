@@ -1,4 +1,4 @@
-# mockten
+<img width="1006" height="1220" alt="CleanShot 2026-07-15 at 01 04 59@2x" src="https://github.com/user-attachments/assets/8bb7b454-3780-4078-8537-a887ee03abdc" /><img width="1344" height="1412" alt="CleanShot 2026-07-15 at 01 03 30@2x" src="https://github.com/user-attachments/assets/4e339a11-b942-4faa-9e01-46feca2cdaa3" /># mockten
 ![snapshot workflow](https://github.com/mockten/mockten/actions/workflows/ci.yml/badge.svg)
 
 **mockten** is a full-featured, microservice-based e-commerce platform built for learning and demonstration. It reproduces the core mechanics of a real online store — product search, catalog browsing, a shopping cart, checkout and payment, order/sales tracking, shipping, rankings, and personalized recommendations — behind an API gateway with centralized authentication, and ships with a developer operations dashboard, a Seller Portal, and an Admin Portal.
@@ -161,10 +161,17 @@ task -v
     task build
     ```
 
-3. Open the storefront at `http://localhost` and explore. The other surfaces are at
-   `/dashboard`, `/seller/login`, and `/admin`.
+3. Open the storefront at `http://localhost/user/login` and explore. The other surfaces are at
+   `/dashboard`, `/seller/login`, and `/admin/login`.
+- **/user/login**:
+  <img width="1344" height="1412" alt="CleanShot 2026-07-15 at 01 03 30@2x" src="https://github.com/user-attachments/assets/e2f004c4-aedb-4bde-9213-9bbda96eabba" />
+- **/dashboard**:
+<img width="2542" height="1486" alt="CleanShot 2026-07-15 at 01 43 11@2x" src="https://github.com/user-attachments/assets/4a10dc35-9b57-40f4-a51d-14de32ee6efb" />
+- **/seller/login**:
+<img width="1232" height="1270" alt="CleanShot 2026-07-15 at 01 04 43@2x" src="https://github.com/user-attachments/assets/172280c5-2a26-4262-9240-90f89e91c9cc" />
+- **/admin/login**:
+    <img width="1006" height="1220" alt="CleanShot 2026-07-15 at 01 04 59@2x" src="https://github.com/user-attachments/assets/f7ebbf69-2199-4c2a-9b82-fef818d46967" />
 
-    ![CleanShot 2025-02-14 at 13 23 37@2x](https://github.com/user-attachments/assets/32157356-2d52-4583-90f8-0469ad32765e)
 
 4. To tear everything down (after stopping the React app with `Ctrl + C`):
 
