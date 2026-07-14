@@ -26,6 +26,9 @@ jobs:
       - name: Build TypeScript
         run: npm run build:dev
 
+      - name: Unit tests
+        run: npm run test
+
   push_snapshot_container_ecfront:
     needs: [build_ecfront]
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
@@ -63,6 +66,9 @@ jobs:
         go-version: '1.23'
     - name: Build
       run: go build -v .
+
+    - name: Unit tests
+      run: go test -v ./...
 
   push_snapshot_container_ecpay:
     needs: [build_ecpay]
@@ -103,6 +109,9 @@ jobs:
     - name: Build
       run: go build -v .
 
+    - name: Unit tests
+      run: go test -v ./...
+
   push_snapshot_container_ranking:
     needs: [build_ranking]
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
@@ -141,6 +150,9 @@ jobs:
     - name: Build
       run: go build -v .
 
+    - name: Unit tests
+      run: go test -v ./...
+
   push_snapshot_container_sale:
     needs: [build_sale]
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
@@ -177,6 +189,9 @@ jobs:
         go-version: '1.23'
     - name: Build
       run: go build -v .
+
+    - name: Unit tests
+      run: go test -v ./...
 
   push_snapshot_container_shipment:
     needs: [build_shipment]
@@ -218,6 +233,9 @@ jobs:
     - name: Build
       run: go build -v .
 
+    - name: Unit tests
+      run: go test -v ./...
+
   push_snapshot_container_searchitem:
     needs: [build_searchitem]
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
@@ -255,6 +273,9 @@ jobs:
         go-version: '1.23'
     - name: Build
       run: go build -v .
+
+    - name: Unit tests
+      run: go test -v ./...
 
   push_snapshot_container_product:
     needs: [build_product]
@@ -455,6 +476,11 @@ jobs:
         env:
           GOWORK: off
 
+      - name: Unit tests
+        run: go test -v ./...
+        env:
+          GOWORK: off
+
   push_snapshot_container_geocoding:
     needs: [build_geocoding]
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
@@ -513,7 +539,24 @@ jobs:
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
+  build_cart:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: cart
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+    - name: Build
+      run: go build -v ./...
+    - name: Unit tests
+      run: go test -v ./...
+
   push_snapshot_container_cart:
+    needs: [build_cart]
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
     env:
@@ -532,7 +575,24 @@ jobs:
         docker build -f cart/Dockerfile -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
+  test_recommendation:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: recommendation
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Install pytest
+      run: pip install pytest
+    - name: Unit tests
+      run: python -m pytest -q
+
   push_snapshot_container_recommendation:
+    needs: [test_recommendation]
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
     defaults:

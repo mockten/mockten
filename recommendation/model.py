@@ -3,6 +3,7 @@ import numpy as np
 from lightfm import LightFM
 from lightfm.data import Dataset
 from scipy.sparse import coo_matrix
+from util import category_image_url
 
 class RecommendationModel:
     def __init__(self):
@@ -133,7 +134,7 @@ class RecommendationModel:
                 "category_id": p["category_id"],
                 "price": float(p["price"]),
                 "score": float(score),
-                "image_url": f"/api/storage/category_{p['category_id']}.png"
+                "image_url": category_image_url(p['category_id'])
             })
 
         # Sort by score descending

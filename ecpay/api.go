@@ -71,7 +71,14 @@ type UserContext struct {
 
 // Extract user details from Authorization Header token or fallback to mock
 func getUser(c *gin.Context) UserContext {
-	authHeader := c.GetHeader("Authorization")
+	return parseUserFromAuthHeader(c.GetHeader("Authorization"))
+}
+
+// parseUserFromAuthHeader derives the acting user from a Bearer JWT's claims
+// (email / preferred_username / sub) without verifying the signature — the API
+// gateway is responsible for authentication. It returns a mock testuser when the
+// header is missing or malformed so local/test flows still work.
+func parseUserFromAuthHeader(authHeader string) UserContext {
 	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
 		token := authHeader[7:]
 		parts := strings.Split(token, ".")

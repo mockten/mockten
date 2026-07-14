@@ -14,6 +14,7 @@ from model import RecommendationModel
 from storage import load_model, save_model, get_minio_client, MODEL_BUCKET, MODEL_KEY
 from minio.error import S3Error
 from train import train_model_logic
+from util import product_image_url, category_image_url
 
 # Environment variables
 MYSQL_HOST = os.getenv("MYSQL_HOST", "mysql-service.default.svc.cluster.local")
@@ -179,7 +180,7 @@ def get_recommendations(user_id: str = Query(..., description="Email or Username
                         "category_id": cat_id,
                         "price": float(p_detail["price"]),
                         "score": float(item.get("score", 0.0)),
-                        "image_url": f"/api/storage/category_{cat_id}.png"
+                        "image_url": category_image_url(cat_id)
                     })
                     if len(recommendations) >= limit:
                         break
@@ -274,7 +275,7 @@ def get_also_bought(product_id: str = Query(..., description="UUID of the purcha
                 "product_name": row["product_name"],
                 "category_id": row["category_id"],
                 "price": float(row["price"]),
-                "image_url": f"/api/storage/{row['product_id']}.png",
+                "image_url": product_image_url(row['product_id']),
             })
 
         return {"product_id": product_id, "also_bought": results, "count": len(results)}

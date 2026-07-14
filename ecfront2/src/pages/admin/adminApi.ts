@@ -147,7 +147,7 @@ export interface AdminUser {
   joined: string;
 }
 
-function mapUser(u: KcUser): AdminUser {
+export function mapUser(u: KcUser): AdminUser {
   const name = `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.username || "—";
   const email = u.email || u.username || "—";
   const attrs = u.attributes || {};
