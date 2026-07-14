@@ -1,4 +1,4 @@
-<img width="1006" height="1220" alt="CleanShot 2026-07-15 at 01 04 59@2x" src="https://github.com/user-attachments/assets/8bb7b454-3780-4078-8537-a887ee03abdc" /><img width="1344" height="1412" alt="CleanShot 2026-07-15 at 01 03 30@2x" src="https://github.com/user-attachments/assets/4e339a11-b942-4faa-9e01-46feca2cdaa3" /># mockten
+# mockten
 ![snapshot workflow](https://github.com/mockten/mockten/actions/workflows/ci.yml/badge.svg)
 
 **mockten** is a full-featured, microservice-based e-commerce platform built for learning and demonstration. It reproduces the core mechanics of a real online store — product search, catalog browsing, a shopping cart, checkout and payment, order/sales tracking, shipping, rankings, and personalized recommendations — behind an API gateway with centralized authentication, and ships with a developer operations dashboard, a Seller Portal, and an Admin Portal.
