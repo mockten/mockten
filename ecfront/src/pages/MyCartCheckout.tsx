@@ -669,7 +669,7 @@ const MyCartCheckout: React.FC = () => {
                       src={item.image}
                       alt={item.name}
                       style={{ width: '64px', height: '64px', objectFit: 'contain', backgroundColor: '#f5f5f5', borderRadius: '4px' }}
-                      onError={(e) => { e.currentTarget.src = "http://localhost:3845/assets/ce1540ba1f8cb0bde2e26ff8f9fc566f7be994a6.svg"; }} /* Fallback to existing icon if fail? Or just the photo placeholder */
+                      onError={(e) => { e.currentTarget.src = "/api/storage/placeholder.png"; }}
                     />
                     <Box>
                       <Typography sx={{ fontFamily: 'Noto Sans', fontSize: '14px', fontWeight: 'bold' }}>{item.name}</Typography>

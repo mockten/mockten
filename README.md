@@ -116,11 +116,11 @@ The versions below are what the project is currently built and tested against (C
 
 | Tool | Version |
 |------|---------|
-| Go | 1.23+ (CI pins `1.23`; service images build on `golang:1.26`, modules target 1.24–1.25) |
-| Node.js | 20+ (Dashboard image uses `node:22`) |
+| [Go](https://go.dev/dl/) | 1.23+ (CI pins `1.23`; service images build on `golang:1.26`, modules target 1.24–1.25) |
+| [Node.js](https://nodejs.org/en/download) | 20+ (Dashboard image uses `node:22`) |
 | [act](https://github.com/nektos/act) | 0.2.88 (runs the CI workflow locally) |
-| Docker Engine / CLI | 24+ (developed on 29.x); the `docker` CLI drives image builds and `docker compose` |
-| Docker Compose | v2 (developed on Compose v2.x, invoked as `docker compose`) |
+| [Docker Engine / CLI](https://docs.docker.com/engine/install/) | 24+ (developed on 29.x); the `docker` CLI drives image builds and `docker compose` |
+| [Docker Compose](https://docs.docker.com/compose/install/) | v2 (developed on Compose v2.x, invoked as `docker compose`) |
 | [gotask](https://taskfile.dev/#/installation) | latest (the `task` runner drives every workflow) |
 
 ## Google Authentication Setup

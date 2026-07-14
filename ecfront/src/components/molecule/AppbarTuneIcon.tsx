@@ -16,8 +16,8 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import TuneSharpIcon from '@mui/icons-material/TuneSharp';
 
-// ダイアログ内のフォームアイテムの初期値を設定
-// ダイアログ内のフォームアイテムの初期値を設定
+// Initial values for the form items inside the dialog
+// Initial values for the form items inside the dialog
 type FilterValues = {
   sex: string;
   jobTitles: string[];
@@ -75,9 +75,9 @@ function AppbarTuneIcon() {
     setFilters({ ...filters, ageGroup: ageGroup });
   };
 
-  // 送信処理（実際にはAPIへのリクエストなど）
+  // Submit handler (would issue the API request in a real implementation)
   const handleSubmit = () => {
-    // フィルターを適用する処理
+    // Apply the selected filters
     console.log(filters);
     handleClose();
   };
@@ -96,13 +96,13 @@ function AppbarTuneIcon() {
         <TuneSharpIcon />
       </IconButton>
       <Dialog open={open} onClose={handleClose} fullWidth={true} maxWidth="md">
-        <DialogTitle>カテゴリー</DialogTitle>
+        <DialogTitle>Category</DialogTitle>
         <DialogContent>
           <Box display="flex" justifyContent="space-around" flex="1 0 auto">
-            <Typography variant="h6">カテゴリー</Typography>
+            <Typography variant="h6">Category</Typography>
             <FormControl component="fieldset">
               <FormGroup>
-                {['本', '漫画', '家電製品', '家具', 'キッチン', '小物', '食料品', 'PC・周辺機器', 'アパレル', 'その他'].map((category) => (
+                {['Books', 'Comics', 'Appliances', 'Furniture', 'Kitchen', 'Accessories', 'Groceries', 'PC & Peripherals', 'Apparel', 'Other'].map((category) => (
                   <FormControlLabel
                     key={category}
                     control={<Checkbox checked={filters.jobTitles.includes(category)} onChange={handleJobTitleChange} name={category} />}
@@ -113,7 +113,7 @@ function AppbarTuneIcon() {
             </FormControl>
           </Box>
           <Box display="flex" justifyContent="space-around" flex="1 0 auto">
-          <Typography variant="h6">出品元</Typography>
+          <Typography variant="h6">Seller</Typography>
             <FormControl fullWidth>
               <InputLabel>From</InputLabel>
               <Select value={filters.liveAt} onChange={handleLiveAtChange}>
@@ -126,7 +126,7 @@ function AppbarTuneIcon() {
             </FormControl>
           </Box>
           <Box display="flex" justifyContent="space-around" flex="1 0 auto">
-            <Typography variant="h6">年齢</Typography>
+            <Typography variant="h6">Age</Typography>
             <FormControl component="fieldset">
               <FormGroup>
                 {['20s', '30s', '40s', '50s+'].map((age) => (
@@ -152,5 +152,5 @@ function AppbarTuneIcon() {
 export default AppbarTuneIcon;
 
 const prefectures = [
-  '北海道', '東北', '関東', '北陸', '中部', '関西', '中国', '四国', '九州', '沖縄'  
+  'Hokkaido', 'Tohoku', 'Kanto', 'Hokuriku', 'Chubu', 'Kansai', 'Chugoku', 'Shikoku', 'Kyushu', 'Okinawa'  
 ];

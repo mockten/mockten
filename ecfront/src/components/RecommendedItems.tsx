@@ -58,8 +58,9 @@ function RecommendedItems() {
     const [isPaymentPopupOpen, setPaymentPopupOpen] = useState(false);
     const [page] = useState(1); // current page of page nation
     const navigate = useNavigate();
-    // const apiUrl = process.env.REACT_APP_SEARCH_API;
-    const apiUrl = 'http://localhost:8080';
+    // Relative path: resolved through nginx/Kong, so it works in any
+    // environment (local, k8s, cloud) instead of a hardcoded localhost host.
+    const apiUrl = '';
 
     const handleClosePaymentPopup = () => {
       setPaymentPopupOpen(false);
@@ -80,7 +81,7 @@ function RecommendedItems() {
         try {
           // const response = await axios.get('/v1/recommend?category=0');
           // actually we have to use recommend API. but this is for test. 
-          const response = await fetch(`${apiUrl}/v1/search?q=product&p=1&t=hoge`, {
+          const response = await fetch(`${apiUrl}/api/search?q=product&p=1&t=hoge`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'

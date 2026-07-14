@@ -339,10 +339,10 @@ func getItemReviewsHandler(db *sql.DB) gin.HandlerFunc {
 }
 
 // getImageURL checks if the image exists in MinIO.
-// パフォーマンス補足:
-// POCレベルではリクエストごとに MinIO を HEAD チェックするのは許容範囲。
-// 本番化する場合は起動時に存在する画像のリストをメモリキャッシュし、
-// 定期的に更新するか、新規画像アップロード時にキャッシュをクリアする仕組みにすること。
+// Performance note:
+// HEAD-checking MinIO on every request is acceptable at PoC scale.
+// For production, cache the list of existing images in memory at startup and
+// refresh it periodically, or invalidate the cache when a new image is uploaded.
 func getImageURL(productID string, categoryID string) string {
 	imageURL := fmt.Sprintf("/api/storage/%s.png", productID)
 	resp, err := http.Head(fmt.Sprintf("http://minio-service.default.svc.cluster.local:9000/photos/%s.png", productID))

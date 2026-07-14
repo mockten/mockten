@@ -6,7 +6,7 @@ interface SellerUser {
   email: string;
   name: string;
   address: string;
-  // その他のユーザー情報フィールドをここに追加
+  // Add any further user-information fields here
 }
 
 const AdminUpdateSeller = () => {
@@ -15,15 +15,16 @@ const AdminUpdateSeller = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
-  // const apiUrl = process.env.REACT_APP_ADMIN_API;
-  const apiUrl = 'http://localhost:50051';
+  // Relative path: resolved through nginx/Kong, so it works in any
+  // environment (local, k8s, cloud) instead of a hardcoded localhost host.
+  const apiUrl = '';
 
   const handleSearch = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const url = `${apiUrl}/v1/admin/seller?email=${encodeURIComponent(email)}`
+      const url = `${apiUrl}/api/admin/seller?email=${encodeURIComponent(email)}`
       const response = await fetch(url)
 
       if (!response.ok) {
@@ -74,7 +75,7 @@ const AdminUpdateSeller = () => {
           disabled={loading}
           fullWidth
         >
-          {loading ? '検索中...' : '検索'}
+          {loading ? 'Searching...' : 'Search'}
         </Button>
       </Grid>
       {error && (
@@ -106,7 +107,7 @@ const AdminUpdateSeller = () => {
             onChange={handleInputChange}
           />
         </Grid>
-        {/* ここに他のフィールドを追加可能 */}
+        {/* Additional fields can be added here */}
       </Grid>
     )}
   </Container>

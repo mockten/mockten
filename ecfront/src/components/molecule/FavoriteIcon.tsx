@@ -12,7 +12,7 @@ const FavoriteButton: React.FC<Props> = ({ productId }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // 必要に応じて Authorization ヘッダーも追加
+          // Add the Authorization header when required
           // 'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
