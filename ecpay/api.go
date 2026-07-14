@@ -6,20 +6,55 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	_ "github.com/go-sql-driver/mysql" // registers the "mysql" sql driver used by initDB
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stripe/stripe-go/v74"
 	"github.com/stripe/stripe-go/v74/customer"
 	"github.com/stripe/stripe-go/v74/paymentintent"
 	"github.com/stripe/stripe-go/v74/paymentmethod"
 )
+
+const (
+	logFilePath = "/var/log/apl/apl.log"
+	// MySQLHost is the DSN template used by initDB.
+	MySQLHost = "%v:%v@tcp(%v)/%v"
+)
+
+func init() {
+	loggingSettings(logFilePath)
+}
+
+// loggingSettings initializes logging to both stdout and a log file.
+func loggingSettings(logFile string) {
+	logfile, _ := os.OpenFile(filepath.Clean(logFile), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+	log.SetOutput(io.MultiWriter(os.Stdout, logfile))
+}
+
+// exportMetrics serves Prometheus metrics on :9100 (run in a goroutine).
+func exportMetrics() {
+	http.Handle("/metrics", promhttp.Handler())
+	if err := http.ListenAndServe(":9100", nil); err != nil {
+		log.Fatalf("metrics goroutine fail:%v", err)
+	}
+}
+
+func main() {
+	// Expose Prometheus metrics, then serve the payment REST API (Gin, :8080).
+	go exportMetrics()
+	startHttpServer()
+}
 
 // Global DB connection pool — opened once at startup, reused across all handlers
 var ecpayDB *sql.DB

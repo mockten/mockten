@@ -120,7 +120,7 @@ A React frontend and the Seller/Admin portals talk to a **Kong** API gateway, wh
 | [`searchitem`](searchitem) | Go | Product search backed by Meilisearch |
 | [`cart`](cart) | Go + Redis | Shopping cart service |
 | [`sale`](sale) | Go | Orders / sales, plus the admin monitoring & audit APIs |
-| [`ecpay`](ecpay) | Go (gRPC) | Payment processing (Stripe) |
+| [`ecpay`](ecpay) | Go (Gin) | Payment processing (Stripe) |
 | [`shipment`](shipment) | Go | Shipment / delivery |
 | [`ranking`](ranking) | Go | Product ranking |
 | [`recommendation`](recommendation) | Python (FastAPI + LightFM) | Personalized recommendations |

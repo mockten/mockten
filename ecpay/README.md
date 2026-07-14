@@ -8,8 +8,7 @@ Payment service (Go, Gin) — Stripe-backed payment methods and checkout.
 
 ```
 ecpay/
-├── api.go          # Gin HTTP server (:8080): payment-method CRUD + checkout
-├── server.go       # entrypoint (main), logging setup, Prometheus metrics (:9100)
+├── api.go          # entrypoint (main), Gin HTTP server (:8080): payment-method CRUD + checkout, metrics, logging
 ├── api_test.go     # unit tests (JWT claim → user extraction)
 ├── config.ini      # service configuration
 ├── go.mod / go.sum
@@ -17,7 +16,7 @@ ecpay/
 ```
 
 - **HTTP** (`api.go`) listens on `:8080` and serves the `/api/payment*` surface.
-- **Metrics** (`server.go`) exposes Prometheus metrics on `:9100`.
+- **Metrics** exposed on `:9100` (Prometheus).
 
 ## Endpoints (exposed via Kong as `/api/*`)
 
