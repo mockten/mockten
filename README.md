@@ -21,7 +21,7 @@ mockten exposes four distinct web surfaces. All run locally behind the same ngin
 ### 🛒 Mockten storefront — `http://localhost/`
 
 The buyer-facing shop. Sign in at `/user/login` (or via Google/Facebook SSO — see [Authentication](#google-authentication-setup)).
-
+<img width="2006" height="912" alt="SUPER SALE" src="https://github.com/user-attachments/assets/d2766e2c-6f27-430d-9bb0-be5ac9a082dd" />
 - Full-text product search (MeiliSearch) with category, price, rating, and stock filters.
 - Product detail pages with images (MinIO), reviews, average rating, and "About the vendor" store info.
 - Wishlist, shopping cart (Redis-backed), and checkout with Stripe-tokenized payment.
@@ -83,31 +83,7 @@ Platform governance for administrators, backed by live Keycloak and backend data
 ---
 
 ## Architecture
-
-A React frontend and the Seller/Admin portals talk to a **Kong** API gateway, which routes to the backend microservices. **Keycloak** provides authentication and authorization for buyers, sellers, and administrators.
-
-```
-                ┌────────────────────────────┐
-                │   ecfront (React SPA)       │
-                │  Storefront · Seller · Admin│
-                └──────────────┬─────────────┘
-                               │
-                        ┌──────▼──────┐
-                        │ apigw (Kong)│
-                        └──────┬──────┘
-        ┌───────────┬─────────┼─────────┬───────────┬────────────┐
-        │           │         │         │           │            │
-   ┌────▼───┐  ┌────▼───┐ ┌───▼────┐ ┌──▼─────┐ ┌───▼────┐  ┌────▼─────────┐
-   │product │  │  cart  │ │  sale  │ │ ecpay  │ │shipment│  │recommendation│
-   └────┬───┘  └────┬───┘ └───┬────┘ └────────┘ └────────┘  └──────────────┘
-        │           │         │
-   ┌────▼───┐  ┌────▼───┐ ┌───▼────┐  ┌──────────┐ ┌──────────┐ ┌──────────┐
-   │searchit│  │ ranking│ │geocodin│  │  uam     │ │ sync     │ │ airflow  │
-   │  em    │  │        │ │  g     │  │(Keycloak)│ │          │ │(pipeline)│
-   └────────┘  └────────┘ └────────┘  └──────────┘ └──────────┘ └──────────┘
-
-  Data & infra:  mysql · redis · meilisearch · minIO · monitoring (Prometheus/Grafana/Loki)
-```
+<img width="2022" height="1200" alt="CleanShot 2026-06-25 at 11 38 50@2x" src="https://github.com/user-attachments/assets/bcc309dd-e565-4df1-9185-8820a4a88516" />
 
 ### Services
 
