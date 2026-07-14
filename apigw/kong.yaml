@@ -207,6 +207,36 @@ services:
           origins: ['*']
           headers: ['Authorization', 'Content-Type']
           credentials: true
+
+  # Lists realm groups (and, via the same prefix, group members at
+  # /api/uam/groups/{id}/members) so the Admin Portal can identify admins by
+  # admin-group membership. strip_path removes /api/uam/groups and the remainder
+  # ("" or "/{id}/members") is appended to the service URL that ends in /groups.
+  - name: keycloak-admin-groups
+    url: http://uam-service.default.svc.cluster.local/admin/realms/mockten-realm-dev/groups
+    routes:
+      - name: keycloak-admin-groups-route
+        paths:
+          - /api/uam/groups
+        strip_path: true
+        methods:
+          - OPTIONS
+          - GET
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - Authorization:$http_authorization
+          remove:
+            headers:
+              - host
+      - name: cors
+        config:
+          origins: ['*']
+          headers: ['Authorization', 'Content-Type']
+          credentials: true
+
   - name: minio-access
     url: http://minio-service.default.svc.cluster.local:9000/photos
     routes:

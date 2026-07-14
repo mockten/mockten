@@ -147,12 +147,15 @@ export interface AdminUser {
   joined: string;
 }
 
-export function mapUser(u: KcUser): AdminUser {
+export function mapUser(u: KcUser, adminIds?: Set<string>): AdminUser {
   const name = `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.username || "—";
   const email = u.email || u.username || "—";
   const attrs = u.attributes || {};
-  let role = "User";
-  if ((u.username || "").toLowerCase() === "superadmin") role = "Admin";
+  // Admins can't be told apart from the plain user list (there is no "admin"
+  // realm role), so they're identified by admin-group membership fetched
+  // separately. Sellers carry a storeName/description attribute.
+  let role = "Customer";
+  if ((u.username || "").toLowerCase() === "superadmin" || (adminIds && adminIds.has(u.id))) role = "Admin";
   else if (attrs.storeName || attrs.description) role = "Seller";
   // enabled=false + status=pending → awaiting approval; enabled=false otherwise → suspended.
   const isPending = (attrs.status || []).includes("pending");
@@ -163,22 +166,64 @@ export function mapUser(u: KcUser): AdminUser {
   return { id: u.id, name, email, role, status, joined };
 }
 
+interface KcGroup { id: string; name: string; subGroups?: KcGroup[] }
+function findGroup(groups: KcGroup[], name: string): KcGroup | null {
+  for (const g of groups) {
+    if (g.name === name) return g;
+    const sub = g.subGroups && findGroup(g.subGroups, name);
+    if (sub) return sub;
+  }
+  return null;
+}
+
+/** Ids of users in the admin-group, so the list can label real admins. */
+async function fetchAdminIds(): Promise<Set<string>> {
+  try {
+    const gres = await adminFetch("/api/uam/groups");
+    if (!gres.ok) return new Set();
+    const groups: KcGroup[] = await gres.json();
+    const adminGroup = findGroup(groups, "admin-group");
+    if (!adminGroup) return new Set();
+    const mres = await adminFetch(`/api/uam/groups/${encodeURIComponent(adminGroup.id)}/members?max=500`);
+    if (!mres.ok) return new Set();
+    const members: KcUser[] = await mres.json();
+    return new Set(members.map((m) => m.id));
+  } catch {
+    return new Set();
+  }
+}
+
 export async function fetchUsers(): Promise<AdminUser[]> {
   const res = await adminFetch("/api/uam/users?max=500&briefRepresentation=false");
   if (!res.ok) throw new Error(`users ${res.status}`);
   const users: KcUser[] = await res.json();
-  return users.map(mapUser);
+  const adminIds = await fetchAdminIds();
+  return users.map((u) => mapUser(u, adminIds));
 }
 
-/** Approve a pending account: enable it and clear the pending marker. */
+/**
+ * Approve a pending account: enable it and clear the pending marker.
+ * Keycloak re-validates required attributes on any PUT that carries
+ * `attributes`, so we must echo back username/email/name too — otherwise it
+ * rejects the update with "error-user-attribute-required" (email) and the
+ * account silently stays pending.
+ */
 export async function approveUser(userId: string, target: string): Promise<boolean> {
   const current = await getUser(userId);
-  const attrs = current?.attributes || {};
+  if (!current) return false;
+  const attrs = current.attributes || {};
   delete attrs.status;
   const res = await adminFetch(`/api/uam/users/${encodeURIComponent(userId)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ enabled: true, attributes: attrs }),
+    body: JSON.stringify({
+      username: current.username,
+      email: current.email || current.username,
+      firstName: current.firstName,
+      lastName: current.lastName,
+      enabled: true,
+      attributes: attrs,
+    }),
   });
   await postAudit("Seller Approved", target, res.ok ? "success" : "failed");
   return res.ok;

@@ -80,6 +80,14 @@ const UserLoginNew: React.FC = () => {
         // Pass BOTH to Auth Context
         auth.login(accessToken, refreshToken);
 
+        // Record the SSO login in the platform audit trail (best-effort). The
+        // actor type is derived server-side from the token roles.
+        fetch('/api/admin/audit', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'Customer Login (SSO)', status: 'success' }),
+        }).catch(() => {});
+
         navigate('/');
       } catch (err: any) {
         alert(err?.message || 'Google login failed');

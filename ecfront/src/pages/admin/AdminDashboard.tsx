@@ -62,6 +62,7 @@ import {
   fetchAdminOrders,
   fetchHealth,
   fetchAudit,
+  getUser,
   AdminUser,
   AdminOrder,
   HealthResponse,
@@ -85,6 +86,9 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
   const [userToDelete, setUserToDelete] = useState<{ id: string; name: string; email: string } | null>(null);
   const [investigateOrder, setInvestigateOrder] = useState<AdminOrder | null>(null);
   const [pendingModalOpen, setPendingModalOpen] = useState(false);
+  // Details for a pending seller, shown inline inside the modal (no navigation)
+  // so approving stays a single click instead of an Edit → set Active detour.
+  const [pendingDetail, setPendingDetail] = useState<Record<string, { storeName: string; phone: string } | "loading">>({});
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [userStatusFilter, setUserStatusFilter] = useState("All");
@@ -212,6 +216,11 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
 
   const ordersTotalPages = Math.max(1, Math.ceil(ordersTotal / ordersLimit));
   const logsTotalPages = Math.max(1, Math.ceil(logsTotal / logsLimit));
+  // The header search box also filters the currently-loaded Orders and Logs rows.
+  const filteredOrders = orders.filter((o) =>
+    !q || o.order_id.toLowerCase().includes(q) || o.user_id.toLowerCase().includes(q) || o.reason.toLowerCase().includes(q));
+  const filteredLogs = logs.filter((l) =>
+    !q || l.action.toLowerCase().includes(q) || l.actor.toLowerCase().includes(q) || (l.target || "").toLowerCase().includes(q));
   const pendingUsers = users.filter((u) => u.status === "pending");
   const pendingCount = pendingUsers.length;
 
@@ -419,7 +428,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                     <option value="All">All roles</option>
                     <option value="Admin">Admin</option>
                     <option value="Seller">Seller</option>
-                    <option value="User">Customer</option>
+                    <option value="Customer">Customer</option>
                   </select>
                   <Button size="sm" className="!text-white gap-2" style={{ backgroundColor: "#dc2626" }} onClick={onCreateUser}>
                     <UserPlus className="w-4 h-4" />
@@ -533,7 +542,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {orders.map((order) => (
+                      {filteredOrders.map((order) => (
                         <TableRow key={order.order_id}>
                           <TableCell className="font-mono text-xs">{order.order_id}</TableCell>
                           <TableCell>{order.user_id}</TableCell>
@@ -636,7 +645,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {logs.map((log) => (
+                      {filteredLogs.map((log) => (
                         <TableRow key={log.id}>
                           <TableCell>{log.action}</TableCell>
                           <TableCell>{log.actor}</TableCell>
@@ -716,21 +725,50 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
               <p className="text-slate-500 py-8 text-center">No pending requests.</p>
             ) : (
               <div className="space-y-3">
-                {pendingUsers.map((u) => (
-                  <div key={u.id} className="flex items-center justify-between border border-slate-200 rounded-lg p-3">
-                    <div className="min-w-0">
-                      <p className="font-medium text-slate-900 truncate">{u.name}</p>
-                      <p className="text-sm text-slate-500 truncate">{u.email}</p>
-                      <p className="text-xs text-slate-400">{u.role} · requested {u.joined}</p>
+                {pendingUsers.map((u) => {
+                  const detail = pendingDetail[u.id];
+                  return (
+                    <div key={u.id} className="border border-slate-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-900 truncate">{u.name}</p>
+                          <p className="text-sm text-slate-500 truncate">{u.email}</p>
+                          <p className="text-xs text-slate-400">{u.role} · requested {u.joined}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              if (detail) { setPendingDetail((p) => { const n = { ...p }; delete n[u.id]; return n; }); return; }
+                              setPendingDetail((p) => ({ ...p, [u.id]: "loading" }));
+                              const kc = await getUser(u.id);
+                              const attrs = kc?.attributes || {};
+                              setPendingDetail((p) => ({
+                                ...p,
+                                [u.id]: { storeName: attrs.storeName?.[0] || "—", phone: attrs.phonenum?.[0] || "—" },
+                              }));
+                            }}
+                          >
+                            {detail ? "Hide" : "Details"}
+                          </Button>
+                          <Button size="sm" className="!text-white gap-1" style={{ backgroundColor: "#16a34a" }} onClick={async () => { await handleApprove(u); }}>
+                            <CheckCircle className="w-4 h-4" /> Approve
+                          </Button>
+                        </div>
+                      </div>
+                      {detail === "loading" && (
+                        <p className="mt-3 text-sm text-slate-500 inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading details…</p>
+                      )}
+                      {detail && detail !== "loading" && (
+                        <div className="mt-3 border-t border-slate-100 pt-3 grid grid-cols-2 gap-2 text-sm">
+                          <div><span className="text-slate-500">Store name</span><p className="text-slate-900">{detail.storeName}</p></div>
+                          <div><span className="text-slate-500">Phone</span><p className="text-slate-900">{detail.phone}</p></div>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button variant="outline" size="sm" onClick={() => { setPendingModalOpen(false); onEditUser?.(u.id); }}>Details</Button>
-                      <Button size="sm" className="!text-white gap-1" style={{ backgroundColor: "#16a34a" }} onClick={async () => { await handleApprove(u); }}>
-                        <CheckCircle className="w-4 h-4" /> Approve
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             <div className="mt-5 flex justify-end">

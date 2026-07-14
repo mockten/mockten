@@ -46,6 +46,9 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
   const [success, setSuccess] = useState(false);
   const [isSeller, setIsSeller] = useState(false);
   const [initialStoreName, setInitialStoreName] = useState("");
+  // Pending only exists *before* an account is first approved. Once it has been
+  // activated, the lifecycle is Active ⇄ Suspended, so we stop offering Pending.
+  const [initialStatus, setInitialStatus] = useState("active");
 
   useEffect(() => {
     let cancelled = false;
@@ -71,6 +74,7 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
       const status = u.enabled === false ? (isPending ? "pending" : "suspended") : "active";
       setIsSeller(isSellerAcct);
       setInitialStoreName(storeName);
+      setInitialStatus(status);
       setFormData({
         firstName: u.firstName || "",
         lastName: u.lastName || "",
@@ -202,7 +206,7 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
                     <SelectTrigger id="status"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
+                      {initialStatus === "pending" && <SelectItem value="pending">Pending</SelectItem>}
                       <SelectItem value="suspended">Suspended</SelectItem>
                     </SelectContent>
                   </Select>

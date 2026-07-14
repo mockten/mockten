@@ -34,6 +34,7 @@ Every route below is declared in `kong.yaml`. This is the same catalog rendered 
 | GET, PUT, DELETE | `/api/uam/users/:id` | Fetch / update / delete a single user |
 | PUT | `/api/uam/users/:id/execute-actions-email` | Send Keycloak action email |
 | GET | `/api/uam/roles` | List realm roles |
+| GET | `/api/uam/groups` | List realm groups; same prefix serves `/api/uam/groups/{id}/members` (used to identify admins by `admin-group` membership) |
 
 ### Storefront
 | Method(s) | Path | Backend |

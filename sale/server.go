@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"math/rand"
 	"net/http"
 	"os"
@@ -1039,7 +1038,6 @@ var euCountries = map[string]bool{
 //   - "Failed / canceled"       — order status is canceled/refunded/failed
 //   - "Unusual location (EU)"    — shipping address country is in the EU
 //   - "Multiple rapid orders"    — same customer placed >= 3 orders within 15 min
-//   - "High value"               — order total is unusually large
 func handleAdminOrders(c *gin.Context) {
 	if _, err := extractEmailFromJWT(c); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
@@ -1089,17 +1087,11 @@ func handleAdminOrders(c *gin.Context) {
 		CreatedAt string  `json:"created_at"`
 	}
 
-	// First pass: scan every order in the window and accumulate amount
-	// statistics so "high value" can be a *relative* anomaly (a statistical
-	// outlier for this store) rather than an arbitrary fixed dollar amount —
-	// $200 is unremarkable for many catalogs, so we flag orders that are far
-	// above this store's own norm instead.
-	type scanned struct {
-		o          AdminOrder
-		rapidCount int
-	}
-	var all []scanned
-	var sum, sumSq float64
+	// Flag genuinely suspicious orders only. "High value" was deliberately
+	// dropped — a fixed dollar threshold is meaningless (a few hundred dollars is
+	// an ordinary order) and a statistical outlier on demo data just produced
+	// confusing sub-$300 cutoffs. The remaining reasons are all concrete signals.
+	var flagged []AdminOrder
 	for rows.Next() {
 		var o AdminOrder
 		var createdAt time.Time
@@ -1110,36 +1102,14 @@ func handleAdminOrders(c *gin.Context) {
 		}
 		o.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
 		o.Country = country
-		all = append(all, scanned{o, rapidCount})
-		sum += o.Amount
-		sumSq += o.Amount * o.Amount
-	}
 
-	// High-value threshold = mean + 3σ (the classic ~99.7th-percentile outlier
-	// cutoff). Only applied when there is enough data for the statistic to be
-	// meaningful; otherwise high-value flagging is skipped entirely.
-	n := len(all)
-	highThreshold := math.MaxFloat64
-	if n >= 20 {
-		mean := sum / float64(n)
-		variance := (sumSq - sum*sum/float64(n)) / float64(n-1)
-		if variance > 0 {
-			highThreshold = mean + 3*math.Sqrt(variance)
-		}
-	}
-
-	var flagged []AdminOrder
-	for _, s := range all {
-		o := s.o
 		switch {
 		case o.Status == "canceled" || o.Status == "refunded" || o.Status == "failed":
 			o.Reason, o.Flagged = "Failed / canceled", true
 		case euCountries[o.Country]:
 			o.Reason, o.Flagged = "Unusual location ("+o.Country+", EU)", true
-		case s.rapidCount >= 3:
+		case rapidCount >= 3:
 			o.Reason, o.Flagged = "Multiple rapid orders", true
-		case o.Amount >= highThreshold:
-			o.Reason, o.Flagged = fmt.Sprintf("High value (outlier, ≥ $%.0f)", highThreshold), true
 		}
 		if o.Flagged {
 			flagged = append(flagged, o)

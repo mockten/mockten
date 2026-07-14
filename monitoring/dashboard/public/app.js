@@ -1547,6 +1547,9 @@ const API_DESCRIPTIONS = {
   'GET /api/uam/roles':
     'Returns all realm-level roles defined in the Keycloak realm (e.g. <code>admin</code>, <code>user</code>). Requires an admin Bearer token forwarded by Kong. Used by the frontend to populate role assignment dropdowns.',
 
+  'GET /api/uam/groups':
+    'Lists the Keycloak realm groups (<code>Customer</code>, <code>Seller</code>, <code>admin-group</code>). The same route prefix also serves group members at <code>/api/uam/groups/{groupId}/members</code>. The Admin Portal uses this to identify administrators by <code>admin-group</code> membership — there is no "admin" realm role, so admins cannot be told apart from the plain user list. Requires an admin Bearer token.',
+
   // Storage
   'GET /api/storage':
     'Proxies GET requests to MinIO object storage (<code>/photos</code> bucket). The path segment after <code>/api/storage</code> maps directly to the photo filename in MinIO. Used by the frontend to render product images without exposing internal MinIO credentials.',
@@ -1742,6 +1745,7 @@ const API_DESCRIPTIONS_JA = {
   'DELETE /api/uam/users/([^/]+)': 'Admin REST APIでKeycloakレルムのユーザーをUUID指定で削除します。<code>userId</code>パスがKeycloakユーザーIDです。管理者Bearerトークンが必要です（KongがURIをKeycloak管理エンドポイントに書き換えます）。',
   'PUT /api/uam/users/([^/]+)/execute-actions-email': '<code>userId</code>で指定したユーザーにKeycloakの「必須アクション実行」メール（パスワードリセット／メール確認など）を送信します。クエリでクライアント・リダイレクト先・リンク有効期間を指定可能。管理者Bearerトークンが必要です。',
   'GET /api/uam/roles': 'Keycloakレルムで定義されたすべてのレルムロールを返します。Kongが管理者トークンを転送します。フロントエンドのロール割り当てドロップダウンの生成に使用されます。',
+  'GET /api/uam/groups': 'Keycloakレルムのグループ（<code>Customer</code>／<code>Seller</code>／<code>admin-group</code>）を一覧します。同じパス配下の<code>/api/uam/groups/{groupId}/members</code>でメンバーも取得できます。「admin」レルムロールが存在せず、ユーザー一覧だけでは管理者を判別できないため、Admin Portalは<code>admin-group</code>所属で管理者を識別します。管理者Bearerトークンが必要です。',
   'GET /api/storage': 'MinIOオブジェクトストレージ（<code>/photos</code>バケット）へのGETリクエストをプロキシします。<code>/api/storage</code>以降のパスがMinIOのファイル名に直接マップされます。',
   'GET /api/search': 'MeiliSearchを利用した全文商品検索。キーワード、ページネーション、カテゴリ、在庫状況、価格範囲、最低評価などのフィルターをサポートします。',
   'GET /api/categories': 'MySQLから商品カテゴリの全リストを返します。フロントエンドの検索バーのカテゴリフィルタードロップダウンに使用されます。',
@@ -1820,6 +1824,7 @@ const API_DESCRIPTIONS_ZH = {
   'DELETE /api/uam/users/([^/]+)': '通过Admin REST API按UUID删除Keycloak领域中的用户。<code>userId</code>路径段为Keycloak用户ID。需要管理员Bearer令牌（Kong会将URI重写为Keycloak管理端点）。',
   'PUT /api/uam/users/([^/]+)/execute-actions-email': '向<code>userId</code>指定的用户发送Keycloak"执行必需操作"邮件（如密码重置/邮箱验证）。可通过查询参数控制客户端、重定向URL和链接有效期。需要管理员Bearer令牌。',
   'GET /api/uam/roles': '返回Keycloak领域中定义的所有领域角色。需要管理员Bearer令牌，用于前端角色分配下拉菜单。',
+  'GET /api/uam/groups': '列出Keycloak领域的组（<code>Customer</code>／<code>Seller</code>／<code>admin-group</code>）。同一路径前缀下的<code>/api/uam/groups/{groupId}/members</code>可获取组成员。由于不存在「admin」领域角色、仅凭用户列表无法区分管理员，Admin Portal通过<code>admin-group</code>成员身份识别管理员。需要管理员Bearer令牌。',
   'GET /api/storage': '代理对MinIO对象存储（<code>/photos</code>存储桶）的GET请求。路径段直接映射到MinIO中的文件名。',
   'GET /api/search': '由MeiliSearch支持的全文商品搜索，支持关键词、分页、类别、库存状态、价格范围和最低评分等过滤器。',
   'GET /api/categories': '从MySQL返回完整的商品类别列表，用于前端搜索栏的类别过滤下拉菜单。',
@@ -1908,6 +1913,7 @@ const API_SCHEMAS = {
     { name: 'max',   location: 'query', type: 'integer', desc: 'Max number of users to return',      desc_ja: '返す最大ユーザー数',            desc_zh: '返回的最大用户数',       required: false, default: 20 }
   ],
   'GET /api/uam/roles': ['__auth__'],
+  'GET /api/uam/groups': ['__auth__'],
   'POST /api/uam/creation/token': [
     { name: 'username', location: 'body', type: 'string', desc: 'Admin login name', desc_ja: '管理者ユーザー名', desc_zh: '管理员用户名', required: true, default: 'superadmin' },
     { name: 'password', location: 'body', type: 'string', desc: 'Admin password',   desc_ja: '管理者パスワード', desc_zh: '管理员密码',   required: true, default: 'superadmin' }
@@ -2579,6 +2585,10 @@ const API_RESPONSE_SCHEMAS = {
   'PUT /api/uam/users/([^/]+)': [
     { field: '(204)', type: 'No Content', desc: 'Keycloak returns 204 with an empty body on success', desc_ja: '成功時Keycloakは204（本文なし）を返す', desc_zh: '成功时Keycloak返回204（无正文）' },
   ],
+  'GET /api/uam/groups': [
+    { field: '[].id',   type: 'string', desc: 'Group UUID (use for /groups/{id}/members)', desc_ja: 'グループUUID（/groups/{id}/members に使用）', desc_zh: '组UUID（用于 /groups/{id}/members）' },
+    { field: '[].name', type: 'string', desc: 'Group name (Customer / Seller / admin-group)', desc_ja: 'グループ名（Customer / Seller / admin-group）', desc_zh: '组名称（Customer / Seller / admin-group）' },
+  ],
   'GET /api/admin/seller': [
     { field: 'email',       type: 'string', desc: "The seller's email (echoed back)", desc_ja: 'セラーのメール（エコー）',   desc_zh: '卖家邮箱（回显）' },
     { field: 'seller_name', type: 'string', desc: 'Buyer-facing store name',          desc_ja: '購入者向け店名',           desc_zh: '面向买家店铺名' },
@@ -2678,7 +2688,12 @@ async function initApiView() {
           const bodySafe = m === 'GET' || m === 'DELETE' || !!findApiSchema(m, path);
           if (m === primary || (documented && bodySafe)) methodsToShow.push(m);
         });
-        if (methodsToShow.length === 0) methodsToShow.push(primary);
+        // Never fall back to OPTIONS (it has no schema and would render a raw
+        // JSON body); prefer the first real method on the route.
+        if (methodsToShow.length === 0) {
+          const firstReal = (route.methods || []).find((m) => m !== 'OPTIONS');
+          methodsToShow.push(firstReal || primary);
+        }
         methodsToShow.forEach((method) => {
           const methodColor = method === 'GET' ? 'var(--green)' : method === 'POST' ? 'var(--blue)' : method === 'DELETE' ? 'var(--red)' : method === 'PUT' ? '#d97706' : 'var(--text-muted)';
           const methodBg = method === 'GET' ? '#16a34a22' : method === 'POST' ? 'var(--blue-bg)' : method === 'DELETE' ? '#dc262622' : method === 'PUT' ? '#d9770622' : 'var(--bg-secondary)';
@@ -5361,7 +5376,7 @@ const I18N = {
     'nav.keycloak': 'Access Management', 'nav.model': 'Model Performance',
     'nav.ci': 'Local CI Pipelines', 'nav.tests': 'E2E Test Runner',
     'nav.pipeline': 'Data Pipeline', 'nav.vulnerability': 'Security Scanning',
-    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(Backdoor)', 'nav.seller': 'Seller page',
+    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(Backdoor)', 'nav.seller': 'Seller page', 'nav.admin': 'Admin page',
     // Header
     'header.autoRefresh': 'AUTO REFRESH', 'header.systemRestart': 'System Restart',
     // Page titles
@@ -5463,7 +5478,7 @@ const I18N = {
     'nav.keycloak': 'アクセス管理', 'nav.model': 'モデル性能',
     'nav.ci': 'ローカルCIパイプライン', 'nav.tests': 'E2Eテスト',
     'nav.pipeline': 'データパイプライン', 'nav.vulnerability': 'セキュリティスキャン',
-    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(裏口)', 'nav.seller': 'Sellerページ',
+    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(裏口)', 'nav.seller': 'Sellerページ', 'nav.admin': 'Adminページ',
     'header.autoRefresh': '自動更新', 'header.systemRestart': 'システム再起動',
     'title.dashboard': 'ダッシュボード', 'title.containers': 'コンテナ一覧',
     'title.logs': 'ログビューア', 'title.topology': 'サービストポロジー',
@@ -5548,7 +5563,7 @@ const I18N = {
     'nav.keycloak': '访问管理', 'nav.model': '模型性能',
     'nav.ci': '本地CI流水线', 'nav.tests': 'E2E测试',
     'nav.pipeline': '数据管道', 'nav.vulnerability': '安全扫描',
-    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(后门)', 'nav.seller': 'Seller页面',
+    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(后门)', 'nav.seller': 'Seller页面', 'nav.admin': 'Admin页面',
     'header.autoRefresh': '自动刷新', 'header.systemRestart': '重启系统',
     'title.dashboard': '仪表盘', 'title.containers': '容器列表',
     'title.logs': '日志查看器', 'title.topology': '服务拓扑',

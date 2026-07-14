@@ -4,7 +4,7 @@ import { mapUser, getStoreName, type KcUser } from "./adminApi";
 describe("mapUser", () => {
   it("derives an active customer", () => {
     const u = mapUser({ id: "1", username: "alice", email: "a@x.io", enabled: true });
-    expect(u).toMatchObject({ role: "User", status: "active", email: "a@x.io" });
+    expect(u).toMatchObject({ role: "Customer", status: "active", email: "a@x.io" });
   });
 
   it("classifies superadmin as Admin", () => {
