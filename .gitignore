@@ -50,7 +50,13 @@ zap-report.html
 
 **/__pycache__/
 *.pyc
-ecpay/ecpay
+# Compiled Go service binaries (produced by `go build`; named after their module/dir)
+sale/sale
+shipment/shipment
+cart/cart
+ranking/ranking
 product/product
+ecpay/ecpay
 searchitem/searchitem
+geocoding/nominatim-geocode-svc
 .agent/
