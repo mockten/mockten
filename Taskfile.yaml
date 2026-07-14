@@ -183,6 +183,10 @@ tasks:
     desc: Run Seller Portal E2E tests locally
     cmds:
       - cd ecfront && npx playwright test tests/scenario-seller.spec.ts --reporter=list
+  e2e_admin:
+    desc: Run Admin Portal E2E tests locally
+    cmds:
+      - cd ecfront && npx playwright test tests/scenario-admin.spec.ts --reporter=list
   ie2e:
     desc: Run Playwright E2E test suite inside Docker container (for Dashboard use)
     cmds:

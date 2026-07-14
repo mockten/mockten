@@ -230,6 +230,56 @@ test.describe('Dashboard Enhancements Spec', () => {
     }
   });
 
+  test('API Specifications: Send Request returns 2xx for write + admin endpoints', async ({ page }) => {
+    await page.locator('nav .nav-item').getByText('API Specifications', { exact: true }).click();
+    await page.waitForSelector('#api-list-ul .db-list-item', { timeout: 15000 });
+
+    // The write endpoints and the newer admin/ranking APIs. These previously
+    // 400/500'd from the GUI because their schemas didn't match the real backend
+    // contract, and nothing caught it — the suite only exercised GETs.
+    const targets = [
+      'POST /api/payment-method',     // attaches Stripe test PM pm_card_visa
+      'PUT /api/payment-method',      // -> /api/payment-method/default
+      'DELETE /api/payment-method',   // needs a real saved card id
+      'PUT /api/geo',                 // needs a real geo_id
+      'POST /api/shipment',           // needs product_id + geo_id
+      'POST /api/ranking',            // -> /api/ranking/update
+      'POST /api/admin/audit',
+      'GET /api/admin/orders',
+      'GET /api/admin/audit',
+      'GET /api/admin/health',
+      'GET /api/admin/seller',
+      'GET /api/uam/groups',
+    ];
+
+    const items = page.locator('#api-list-ul .db-list-item');
+    const count = await items.count();
+
+    for (const target of targets) {
+      let matched = false;
+      for (let i = 0; i < count; i++) {
+        const text = (await items.nth(i).innerText()).replace(/\s+/g, ' ').trim();
+        if (text === target) {
+          matched = true;
+          await items.nth(i).click();
+          // Wait for the dynamic ids (token, geo_id, payment-method id, product id)
+          // to resolve so the request carries real data.
+          await page.waitForFunction(() => {
+            const inputs = Array.from(document.querySelectorAll('.api-gui-input')) as HTMLInputElement[];
+            return inputs.every(el => el.value !== 'Loading...');
+          }, { timeout: 20000 });
+          await page.getByRole('button', { name: 'Send Request' }).click();
+          await expect(page.locator('#api-test-response'), `${target} response`).toContainText(
+            /Status:\s*2\d\d/,
+            { timeout: 20000 }
+          );
+          break;
+        }
+      }
+      expect(matched, `route present: ${target}`).toBe(true);
+    }
+  });
+
   test('API Specifications: image upload (new API) Send Request returns 2xx', async ({ page }) => {
     await page.locator('nav .nav-item').getByText('API Specifications', { exact: true }).click();
     await page.waitForSelector('#api-list-ul .db-list-item', { timeout: 15000 });

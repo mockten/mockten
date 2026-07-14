@@ -1611,10 +1611,10 @@ const API_DESCRIPTIONS = {
     'Lists the authenticated user\'s saved payment methods (credit/debit cards) from MySQL via the <code>ecpay</code> Go service. Card details are stored encrypted; only type and masked number are returned.',
 
   'POST /api/payment-method':
-    'Registers a new payment method. The <code>ecpay</code> Go service tokenizes the card via Stripe API and stores the Stripe token reference in MySQL. Raw card numbers are never persisted.',
+    'Attaches a Stripe <strong>PaymentMethod</strong> to the user and saves the reference in MySQL. The body takes a Stripe PaymentMethod id (<code>payment_method_id</code>) — the card itself is tokenized in the browser by Stripe.js, so raw card numbers never reach mockten. For testing, Stripe\'s ready-made ids work directly: <code>pm_card_visa</code> (VISA 4242 4242 4242 4242) and <code>pm_card_mastercard</code> (5555 5555 5555 4444).',
 
   'PUT /api/payment-method':
-    'Updates metadata for an existing saved payment method (e.g. billing name). Does not re-tokenize — the Stripe token reference stays unchanged.',
+    'Marks a saved payment method as the user\'s <strong>default</strong> card (all others are unset). Served by the <code>ecpay</code> handler at <code>/api/payment-method/default</code>; Kong prefix-matches <code>/api/payment-method</code>. Body: <code>payment_method_id</code>.',
 
   'DELETE /api/payment-method':
     'Removes a saved payment method from MySQL and detaches the Stripe payment method via the Stripe API.',
@@ -1766,8 +1766,8 @@ const API_DESCRIPTIONS_JA = {
   'GET /api/geo': '保存済みのジオコーディング済み住所レコードを返します。チェックアウト時の配送先選択に使用されます。',
   'PUT /api/geo': 'Google Maps APIで返された緯度経度座標とともに新しい住所を保存します。',
   'GET /api/payment-method': '認証済みユーザーの保存済み支払い方法をMySQLから一覧表示します。カード詳細は暗号化されており、種類とマスクされた番号のみ返します。',
-  'POST /api/payment-method': '新しい支払い方法を登録します。Stripe APIでカードをトークン化し、StripeトークンリファレンスのみMySQLに保存します。',
-  'PUT /api/payment-method': '既存の支払い方法のメタデータを更新します（例：請求者名）。Stripeトークンは変更されません。',
+  'POST /api/payment-method': 'Stripeの<strong>PaymentMethod</strong>をユーザーに紐付け、参照をMySQLに保存します。ボディにはStripeのPaymentMethod ID（<code>payment_method_id</code>）を渡します。カード自体はブラウザ側のStripe.jsでトークン化されるため、生のカード番号はmocktenに届きません。テストにはStripe既製のIDがそのまま使えます: <code>pm_card_visa</code>（VISA 4242 4242 4242 4242）、<code>pm_card_mastercard</code>（5555 5555 5555 4444）。',
+  'PUT /api/payment-method': '保存済みの支払い方法をユーザーの<strong>デフォルト</strong>カードに設定します（他はすべて解除）。実体は<code>ecpay</code>の<code>/api/payment-method/default</code>ハンドラで、Kongが<code>/api/payment-method</code>を前方一致します。ボディ: <code>payment_method_id</code>。',
   'DELETE /api/payment-method': 'MySQLから支払い方法を削除し、Stripe APIでも決済方法を切り離します。',
   'GET /api/payment': '認証済みユーザーの注文・支払い履歴をMySQLから返します。',
   'POST /api/payment': 'Stripe APIで支払いを実行します。注文をMySQLに記録し、配送・ランキングサービスを非同期で起動します。',
@@ -1845,8 +1845,8 @@ const API_DESCRIPTIONS_ZH = {
   'GET /api/geo': '返回用户保存的地理编码地址记录，用于结账时选择配送地址。',
   'PUT /api/geo': '保存带有Google Maps API返回的经纬度坐标的新地址。',
   'GET /api/payment-method': '从MySQL列出已认证用户的保存支付方式。卡片详情已加密，仅返回类型和脱敏卡号。',
-  'POST /api/payment-method': '注册新的支付方式。通过Stripe API对卡片进行令牌化，仅将Stripe令牌引用存储在MySQL中。',
-  'PUT /api/payment-method': '更新现有支付方式的元数据（如账单姓名）。Stripe令牌保持不变。',
+  'POST /api/payment-method': '将Stripe的<strong>PaymentMethod</strong>附加到用户并将引用保存到MySQL。请求体传入Stripe PaymentMethod ID（<code>payment_method_id</code>）。卡片本身由浏览器端的Stripe.js令牌化，原始卡号不会到达mockten。测试可直接使用Stripe现成ID：<code>pm_card_visa</code>（VISA 4242 4242 4242 4242）、<code>pm_card_mastercard</code>（5555 5555 5555 4444）。',
+  'PUT /api/payment-method': '将已保存的支付方式设为用户的<strong>默认</strong>卡片（其余取消默认）。实际由<code>ecpay</code>的<code>/api/payment-method/default</code>处理，Kong前缀匹配<code>/api/payment-method</code>。请求体：<code>payment_method_id</code>。',
   'DELETE /api/payment-method': '从MySQL删除支付方式并通过Stripe API分离支付方法。',
   'GET /api/payment': '从MySQL返回已认证用户的订单/支付历史。',
   'POST /api/payment': '通过Stripe API执行支付，将订单记录到MySQL，并异步触发配送和排名服务。',
@@ -1978,14 +1978,14 @@ const API_SCHEMAS = {
   ],
   'POST /api/payment-method': [
     '__auth__',
-    { name: 'type',    location: 'body', type: 'string', desc: 'Card type (e.g. VISA, JCB)',        desc_ja: 'カード種別（例：VISA、JCB）', desc_zh: '卡类型（如VISA、JCB）',   required: true, default: 'VISA' },
-    { name: 'details', location: 'body', type: 'object', desc: 'Payment card details object',       desc_ja: 'カード詳細オブジェクト',     desc_zh: '支付卡详情对象',          required: true, default: '{"card_number":"1111222233334444","holder_name":"Liam Smith"}' }
+    { name: 'payment_method_id', location: 'body', type: 'string', desc: "Stripe PaymentMethod id to attach. Use Stripe's test id pm_card_visa (VISA 4242…); pm_card_mastercard also works.", desc_ja: 'アタッチするStripe PaymentMethod ID。Stripeのテスト用 pm_card_visa（VISA 4242…）が使えます。pm_card_mastercard も可。', desc_zh: '要附加的Stripe PaymentMethod ID。可用Stripe测试ID pm_card_visa（VISA 4242…）；也可用 pm_card_mastercard。', required: true, default: 'pm_card_visa' }
   ],
   'POST /api/shipment': [
     '__auth__',
-    { name: 'orderId',    location: 'body', type: 'string', desc: 'Associated Order UUID',       desc_ja: '関連注文UUID',       desc_zh: '关联订单UUID',   required: true, default: 'dc105f9f-501f-43b2-9916-5c1151a91e9e' },
-    { name: 'recipient',  location: 'body', type: 'string', desc: 'Full name of recipient',      desc_ja: '受取人のフルネーム', desc_zh: '收件人全名',     required: true, default: 'Liam Smith' },
-    { name: 'address',    location: 'body', type: 'string', desc: 'Shipping address details',    desc_ja: '配送先住所の詳細',   desc_zh: '配送地址详情',   required: true, default: '1-1 Chiyoda, Tokyo' }
+    { name: 'product_id',      location: 'body', type: 'string',  desc: 'Product being shipped (auto-filled with a real product)', desc_ja: '配送する商品（実在の商品で自動入力）', desc_zh: '要配送的商品（自动填充真实商品）', required: true,  default: '__first_product_id__' },
+    { name: 'geo_id',          location: 'body', type: 'string',  desc: 'Destination address id (auto-filled with a real geo_id)',  desc_ja: '配送先住所ID（実在のgeo_idで自動入力）', desc_zh: '目的地地址ID（自动填充真实geo_id）', required: true,  default: '__first_geo_id__' },
+    { name: 'quantity',        location: 'body', type: 'integer', desc: 'Units to ship',                                            desc_ja: '配送数量',        desc_zh: '配送数量',        required: true,  default: 1 },
+    { name: 'scheduled_start', location: 'body', type: 'string',  desc: 'Optional delivery start "YYYY-MM-DD HH:MM:SS". Omitted in TEST_MODE, where delivery advances immediately.', desc_ja: '任意の配送開始日時「YYYY-MM-DD HH:MM:SS」。TEST_MODEでは省略され、即時に配送が進みます。', desc_zh: '可选的配送开始时间「YYYY-MM-DD HH:MM:SS」。TEST_MODE下省略，配送立即推进。', required: false, default: '' }
   ],
   'GET /api/recommendation': [
     { name: 'user_id', location: 'query', type: 'string', desc: 'User email or ID for personalized recommendations', desc_ja: 'パーソナライズ推薦用ユーザーメールまたはID', desc_zh: '个性化推荐用用户邮箱或ID', required: true, default: 'dev_user_001@example.com' }
@@ -2041,22 +2041,24 @@ const API_SCHEMAS = {
   ],
   'PUT /api/geo': [
     '__auth__',
-    { name: 'user_id',    location: 'body', type: 'string', desc: 'User ID',        desc_ja: 'ユーザーID',  desc_zh: '用户ID',    required: true, default: '__superadmin_email__' },
-    { name: 'postalCode', location: 'body', type: 'string', desc: 'Postal code',    desc_ja: '郵便番号',    desc_zh: '邮政编码',  required: true, default: '100-0001' },
-    { name: 'address',    location: 'body', type: 'string', desc: 'Street address', desc_ja: '住所',        desc_zh: '街道地址',  required: true, default: '1-1 Chiyoda, Tokyo' },
+    { name: 'geo_id',       location: 'body', type: 'string', desc: 'Saved address id to update (auto-filled with a real geo_id)', desc_ja: '更新する保存済み住所ID（実在のgeo_idで自動入力）', desc_zh: '要更新的已保存地址ID（自动填充真实geo_id）', required: true,  default: '__first_geo_id__' },
+    { name: 'user_id',      location: 'body', type: 'string', desc: 'Owner of the address',  desc_ja: '住所の所有者',  desc_zh: '地址所有者',  required: true,  default: '__superadmin_email__' },
+    { name: 'postal_code',  location: 'body', type: 'string', desc: 'Postal code',           desc_ja: '郵便番号',      desc_zh: '邮政编码',    required: true,  default: '105-0011' },
+    { name: 'prefecture',   location: 'body', type: 'string', desc: 'Prefecture / state',    desc_ja: '都道府県',      desc_zh: '都道府县/州', required: true,  default: 'Tokyo' },
+    { name: 'city',         location: 'body', type: 'string', desc: 'City',                  desc_ja: '市区町村',      desc_zh: '城市',        required: true,  default: 'Minato City' },
+    { name: 'town',         location: 'body', type: 'string', desc: 'Town / street',         desc_ja: '町名・番地',    desc_zh: '街道',        required: true,  default: 'Shibakoen 4-2-8' },
+    { name: 'country_code', location: 'body', type: 'string', desc: 'ISO country code',      desc_ja: 'ISO国コード',   desc_zh: 'ISO国家代码', required: false, default: 'JP' },
   ],
 
   // ── Payment ─────────────────────────────────────────────────────────────────
   'GET /api/payment-method': ['__auth__'],
   'PUT /api/payment-method': [
     '__auth__',
-    { name: 'id',      location: 'body', type: 'string', desc: 'Payment method ID to update',  desc_ja: '更新する支払い方法ID',      desc_zh: '要更新的支付方式ID',     required: true, default: '' },
-    { name: 'type',    location: 'body', type: 'string', desc: 'Card type (VISA, JCB, etc.)',  desc_ja: 'カード種別（VISA、JCB等）', desc_zh: '卡类型（VISA、JCB等）',  required: true, default: 'VISA' },
-    { name: 'details', location: 'body', type: 'object', desc: 'Updated card details object',  desc_ja: '更新後のカード詳細',        desc_zh: '更新后的卡详情对象',     required: true, default: '{"card_number":"1111222233334444","holder_name":"Liam Smith"}' }
+    { name: 'payment_method_id', location: 'body', type: 'string', desc: 'Saved payment-method id to make the default (auto-filled with a real saved card)', desc_ja: 'デフォルトにする保存済み支払い方法ID（実在のカードで自動入力）', desc_zh: '设为默认的已保存支付方式ID（自动填充真实卡片）', required: true, default: '__first_payment_method_id__' }
   ],
   'DELETE /api/payment-method': [
     '__auth__',
-    { name: 'id', location: 'body', type: 'string', desc: 'Payment method ID to delete', desc_ja: '削除する支払い方法ID', desc_zh: '要删除的支付方式ID', required: true, default: '' }
+    { name: 'payment_method_id', location: 'body', type: 'string', desc: 'Saved payment-method id to delete (auto-filled with a real saved card)', desc_ja: '削除する保存済み支払い方法ID（実在のカードで自動入力）', desc_zh: '要删除的已保存支付方式ID（自动填充真实卡片）', required: true, default: '__first_payment_method_id__' }
   ],
   'GET /api/payment': ['__auth__'],
 
@@ -2605,6 +2607,8 @@ const API_TEST_PATH_OVERRIDES = {
   'GET /api/sale': '/api/sale/active',
   // The ranking-update handler lives at /api/ranking/update (Kong prefix-matches /api/ranking).
   'POST /api/ranking': '/api/ranking/update',
+  // "Update payment method" is really "set as default", served at /default.
+  'PUT /api/payment-method': '/api/payment-method/default',
 };
 
 function _normalizePath(path) {
@@ -2785,7 +2789,7 @@ function selectApiRoute(sIdx, rIdx, methodOverride) {
         <label style="font-weight:500; margin-bottom:4px; display:block; font-size:12px; color:var(--text-secondary);">
           ${f.name} ${f.required ? '<span style="color:var(--red); font-size:10px;">*</span>' : ''} <span style="font-size:10px; color:var(--text-muted);">(${f.location}, ${f.type})</span>
         </label>
-        <input type="text" class="form-control api-gui-input" data-name="${f.name}" data-location="${f.location}" data-type="${f.type}" style="width:100%; font-family:monospace; background:var(--bg-surface); color:#e2e8f0; border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px; font-size:13px;" data-sentinel="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__', '__first_seller_product_id__', '__seller_token__', '__first_user_id__'].includes(f.default) ? f.default : ''}" value="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__', '__first_seller_product_id__', '__seller_token__', '__first_user_id__'].includes(f.default) ? 'Loading...' : (f.default ?? '')}" placeholder="${fd}" />
+        <input type="text" class="form-control api-gui-input" data-name="${f.name}" data-location="${f.location}" data-type="${f.type}" style="width:100%; font-family:monospace; background:var(--bg-surface); color:#e2e8f0; border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px; font-size:13px;" data-sentinel="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__', '__first_seller_product_id__', '__seller_token__', '__first_user_id__', '__first_payment_method_id__'].includes(f.default) ? f.default : ''}" value="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__', '__first_seller_product_id__', '__seller_token__', '__first_user_id__', '__first_payment_method_id__'].includes(f.default) ? 'Loading...' : (f.default ?? '')}" placeholder="${fd}" />
       </div>`;
     }).join('');
 
@@ -2857,6 +2861,15 @@ function selectApiRoute(sIdx, rIdx, methodOverride) {
             });
           });
         }
+      });
+    }
+
+    // Async-fill __first_payment_method_id__ — a real saved card id
+    if (schema.some(f => f.default === '__first_payment_method_id__')) {
+      _fetchFirstPaymentMethodId().then(() => {
+        document.querySelectorAll('.api-gui-input[data-sentinel="__first_payment_method_id__"]').forEach(el => {
+          el.value = _firstPaymentMethodIdCache || '';
+        });
       });
     }
   } else if (schema !== null && schema.length === 0) {
@@ -5698,6 +5711,23 @@ async function _fetchFirstGeoId() {
     const d = await r.json();
     const first = Array.isArray(d) ? d[0] : null;
     if (first) _firstGeoIdCache = first.geo_id || '';
+  } catch {}
+}
+
+// Resolves a real saved payment-method id so the PUT/DELETE /api/payment-method
+// test requests operate on an existing card instead of an empty id.
+let _firstPaymentMethodIdCache = null;
+async function _fetchFirstPaymentMethodId() {
+  if (_firstPaymentMethodIdCache) return;
+  try {
+    const tr = await fetch('/dashboard/api/superadmin-token');
+    if (!tr.ok) return;
+    const td = await tr.json();
+    const r = await fetch('/api/payment-method', { headers: { Authorization: `Bearer ${td.token}` } });
+    if (!r.ok) return;
+    const d = await r.json();
+    const first = Array.isArray(d) ? d[0] : null;
+    if (first) _firstPaymentMethodIdCache = first.id || '';
   } catch {}
 }
 
