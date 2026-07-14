@@ -167,8 +167,11 @@ task -v
   <img width="1344" height="1412" alt="CleanShot 2026-07-15 at 01 03 30@2x" src="https://github.com/user-attachments/assets/e2f004c4-aedb-4bde-9213-9bbda96eabba" />
 - **/dashboard**:
 <img width="2542" height="1486" alt="CleanShot 2026-07-15 at 01 43 11@2x" src="https://github.com/user-attachments/assets/4a10dc35-9b57-40f4-a51d-14de32ee6efb" />
+
 - **/seller/login**:
+  
 <img width="1232" height="1270" alt="CleanShot 2026-07-15 at 01 04 43@2x" src="https://github.com/user-attachments/assets/172280c5-2a26-4262-9240-90f89e91c9cc" />
+
 - **/admin/login**:
     <img width="1006" height="1220" alt="CleanShot 2026-07-15 at 01 04 59@2x" src="https://github.com/user-attachments/assets/f7ebbf69-2199-4c2a-9b82-fef818d46967" />
 
