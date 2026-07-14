@@ -68,3 +68,24 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+/*
+ * Chrome/Safari tint autofilled inputs with their own background and text
+ * colour (:-webkit-autofill). Browsers only autofill the fields they recognise
+ * — name, email, tel — so on a sign-up form those ended up grey while Store
+ * Name and the password fields stayed the normal colour, which looked like two
+ * different kinds of input. Repaint autofilled fields to match a normal input
+ * so every field in a form looks the same.
+ */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--input-background, #f3f3f5) inset !important;
+  box-shadow: 0 0 0 1000px var(--input-background, #f3f3f5) inset !important;
+  -webkit-text-fill-color: var(--foreground, #213547) !important;
+  caret-color: var(--foreground, #213547);
+  /* Chrome re-applies its background on a timer; outrun it. */
+  transition: background-color 100000s ease-in-out 0s;
+}

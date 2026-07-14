@@ -22,11 +22,47 @@ mockten exposes four distinct web surfaces. All run locally behind the same ngin
 
 The buyer-facing shop. Sign in at `/user/login` (or via Google/Facebook SSO — see [Authentication](#google-authentication-setup)).
 <img width="2006" height="912" alt="SUPER SALE" src="https://github.com/user-attachments/assets/d2766e2c-6f27-430d-9bb0-be5ac9a082dd" />
-- Full-text product search (MeiliSearch) with category, price, rating, and stock filters.
-- Product detail pages with images (MinIO), reviews, average rating, and "About the vendor" store info.
-- Wishlist, shopping cart (Redis-backed), and checkout with Stripe-tokenized payment.
-- **Orders are created on purchase** and linked to shipment transactions; the customer-facing Purchase ID equals the seller-visible `order_id`.
-- Personalized recommendations: "Top Picks For You", "Based on Browsing History", and "Frequently Bought Together" (see the Recommendation Engine below).
+
+#### Before you can buy: two prerequisites
+
+Checkout is blocked until the account has both. This mirrors a real store, and the end-to-end tests set both up first.
+
+| Prerequisite | Where | Why |
+|---|---|---|
+| **Delivery address** | `/user/address` | The `geocoding` service turns the address into lat/lon and a country code. Shipping fees are computed from the great-circle (Haversine) distance to the product's warehouse, so an order cannot be priced without one. |
+| **Payment card** | `/user/payment` → *Add new card* | The card is tokenized in the browser by Stripe Elements; mockten only ever stores the Stripe token, brand, last4 and expiry — never the raw number. |
+
+**Stripe is in test mode — use a test card, never a real one:**
+
+| Brand | Number | Expiry / CVC / Postal |
+|---|---|---|
+| VISA | `4242 4242 4242 4242` | any future expiry, any 3-digit CVC, any postal code |
+| Mastercard | `5555 5555 5555 4444` | same |
+| Amex | `3782 822463 10005` | 4-digit CVC |
+
+No real money moves. (The Developer Dashboard's API test forms use Stripe's ready-made ids `pm_card_visa` / `pm_card_mastercard` for the same reason.)
+
+#### Browsing and buying
+
+1. **Search** (`/search`) — full-text over MeiliSearch, filterable by category, price range, minimum rating, stock and condition (new/used).
+2. **Product detail** (`/item/:id`) — images from MinIO, customer reviews and average rating, *About the vendor* (the seller's store description), plus "similar items" and "frequently bought together".
+3. **Wishlist** (`/fav/list`) — *Toggle Favorite* on any product; you can **Buy Now** straight from the wishlist.
+4. **Cart** (`/cart/list`) — Redis-backed, so it survives sign-out. Choose the shipping leg per item.
+5. **Checkout** (`/cart/checkout` → `/cart/confirm`) — shows the saved card (`•••• 4242`) and address, and the shipping fee. Domestic orders are priced by distance; international routes offer **air / sea × standard / express**, each with its own fee and ETA in days.
+6. **Place Order** — Stripe creates a PaymentIntent, an `Order` row is written, and shipment transactions are created. The **Purchase ID shown to the buyer is the `order_id`** the seller sees in their portal.
+7. **Order history** (`/order-history`) — every purchase with its live shipment status.
+8. **Review** (`/item/:id/review`) — after buying, leave a rating; the product's average rating is recalculated atomically.
+
+#### Shipping lifecycle (and why it finishes instantly here)
+
+A background worker in the `shipment` service advances each shipment `preparing → in_transit → delivered` on a tick (`TICK_INTERVAL_SECONDS`, default 200s).
+
+- **`TEST_MODE=true`** (how this repo runs locally): any `scheduled_start` is ignored, so the worker picks the shipment up on the very next tick and the delivery completes almost immediately — handy for demos and E2E.
+- **`TEST_MODE` unset**: you can pass a `scheduled_start` (`YYYY-MM-DD HH:MM:SS`) and the delivery only *begins* on that date, behaving like a real scheduled dispatch.
+
+#### Personalization
+
+"Top Picks For You" (LightFM collaborative filtering), "Based on Browsing History", and "Frequently Bought Together" (co-purchase SQL). Best-seller **rankings** update in real time on every purchase. See the Recommendation Engine section below.
 
 <img width="1440" alt="Mockten storefront" src="https://github.com/user-attachments/assets/2bbd4a97-a5c7-47cf-99f2-168162273272" />
 
