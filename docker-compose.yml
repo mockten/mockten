@@ -298,11 +298,11 @@ services:
       - HOST_WORKSPACE_PATH=${HOST_WORKSPACE_PATH:-${PWD}}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./ecfront2.log:/app/ecfront2.log:ro
+      - ./ecfront.log:/app/ecfront.log:ro
       - ./apigw/kong.yaml:/app/kong.yaml:ro
       - ./uam/realm-export-dev.json:/app/realm-export-dev.json:ro
-      - ./ecfront2/tests:/app/tests:ro
-      - ./ecfront2:/app/ecfront2
+      - ./ecfront/tests:/app/tests:ro
+      - ./ecfront:/app/ecfront
       - ./Taskfile.yaml:/app/Taskfile.yaml:ro
       - ./.github/workflows/ci.yml:/app/.github/workflows/ci.yml:ro
       - ./:${HOST_WORKSPACE_PATH:-${PWD}}

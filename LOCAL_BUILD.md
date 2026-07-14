@@ -27,7 +27,7 @@ $ docker start ${mockten-auth container id}
 
 # Run frontend
 ```
-$ cd ecfront2
+$ cd ecfront
 $ npm run dev
 > mockten@0.0.0 dev
 > vite

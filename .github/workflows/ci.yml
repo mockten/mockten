@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-22.04
     defaults:
       run:
-        working-directory: ecfront2
+        working-directory: ecfront
 
     steps:
       - uses: actions/checkout@v1
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-22.04
     defaults:
       run:
-        working-directory: ecfront2
+        working-directory: ecfront
     env:
       MAJOR_VERSION: 0
       MINOR_VERSION: 0

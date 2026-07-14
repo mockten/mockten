@@ -1348,10 +1348,10 @@ wssContainer.on('connection', async (ws, req) => {
 
 // Frontend (Vite) log file streaming
 wssFrontend.on('connection', ws => {
-  const logPath = '/app/ecfront2.log';
+  const logPath = '/app/ecfront.log';
 
   if (!fs.existsSync(logPath)) {
-    if (ws.readyState === WebSocket.OPEN) ws.send('[info] ecfront2.log not found — frontend may not be running yet.');
+    if (ws.readyState === WebSocket.OPEN) ws.send('[info] ecfront.log not found — frontend may not be running yet.');
     // Still watch in case it appears
   } else {
     // Send existing tail first

@@ -88,7 +88,7 @@ A React frontend and the Seller/Admin portals talk to a **Kong** API gateway, wh
 
 ```
                 ┌────────────────────────────┐
-                │   ecfront2 (React SPA)      │
+                │   ecfront (React SPA)       │
                 │  Storefront · Seller · Admin│
                 └──────────────┬─────────────┘
                                │
@@ -113,7 +113,7 @@ A React frontend and the Seller/Admin portals talk to a **Kong** API gateway, wh
 
 | Module | Language / Tech | Responsibility |
 |--------|-----------------|----------------|
-| [`ecfront2`](ecfront2) | React + Vite + TypeScript | Storefront SPA plus the Seller and Admin portals |
+| [`ecfront`](ecfront) | React + Vite + TypeScript | Storefront SPA plus the Seller and Admin portals |
 | [`apigw`](apigw) | Kong | API gateway — routing, auth plugins, rate limiting |
 | [`uam`](uam) | Keycloak | User Account Management: buyers, sellers, admins, social login |
 | [`product`](product) | Go (Gin) | Product catalog: listing, detail, reviews, wishlist |
@@ -201,7 +201,7 @@ task -v
 Unit tests run automatically in CI (`.github/workflows/ci.yml`) on every pull request:
 
 - **Go services** (`ecpay`, `ranking`, `sale`, `shipment`, `searchitem`, `product`, `geocoding`, `cart`) run `go test ./...`.
-- **Frontend** (`ecfront2`) runs `npm run test` (Vitest).
+- **Frontend** (`ecfront`) runs `npm run test` (Vitest).
 - **Recommendation** (`recommendation`) runs `pytest`.
 
 To run the full local end-to-end, integration, and security suite, use the Taskfile targets (see `.clinerules` for the canonical order):

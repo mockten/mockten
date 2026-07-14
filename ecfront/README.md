@@ -1,13 +1,13 @@
-# ecfront2
+# ecfront
 
 Frontend for mockten — a React + Vite + TypeScript single-page app that hosts **three** surfaces: the buyer **storefront**, the **Seller Portal** (`/seller/*`), and the **Admin Portal** (`/admin/*`). It talks to the backend exclusively through the Kong API gateway under `/api/*`.
 
-> The Developer Dashboard is a separate app under [`monitoring/dashboard`](../monitoring), not part of ecfront2.
+> The Developer Dashboard is a separate app under [`monitoring/dashboard`](../monitoring), not part of ecfront.
 
 ## Layout
 
 ```
-ecfront2/
+ecfront/
 ├── src/
 │   ├── App.tsx                 # top-level routes for all three surfaces
 │   ├── main.tsx                # app entrypoint

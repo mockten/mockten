@@ -16,7 +16,7 @@
 
 node_modules
 **/node_modules
-/ecfront2/node_modules/.vite
+/ecfront/node_modules/.vite
 uam/config.json
 uam/config.json
 profile/test.sh
@@ -25,9 +25,9 @@ uam/config.json
 ecpay/test.text
 .secrets
 .clinerules
-ecfront2/debug_payment_page.png
-ecfront2/playwright-report/
-ecfront2/test-results/
+ecfront/debug_payment_page.png
+ecfront/playwright-report/
+ecfront/test-results/
 test-results/
 PR_SUMMARY*
 step*
@@ -44,8 +44,8 @@ minIO/chrome_profile/*
 minIO/photos/debug*
 minIO/photos/
 minIO/.photos_downloaded
-ecfront2.log
-ecfront2.pid
+ecfront.log
+ecfront.pid
 zap-report.html
 
 **/__pycache__/

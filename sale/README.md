@@ -59,4 +59,4 @@ Unit tests cover the `max1` helper and the `euCountries` classification map used
 ## Related
 
 - Order / audit tables and demo seed data live in [`mysql`](../mysql).
-- The Admin Portal UI lives in [`ecfront2/src/pages/admin`](../ecfront2); these endpoints are also documented in the Developer Dashboard's API Specifications panel.
+- The Admin Portal UI lives in [`ecfront/src/pages/admin`](../ecfront); these endpoints are also documented in the Developer Dashboard's API Specifications panel.
