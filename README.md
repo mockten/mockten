@@ -114,7 +114,8 @@ Platform governance for administrators, backed by live Keycloak and backend data
 - **System Health**: live component health (Database, API Server, Catalog/Inventory) and colloquial System Alerts derived from real backend metrics.
 - **Activity Logs**: the platform-wide audit trail (logins, order placement, admin actions), paginated.
 
-> _Screenshot: Admin Portal dashboard (add here)._
+<img width="2308" height="1156" alt="CleanShot 2026-07-15 at 23 33 54@2x" src="https://github.com/user-attachments/assets/cdabae6a-223e-4c8c-98fe-2837c37bd92f" />
+
 
 ---
 
@@ -181,9 +182,9 @@ Once the app is created, copy its App ID and App Secret into `uam/uam.env` (copy
 ## Payment (Stripe) Setup
 Card payments are processed with [Stripe](https://stripe.com/). Create a free Stripe account, and while the dashboard is in **Test mode** open **Developers → API keys** to find your **Publishable key** (`pk_test_…`) and **Secret key** (`sk_test_…`).
 
-<!-- Paste the Stripe "API keys" screenshot below: drag the image into GitHub's
-     README editor and it will upload to user-attachments and fill in the src. -->
-<img width="880" alt="Stripe API keys" src="REPLACE_WITH_STRIPE_API_KEYS_SCREENSHOT_URL" />
+
+<img width="1642" height="736" alt="CleanShot 2026-07-15 at 23 35 02@2x" src="https://github.com/user-attachments/assets/d458bd0d-8046-4427-a2ae-440ad1acb9ce" />
+
 
 Copy each key into the matching environment file:
 
