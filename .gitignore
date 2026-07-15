@@ -65,6 +65,14 @@ zap-report.html
 
 **/__pycache__/
 *.pyc
+
+# Python virtualenvs (e.g. mysql/seeder/venv). `python -m venv` also drops its
+# own `.gitignore` with `*` inside, but ignore them explicitly here too so a venv
+# created any other way can never be committed.
+venv/
+**/venv/
+.venv/
+**/.venv/
 # Compiled Go service binaries (produced by `go build`; named after their module/dir)
 sale/sale
 shipment/shipment
