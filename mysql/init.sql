@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS TimeSale (
 
 INSERT INTO TimeSale (id, name, start_date, end_date, discount_rate)
 VALUES
-('f1234567-abcd-1234-abcd-1234567890ab', 'Mockten Super Sale', '2026-06-01 00:00:00', '2026-06-30 23:59:59', 0.10),
+('f1234567-abcd-1234-abcd-1234567890ab', 'Mockten Super Sale', '2026-06-01 00:00:00', '2036-06-01 23:59:59', 0.10),
 ('f2345678-abcd-1234-abcd-1234567890ab', "Father's day Sale", '2026-06-14 00:00:00', '2026-06-28 23:59:59', 0.30),
 ('f3456789-abcd-1234-abcd-1234567890ab', 'June Deals', '2026-06-01 00:00:00', '2026-06-30 23:59:59', 0.20),
 ('f456789a-abcd-1234-abcd-1234567890ab', 'July Hot Deals', '2026-06-01 00:00:00', '2026-07-31 23:59:59', 0.15)

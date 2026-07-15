@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	crand "crypto/rand"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -17,7 +18,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	crand "crypto/rand"
 
 	"github.com/MicahParks/keyfunc/v3"
 	_ "github.com/go-sql-driver/mysql"
@@ -657,6 +657,12 @@ WHERE geo_id = ?
 	return &g, nil
 }
 
+// feeScale uniformly scales every shipping fee (road legs + air/sea freight) so
+// the customer-facing quotes stay in a realistic range for a demo storefront.
+// Applied at the source of each fee so the cheaper-route comparisons and the
+// derived delivery-day estimates remain consistent.
+const feeScale = 0.1
+
 func getShippingRates(country string, distance float64) (float64, float64, error) {
 	q := `
 SELECT shipping_type, rate_per_10km
@@ -696,7 +702,7 @@ WHERE country_code = ?
 	if express > capExpress {
 		express = capExpress
 	}
-	return round2(standard), round2(express), nil
+	return round2(standard * feeScale), round2(express * feeScale), nil
 }
 
 func getClosestAirport(country string, lat, lon float64) (Node, float64, error) {
@@ -768,7 +774,7 @@ WHERE origin = ? AND destination = ?
 	if err != nil {
 		return 0, err
 	}
-	return fee, nil
+	return round2(fee * feeScale), nil
 }
 
 func getInternationalAirFee(originAirport, destAirport string) (float64, error) {
@@ -782,7 +788,7 @@ WHERE origin = ? AND destination = ?
 	if err != nil {
 		return 0, err
 	}
-	return fee, nil
+	return round2(fee * feeScale), nil
 }
 
 func getSeaFreightFee(originCountry, destCountry string) (float64, error) {
@@ -796,7 +802,7 @@ WHERE origin_country_code = ? AND destination_country_code = ?
 	if err != nil {
 		return 0, err
 	}
-	return fee, nil
+	return round2(fee * feeScale), nil
 }
 
 // ===== Shipping math / utils =====
