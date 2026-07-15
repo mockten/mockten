@@ -1,14 +1,3 @@
-FROM alpine:3.19 AS builder
-
-RUN apk add --no-cache jq
-COPY config.json /tmp/config.json
-COPY realm-export.json /tmp/realm-export.json
-COPY realm-export-dev.json /tmp/realm-export-dev.json
-RUN jq -r 'to_entries[] | "s/\\\"" + .key + "\\\"/\\\"" + .value + "\\\"/g"' /tmp/config.json \
-  | xargs -I{} sed -i -e '{}' /tmp/realm-export.json
-RUN jq -r 'to_entries[] | "s/\\\"" + .key + "\\\"/\\\"" + .value + "\\\"/g"' /tmp/config.json \
-  | xargs -I{} sed -i -e '{}' /tmp/realm-export-dev.json
-
 FROM quay.io/keycloak/keycloak:latest
 
 ENV KEYCLOAK_ADMIN=admin
@@ -22,8 +11,14 @@ USER root
 RUN mkdir -p /opt/keycloak/staging && chown -R keycloak:keycloak /opt/keycloak/staging
 USER keycloak
 
-COPY --chown=keycloak:keycloak --from=builder /tmp/realm-export.json /opt/keycloak/staging/realm-export.json
-COPY --chown=keycloak:keycloak --from=builder /tmp/realm-export-dev.json /opt/keycloak/staging/realm-export-dev.json
+# The realm templates ship with PLACEHOLDER tokens (GOOGLE_CLIENT_ID,
+# FACEBOOK_CLIENT_SECRET, …), never real credentials. The actual OAuth secrets
+# are substituted into the realm import at container startup from environment
+# variables (see docker-entrypoint.sh), so no secret is ever baked into — or
+# pushed with — this image. In Kubernetes, supply those env vars from a Secret
+# via envFrom; for local Compose they come from the gitignored uam/uam.env.
+COPY --chown=keycloak:keycloak realm-export.json /opt/keycloak/staging/realm-export.json
+COPY --chown=keycloak:keycloak realm-export-dev.json /opt/keycloak/staging/realm-export-dev.json
 COPY docker-entrypoint.sh /opt/keycloak/docker-entrypoint.sh
 
 EXPOSE 80

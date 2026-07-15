@@ -1,0 +1,6 @@
+# Never let local secrets enter the build context (and thus the pushed image).
+# OAuth credentials are injected at runtime via env vars, not at build time.
+config.json
+uam.env
+*.env
+!uam.env.example

@@ -57,6 +57,14 @@ services:
       DEV_MODE: "true"
       JAVA_OPTS_APPEND: "-Xms128m -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+DisableExplicitGC"
       KC_LOG_LEVEL: "WARN"
+    # OAuth secrets for the Google/Facebook identity providers are injected into
+    # the realm import at startup (see uam/docker-entrypoint.sh) instead of being
+    # baked into the image. Provide them locally in the gitignored uam/uam.env
+    # (copy uam/uam.env.example). The file is optional: without it the app still
+    # boots, only social login is disabled. In Kubernetes use a Secret + envFrom.
+    env_file:
+      - path: ./uam/uam.env
+        required: false
     networks:
       - mockten_nw
     tty: true

@@ -10,8 +10,8 @@ User Account Management, built on [Keycloak](https://www.keycloak.org/).
 uam/
 ├── realm-export-dev.json    # Keycloak realm import for local/dev (clients, roles, groups, IdPs)
 ├── realm-export.json        # Keycloak realm import for other environments
-├── config.json              # Google/Facebook identity-provider Client ID/secret
-├── docker-entrypoint.sh     # imports the realm and starts Keycloak
+├── uam.env.example          # template for the OAuth secrets injected at runtime
+├── docker-entrypoint.sh     # injects secrets, imports the realm, starts Keycloak
 └── Dockerfile
 ```
 
@@ -28,5 +28,19 @@ Token issuance, userinfo, SSO auth/broker callbacks, realm roles, and the Admin 
 
 ## Configuration
 
-- `config.json` — Google and Facebook identity-provider Client ID/secret (see the repository root [README](../README.md#google-authentication-setup) for setup).
 - Realm structure (clients, roles, groups, web origins such as `http://nginx` for containerized E2E) is defined in the `realm-export*.json` files and imported at container start.
+
+### OAuth secrets are injected at runtime, never baked into the image
+
+The realm templates ship with **placeholder** tokens (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET`). The real Google/Facebook credentials are substituted into the realm import by `docker-entrypoint.sh` **at container startup**, read from environment variables. Nothing secret is written into the image, so the built image is safe to `docker push`. A key that is left unset keeps its placeholder and the app still boots — only that social login is disabled.
+
+- **Local (Docker Compose):** copy `uam.env.example` to `uam.env` (gitignored) and fill in the four values. Compose loads it via `env_file` (marked `required: false`, so the file is optional). See the repository root [README](../README.md#google-authentication-setup) for where to obtain the values.
+- **Kubernetes:** do **not** ship a file. Store the four keys in a `Secret` and expose them to the uam `Deployment` with `envFrom`:
+
+  ```yaml
+  envFrom:
+    - secretRef:
+        name: uam-oauth
+  ```
+
+  (or, equivalently, a `ConfigMap` for the non-secret client IDs plus a `Secret` for the secrets). The entrypoint reads whatever the pod's environment provides.
