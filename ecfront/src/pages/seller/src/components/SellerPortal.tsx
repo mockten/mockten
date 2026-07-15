@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { formatLocalTimestamp } from "../../../../module/datetime";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -778,7 +779,7 @@ export function SellerPortal() {
                               {mapUIStatus(order.status)}
                             </Badge>
                           </TableCell>
-                          <TableCell>{order.created_at}</TableCell>
+                          <TableCell>{formatLocalTimestamp(order.created_at)}</TableCell>
                         </TableRow>
                       ))}
                       {loadingOrders && (
@@ -1057,7 +1058,7 @@ export function SellerPortal() {
                               {mapUIStatus(order.status)}
                             </Badge>
                           </TableCell>
-                          <TableCell>{order.created_at}</TableCell>
+                          <TableCell>{formatLocalTimestamp(order.created_at)}</TableCell>
                         </TableRow>
                       ))}
                       {loadingOrders && (

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { formatLocalTimestamp } from "../../module/datetime";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -399,7 +400,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                           <TableCell>{order.user_id}</TableCell>
                           <TableCell>${order.amount.toFixed(2)}</TableCell>
                           <TableCell><Badge variant="secondary" className="bg-red-100 text-red-800">{order.reason}</Badge></TableCell>
-                          <TableCell className="text-slate-500">{order.created_at}</TableCell>
+                          <TableCell className="text-slate-500">{formatLocalTimestamp(order.created_at)}</TableCell>
                         </TableRow>
                       ))}
                       {!loading && orders.length === 0 && (
@@ -571,7 +572,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                           <TableCell>${order.amount.toFixed(2)}</TableCell>
                           <TableCell><Badge variant="secondary" className={getStatusColor(order.status)}>{order.status}</Badge></TableCell>
                           <TableCell><Badge variant="secondary" className="bg-red-100 text-red-800">{order.reason}</Badge></TableCell>
-                          <TableCell className="text-slate-500">{order.created_at}</TableCell>
+                          <TableCell className="text-slate-500">{formatLocalTimestamp(order.created_at)}</TableCell>
                           <TableCell>
                             <Button variant="ghost" size="sm" onClick={() => setInvestigateOrder(order)}>Investigate</Button>
                           </TableCell>
@@ -673,7 +674,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                           <TableCell>{log.actor}</TableCell>
                           <TableCell><Badge variant="secondary" className="bg-slate-100 text-slate-700 capitalize">{log.actor_type || "system"}</Badge></TableCell>
                           <TableCell className="text-slate-500">{log.target || "—"}</TableCell>
-                          <TableCell className="text-slate-500">{log.timestamp}</TableCell>
+                          <TableCell className="text-slate-500">{formatLocalTimestamp(log.timestamp)}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               {getStatusIcon(log.status)}
@@ -725,7 +726,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
               <div className="flex justify-between"><span className="text-slate-500">Amount</span><span>${investigateOrder.amount.toFixed(2)}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Status</span><span>{investigateOrder.status}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Shipping country</span><span>{investigateOrder.country || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Placed</span><span>{investigateOrder.created_at}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Placed</span><span>{formatLocalTimestamp(investigateOrder.created_at)}</span></div>
               <div className="mt-3 rounded-md bg-red-50 border border-red-200 p-3 text-red-800">
                 <strong>Flag reason:</strong> {investigateOrder.reason}
               </div>
