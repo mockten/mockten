@@ -274,7 +274,6 @@ export function CreateUserPage({ onBack, onUserCreated }: CreateUserPageProps) {
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="pending">Pending (awaiting approval)</SelectItem>
-                      <SelectItem value="suspended">Suspended</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
