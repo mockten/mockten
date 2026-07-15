@@ -143,6 +143,25 @@ test.describe('Admin Portal', () => {
     await expect(page.getByText('Delete User')).toHaveCount(0);
   });
 
+  test('13. superadmin Edit page cannot suspend or delete', async ({ page }) => {
+    await loginAsAdmin(page);
+    await openSection(page, 'User Management');
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15000 });
+    await page.locator('select[aria-label="Filter by role"]').selectOption('Admin');
+    const row = page.locator('table tbody tr', { hasText: 'superadmin@example.com' });
+    await expect(row).toBeVisible({ timeout: 10000 });
+    // Open the row menu and go to Edit.
+    await row.getByRole('button').last().click();
+    await page.getByText('Edit User').click();
+    // Edit page loaded (email is an input, so assert on the section heading).
+    await expect(page.getByText('Personal Information')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('input#email')).toHaveValue('superadmin@example.com', { timeout: 15000 });
+    // The status control is locked to Active (no Suspended), and Delete is gone.
+    await expect(page.getByText(/root administrator cannot be suspended|cannot suspend your own account/)).toBeVisible();
+    await expect(page.getByText(/Protected account/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Delete User' })).toHaveCount(0);
+  });
+
   test('11. Logout returns to the admin login screen', async ({ page }) => {
     await loginAsAdmin(page);
     await page.getByRole('button', { name: /superadmin/i }).click();

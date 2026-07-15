@@ -23,7 +23,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
-import { getUser, updateUser, deleteUser, getStoreName, getSellerStoreName, updateSellerStoreName } from "./adminApi";
+import { Shield } from "lucide-react";
+import { getUser, updateUser, deleteUser, getStoreName, getSellerStoreName, updateSellerStoreName, getAdminEmail } from "./adminApi";
 
 interface EditUserPageProps {
   onBack: () => void;
@@ -101,7 +102,8 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
-        status: formData.status,
+        // A protected account (self / root admin) can never be saved as suspended.
+        status: isProtected ? "active" : formData.status,
         ...(isSeller ? { storeName: formData.storeName } : {}),
       },
       formData.email
@@ -124,6 +126,16 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
     await deleteUser(userId, formData.email);
     onUserUpdated();
   };
+
+  // The signed-in admin and the root superadmin cannot be suspended or deleted,
+  // so nobody can lock themselves out or lose the root account. Guarded here too
+  // (not just in the User Management row menu) since Edit is another way in.
+  const meEmail = getAdminEmail();
+  const isProtected =
+    formData.email === "superadmin@example.com" ||
+    (formData.firstName === "Super" && formData.lastName === "Admin") ||
+    formData.email === meEmail ||
+    (!!formData.email && formData.email.split("@")[0] === meEmail);
 
   return (
     <div className="min-h-screen bg-red-50">
@@ -202,14 +214,31 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
               <CardContent>
                 <div className="space-y-2 max-w-xs">
                   <Label htmlFor="status">Status</Label>
-                  <Select value={formData.status} onValueChange={(v: string) => handleInputChange("status", v)}>
-                    <SelectTrigger id="status"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      {initialStatus === "pending" && <SelectItem value="pending">Pending</SelectItem>}
-                      <SelectItem value="suspended">Suspended</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {isProtected ? (
+                    <>
+                      <Select value="active" disabled>
+                        <SelectTrigger id="status"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-slate-500 inline-flex items-center gap-1">
+                        <Shield className="w-3.5 h-3.5" />
+                        {formData.email === "superadmin@example.com" || (formData.firstName === "Super" && formData.lastName === "Admin")
+                          ? "The root administrator cannot be suspended."
+                          : "You cannot suspend your own account."}
+                      </p>
+                    </>
+                  ) : (
+                    <Select value={formData.status} onValueChange={(v: string) => handleInputChange("status", v)}>
+                      <SelectTrigger id="status"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        {initialStatus === "pending" && <SelectItem value="pending">Pending</SelectItem>}
+                        <SelectItem value="suspended">Suspended</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -221,23 +250,29 @@ export function EditUserPage({ onBack, onUserUpdated, userId }: EditUserPageProp
             )}
 
             <div className="flex items-center justify-between">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button type="button" variant="outline" className="text-red-600 border-red-200 gap-2">
-                    <Trash2 className="w-4 h-4" /> Delete User
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete this user?</AlertDialogTitle>
-                    <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              {isProtected ? (
+                <span className="text-sm text-slate-400 inline-flex items-center gap-1.5">
+                  <Shield className="w-4 h-4" /> Protected account — cannot be deleted
+                </span>
+              ) : (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button type="button" variant="outline" className="text-red-600 border-red-200 gap-2">
+                      <Trash2 className="w-4 h-4" /> Delete User
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this user?</AlertDialogTitle>
+                      <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
 
               <div className="flex gap-3">
                 <Button type="button" variant="outline" onClick={onBack}>Cancel</Button>
