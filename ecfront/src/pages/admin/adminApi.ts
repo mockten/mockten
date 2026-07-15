@@ -69,13 +69,14 @@ export async function adminFetch(input: string, init: RequestInit = {}): Promise
   return res;
 }
 
-/** Fire-and-forget audit log entry. */
+/** Fire-and-forget audit log entry. Tagged as an admin action (admin tokens
+ *  carry no role claim, so the backend can't infer this from the JWT). */
 export async function postAudit(action: string, target = "", status = "success"): Promise<void> {
   try {
     await fetch("/api/admin/audit", {
       method: "POST",
       headers: { ...adminHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({ action, target, status }),
+      body: JSON.stringify({ action, target, status, actor_type: "admin" }),
     });
   } catch {
     /* non-fatal */

@@ -98,6 +98,7 @@ const MyCartConfirm: React.FC = () => {
           action: 'Order Placed',
           target: res.data.order_id || res.data.payment_id || '',
           status: 'success',
+          actor_type: 'customer',
         }).catch(() => {});
         try {
           if (isFromCart) {

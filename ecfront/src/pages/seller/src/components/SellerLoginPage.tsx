@@ -54,7 +54,7 @@ export function SellerLoginPage() {
       fetch("/api/admin/audit", {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "Seller Login", status: "success" }),
+        body: JSON.stringify({ action: "Seller Login", status: "success", actor_type: "seller" }),
       }).catch(() => {});
 
       navigate("/seller/portal");

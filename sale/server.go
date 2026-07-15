@@ -1206,9 +1206,10 @@ func handlePostAudit(c *gin.Context) {
 		return
 	}
 	var body struct {
-		Action string `json:"action"`
-		Target string `json:"target"`
-		Status string `json:"status"`
+		Action    string `json:"action"`
+		Target    string `json:"target"`
+		Status    string `json:"status"`
+		ActorType string `json:"actor_type"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Action) == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "action is required"})
@@ -1218,7 +1219,14 @@ func handlePostAudit(c *gin.Context) {
 	if status == "" {
 		status = "success"
 	}
+	// The realm issues no "admin" role (admins are a group), so admin tokens
+	// carry no role claim and would fall through to "customer". Let the caller
+	// state its actor type explicitly (each frontend context knows it); fall
+	// back to the token's roles, which correctly identify sellers.
 	actorType := actorTypeFromJWT(c)
+	if t := strings.ToLower(strings.TrimSpace(body.ActorType)); t == "admin" || t == "seller" || t == "customer" {
+		actorType = t
+	}
 	if _, err := db.Exec(
 		"INSERT INTO AuditLog (action, actor, actor_type, target, status) VALUES (?, ?, ?, ?, ?)",
 		body.Action, actor, actorType, body.Target, status,

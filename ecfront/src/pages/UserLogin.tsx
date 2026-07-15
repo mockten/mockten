@@ -85,7 +85,7 @@ const UserLoginNew: React.FC = () => {
         fetch('/api/admin/audit', {
           method: 'POST',
           headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'Customer Login (SSO)', status: 'success' }),
+          body: JSON.stringify({ action: 'Customer Login (SSO)', status: 'success', actor_type: 'customer' }),
         }).catch(() => {});
 
         navigate('/');

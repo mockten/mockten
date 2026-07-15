@@ -31,7 +31,7 @@ export const login = async (userID: string, password: string): Promise<LoginResp
     fetch('/api/admin/audit', {
       method: 'POST',
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'Customer Login', status: 'success' }),
+      body: JSON.stringify({ action: 'Customer Login', status: 'success', actor_type: 'customer' }),
     }).catch(() => {});
 
     const userInfoResponse = await axios.get(USER_INFO_URL, {
