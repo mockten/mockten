@@ -263,6 +263,59 @@ A denormalized projection of `Product` joined with `Seller`, `Category` and `Sto
 
 Deactivated products are removed from the index by `sync` so they stop appearing in storefront search while remaining in MySQL.
 
+## Redis
+
+Persistent (AOF + a PVC). Redis backs exactly two features. **Note the actual key
+types** — the ranking is not a JSON document, and browsing history is not in Redis
+at all.
+
+### Ranking — Sorted Sets (ZSET), one per month × category
+
+There is **no single `ranking` key holding a JSON blob**. Each month/category is
+its own sorted set:
+
+| Key | Contents |
+|-----|----------|
+| `ranking:{YYYY-MM}:{category_id}` | per-category board for the month |
+| `ranking:{YYYY-MM}:all` | cross-category board for the month |
+
+- **Type:** sorted set (ZSET). **Member** = `product_id`, **score** = cumulative purchase count.
+- `POST /api/ranking/update` (called on each purchase) runs `ZINCRBY` on both the
+  category set and the `:all` set by the quantity bought.
+- `GET /api/ranking` reads the top 10 with `ZREVRANGE … WITHSCORES` and hydrates
+  product metadata from MySQL.
+- The month is formatted `YYYY-MM` (Go `2006-01`).
+
+### Shopping cart — one JSON string per user, key `cart:{user_id}`
+
+Stored with `GET`/`SET` (TTL-bounded). Serialized `RedisCart`:
+
+```json
+{
+  "updated_at": "2026-05-01T12:00:00Z",
+  "cart": [
+    {
+      "product_id": "abc123",
+      "id": "abc123:road",
+      "quantity": 2,
+      "added_at": "2026-04-15T09:00:00Z",
+      "shipping_fee": 500,
+      "shipping_type": "road",
+      "shipping_days": 3
+    }
+  ]
+}
+```
+
+`id` is `"{product_id}:{shipping_type}"`, so the same product with a different
+shipping leg (`road` / `air` / `sea`) is a distinct cart line.
+
+### Browsing history — MySQL, **not** Redis
+
+There is no `history:{user_id}` Redis key. Browsing history lives in the MySQL
+`BrowsingHistory` table (see above), written by `POST /api/browsing-history/{productId}`
+and read by `GET /api/browsing-history/recommendations`.
+
 ## Regenerating this page
 
 This page was produced from the running stack. To refresh it, dump the schema for the app tables:
