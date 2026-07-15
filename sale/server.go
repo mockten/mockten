@@ -252,7 +252,7 @@ func handleSellerStats(c *gin.Context) {
 		var ps PeriodStats
 		query := `
 			SELECT
-				COALESCE(SUM(o.total_amount), 0) as revenue,
+				COALESCE(SUM(o.subtotal_amount), 0) as revenue,
 				COUNT(DISTINCT o.order_id) as orders,
 				COALESCE(SUM(t.quantity), 0) as products,
 				COUNT(DISTINCT o.user_id) as customers
@@ -356,7 +356,7 @@ func handleSellerOrders(c *gin.Context) {
 		WHEN 'delivered' THEN 3 ELSE 1 END)`
 
 	baseQuery := `
-		SELECT o.order_id, o.user_id, o.total_amount, o.created_at,
+		SELECT o.order_id, o.user_id, o.subtotal_amount, o.created_at,
 			` + statusRankExpr + ` AS status_rank
 		FROM ` + "`Order`" + ` o
 		JOIN ` + "`Transaction`" + ` t ON JSON_CONTAINS(o.transactions_json, JSON_QUOTE(t.transaction_id))
@@ -371,7 +371,7 @@ func handleSellerOrders(c *gin.Context) {
 		args = append(args, like, like)
 	}
 
-	baseQuery += " GROUP BY o.order_id, o.user_id, o.total_amount, o.created_at"
+	baseQuery += " GROUP BY o.order_id, o.user_id, o.subtotal_amount, o.created_at"
 
 	if statusRankFilter >= 0 {
 		baseQuery += " HAVING status_rank = ?"
@@ -1314,13 +1314,6 @@ func handleAdminHealth(c *gin.Context) {
 			"dbPingMs":    pingMs,
 		},
 	})
-}
-
-func max1(n int) int {
-	if n < 1 {
-		return 1
-	}
-	return n
 }
 
 // handleAdminGetSeller returns a seller's store profile (store name +
