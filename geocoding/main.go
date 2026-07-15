@@ -678,8 +678,24 @@ WHERE country_code = ?
 		}
 		rates[t] = rate
 	}
-	standard := rates["standard"] * (distance / 10)
-	express := rates["express"] * (distance / 10)
+	// Realistic shipping model: a fixed handling fee plus a modest per-distance
+	// component, capped. A pure rate × distance (with no base and no ceiling) let
+	// intercontinental distances balloon to absurd figures like $111 for an $8
+	// item; real carriers charge a handling base and cap the long-haul cost.
+	const (
+		baseStandard = 3.5
+		baseExpress  = 7.0
+		capStandard  = 30.0
+		capExpress   = 60.0
+	)
+	standard := baseStandard + rates["standard"]*(distance/10)
+	express := baseExpress + rates["express"]*(distance/10)
+	if standard > capStandard {
+		standard = capStandard
+	}
+	if express > capExpress {
+		express = capExpress
+	}
 	return round2(standard), round2(express), nil
 }
 

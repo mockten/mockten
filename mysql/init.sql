@@ -440,12 +440,15 @@ VALUES
 ON DUPLICATE KEY UPDATE
   stocks = VALUES(stocks);
 
+-- Per-10km distance component (added to a fixed handling base and capped in the
+-- geocoding service). Tuned so domestic orders land around $4-8 and the longest
+-- intercontinental routes hit the cap (~$30 standard) rather than $100+.
 INSERT INTO ShippingRate (country_code, shipping_type, rate_per_10km)
 VALUES
-('JP', 'standard', 0.08),
-('JP', 'express',  0.16),
-('SG', 'standard', 0.10),
-('SG', 'express',  0.20)
+('JP', 'standard', 0.020),
+('JP', 'express',  0.040),
+('SG', 'standard', 0.025),
+('SG', 'express',  0.050)
 ON DUPLICATE KEY UPDATE
   rate_per_10km = VALUES(rate_per_10km);
 

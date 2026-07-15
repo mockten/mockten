@@ -128,6 +128,21 @@ test.describe('Admin Portal', () => {
     await expect(page.locator('table tbody')).toContainText('superadmin', { timeout: 10000 });
   });
 
+  test('12. superadmin cannot be suspended or deleted (protected root admin)', async ({ page }) => {
+    await loginAsAdmin(page);
+    await openSection(page, 'User Management');
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15000 });
+    // Filter to Admins so superadmin is on the first page (107 users otherwise).
+    await page.locator('select[aria-label="Filter by role"]').selectOption('Admin');
+    const row = page.locator('table tbody tr', { hasText: 'superadmin@example.com' });
+    await expect(row).toBeVisible({ timeout: 10000 });
+    await row.getByRole('button').last().click();
+    // Suspend / Delete must not be offered; a Protected notice is shown instead.
+    await expect(page.getByText(/Protected/)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Suspend Account')).toHaveCount(0);
+    await expect(page.getByText('Delete User')).toHaveCount(0);
+  });
+
   test('11. Logout returns to the admin login screen', async ({ page }) => {
     await loginAsAdmin(page);
     await page.getByRole('button', { name: /superadmin/i }).click();

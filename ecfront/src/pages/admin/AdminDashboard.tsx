@@ -205,6 +205,16 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
     }
   };
 
+  // An admin must not be able to lock themselves out or remove the root admin,
+  // so Suspend/Delete are blocked for the signed-in account and for superadmin.
+  // (Other admins can still be suspended/deleted.)
+  const meEmail = getAdminEmail();
+  const isProtectedUser = (u: AdminUser) => {
+    const isSuperadmin = u.email === "superadmin@example.com" || u.name === "Super Admin";
+    const isSelf = u.email === meEmail || u.email.split("@")[0] === meEmail;
+    return isSuperadmin || isSelf;
+  };
+
   const q = searchQuery.toLowerCase();
   const filteredUsers = users.filter((u) => {
     if (userStatusFilter !== "All" && u.status !== userStatusFilter.toLowerCase()) return false;
@@ -482,15 +492,27 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                                   <Edit className="w-4 h-4 mr-2" />
                                   Edit User
                                 </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-amber-600" onClick={() => handleSuspend(user)}>
-                                  <Ban className="w-4 h-4 mr-2" />
-                                  {user.status === "suspended" ? "Reactivate Account" : "Suspend Account"}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="text-red-600" onClick={() => { setUserToDelete({ id: user.id, name: user.name, email: user.email }); setDeleteDialogOpen(true); }}>
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete User
-                                </DropdownMenuItem>
+                                {isProtectedUser(user) ? (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem disabled className="text-slate-400">
+                                      <Shield className="w-4 h-4 mr-2" />
+                                      {user.email === meEmail || user.email.split("@")[0] === meEmail ? "Protected (your account)" : "Protected (root admin)"}
+                                    </DropdownMenuItem>
+                                  </>
+                                ) : (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="text-amber-600" onClick={() => handleSuspend(user)}>
+                                      <Ban className="w-4 h-4 mr-2" />
+                                      {user.status === "suspended" ? "Reactivate Account" : "Suspend Account"}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem className="text-red-600" onClick={() => { setUserToDelete({ id: user.id, name: user.name, email: user.email }); setDeleteDialogOpen(true); }}>
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Delete User
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
