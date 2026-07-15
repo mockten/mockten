@@ -22,6 +22,8 @@ apigw/
 
 Every route below is declared in `kong.yaml`. This is the same catalog rendered — with per-endpoint Description (EN/JA/ZH), Input Schema (including which parameters are Mandatory), Response Schema, and a runnable **Test Request** form — in the Developer Dashboard's **API Specifications** panel (`http://localhost/dashboard`). The Dashboard builds that view by parsing this file live, so keeping `kong.yaml` correct keeps the spec correct.
 
+> **Full API reference:** for the complete, per-endpoint documentation — request parameters, mandatory fields, and response schemas for every route — see the [API wiki page](https://github.com/mockten/mockten/wiki/API). The table below is only a quick route index.
+
 ### Auth / UAM (Keycloak)
 | Method(s) | Path | Backend |
 |-----------|------|---------|
