@@ -305,7 +305,7 @@ function createK8sRuntime() {
     },
 
     async logStream(id, tail, onText, onError, onEnd) {
-      const { logApi } = await init();
+      const { core, logApi } = await init();
       const { PassThrough } = require('stream');
       const stream = new PassThrough();
       stream.on('data', chunk => onText(chunk.toString('utf8')));
@@ -314,7 +314,14 @@ function createK8sRuntime() {
 
       let req;
       try {
-        req = await logApi.log(K8S_NAMESPACE, id, undefined, stream, {
+        // The client sets ?container= unconditionally, so it must be a real
+        // name — passing undefined would request "container=undefined" and the
+        // API would reject it. Our pods are single-container; take the first.
+        const pod = await core.readNamespacedPod({ name: id, namespace: K8S_NAMESPACE });
+        const container = pod?.spec?.containers?.[0]?.name;
+        if (!container) throw new Error(`no container found on pod ${id}`);
+
+        req = await logApi.log(K8S_NAMESPACE, id, container, stream, {
           follow: true,
           tailLines: tail,
           timestamps: true,
