@@ -21,6 +21,10 @@
 
 const K8S_NAMESPACE = process.env.K8S_NAMESPACE || 'default';
 
+// Prefer bash when the image has it, fall back to sh. Shared by both runtimes so
+// the terminal behaves the same whether it lands in a container or a pod.
+const SHELL_CMD = ['/bin/sh', '-c', '[ -x /bin/bash ] && exec /bin/bash || exec /bin/sh'];
+
 /**
  * DEV_MODE decides which runtime we use.
  * - Explicit DEV_MODE=true/false always wins.
@@ -69,8 +73,9 @@ function capabilities() {
       logs: true,
       stats: true,
       restart: true,
-      startStop: DEV_MODE, // no k8s equivalent
-      exec: DEV_MODE,      // would need pods/exec RBAC; intentionally not granted
+      startStop: DEV_MODE, // no k8s equivalent (a Pod is scheduled or gone)
+      // `kubectl exec` equivalent; needs pods/exec RBAC in the cluster.
+      exec: true,
     },
     syncTrigger: DEV_MODE,     // needs exec into the sync container
     dbExportImport: DEV_MODE,  // needs exec into the mysql container (mysqldump)
@@ -167,6 +172,33 @@ function createDockerRuntime() {
       stream.on('error', e => onError(e));
       stream.on('end', () => onEnd());
       return { destroy: () => { try { stream.destroy?.(); } catch { /* already gone */ } } };
+    },
+
+    /** Interactive shell. Returns a handle to write stdin and tear the session down. */
+    async execStream(id, cols, rows, onText, onError, onEnd) {
+      const container = docker.getContainer(id);
+      const exec = await container.exec({
+        Cmd: SHELL_CMD,
+        AttachStdin: true,
+        AttachStdout: true,
+        AttachStderr: true,
+        Tty: true,
+        OpenStdin: true,
+        StdinOnce: false,
+      });
+      const stream = await exec.start({ hijack: true, stdin: true });
+      try {
+        await exec.resize({ w: cols, h: rows });
+      } catch (e) {
+        console.warn('Failed to resize terminal:', e.message);
+      }
+      stream.on('data', chunk => onText(chunk.toString('utf8')));
+      stream.on('end', () => onEnd());
+      stream.on('error', e => onError(e));
+      return {
+        write: data => { if (stream.writable) stream.write(data); },
+        destroy: () => { try { stream.destroy?.(); } catch { /* already gone */ } },
+      };
     },
   };
 }
@@ -333,6 +365,40 @@ function createK8sRuntime() {
         destroy: () => {
           try { req?.abort?.(); } catch { /* already finished */ }
           try { stream.destroy(); } catch { /* already destroyed */ }
+        },
+      };
+    },
+
+    /** Interactive shell, the Kubernetes equivalent of `kubectl exec -it`. */
+    async execStream(id, cols, rows, onText, onError, onEnd) {
+      const { k8s, kc, core } = await init();
+      const { PassThrough } = require('stream');
+
+      const pod = await core.readNamespacedPod({ name: id, namespace: K8S_NAMESPACE });
+      const container = pod?.spec?.containers?.[0]?.name;
+      if (!container) throw new Error(`no container found on pod ${id}`);
+
+      const stdin = new PassThrough();
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      stdout.on('data', chunk => onText(chunk.toString('utf8')));
+      stderr.on('data', chunk => onText(chunk.toString('utf8')));
+
+      // Note: cols/rows are accepted for parity with the Docker runtime but not
+      // applied — resizing needs the exec channel's dedicated resize stream, and
+      // the shell simply uses its default geometry.
+      const conn = await new k8s.Exec(kc).exec(
+        K8S_NAMESPACE, id, container, SHELL_CMD,
+        stdout, stderr, stdin, true /* tty */,
+        () => onEnd(),
+      );
+      conn.on?.('error', e => onError(e));
+
+      return {
+        write: data => { try { stdin.write(data); } catch (e) { onError(e); } },
+        destroy: () => {
+          try { conn?.close?.(); } catch { /* already closed */ }
+          try { stdin.end(); } catch { /* already ended */ }
         },
       };
     },

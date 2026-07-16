@@ -25,11 +25,15 @@ RUN mkdir -p /root/.config/act && printf '%s\n' \
     '-P ubuntu-20.04=catthehacker/ubuntu:act-20.04' \
     > /root/.config/act/actrc
 
+# Built from the repository root (see docker-compose.yml / release.yml) so that
+# apigw/kong.yaml can be copied in — the API Specifications panel parses it, and
+# compose only bind-mounts it in DEV, which left it missing from the image.
 WORKDIR /app
-COPY package.json .
+COPY monitoring/dashboard/package.json .
 RUN npm install --omit=dev
-COPY server.js .
-COPY runtime.js .
-COPY public/ ./public/
+COPY monitoring/dashboard/server.js .
+COPY monitoring/dashboard/runtime.js .
+COPY monitoring/dashboard/public/ ./public/
+COPY apigw/kong.yaml /app/kong.yaml
 EXPOSE 3001
 CMD ["node", "server.js"]

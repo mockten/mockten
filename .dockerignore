@@ -1,0 +1,27 @@
+# Applies only to builds that use the repository root as their context (the
+# dashboard image, which needs both monitoring/dashboard/ and apigw/kong.yaml).
+# Per-service images build from their own directory and are unaffected.
+.git
+**/node_modules
+**/dist
+**/venv
+**/.venv
+**/__pycache__
+*.log
+ecfront.log
+ecfront.pid
+
+# Never let local secrets into any build context.
+.env
+**/.env
+**/.env.*
+!**/.env.example
+!ecfront/.env.development
+!ecfront/.env.production
+uam/uam.env
+uam/config.json
+
+# Test/CI artefacts and things no image needs.
+ecfront/test-results
+ecfront/playwright-report
+**/terraform.tfstate*

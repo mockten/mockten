@@ -306,7 +306,10 @@ services:
     image: mockten-dashboard
     mem_limit: 500m
     build:
-      context: ./monitoring/dashboard
+      # Root context so the image can include apigw/kong.yaml (the API
+      # Specifications panel parses it); see monitoring/dashboard/Dockerfile.
+      context: .
+      dockerfile: monitoring/dashboard/Dockerfile
     environment:
       - NODE_OPTIONS=--max-old-space-size=350
       - HOST_WORKSPACE_PATH=${HOST_WORKSPACE_PATH:-${PWD}}

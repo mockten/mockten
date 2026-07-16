@@ -48,6 +48,13 @@ const docker = runtime.raw;
 
 console.log(`Dashboard runtime mode: ${MODE} (DEV_MODE=${DEV_MODE})`);
 
+// The gateway's hostname differs per environment: docker-compose names the
+// container `apigw`, while the k8s Service is `apigw-service`, so a hardcoded
+// `apigw` cannot resolve in-cluster. Default to the compose names and let the
+// deployment point these at whatever it calls the gateway.
+const APIGW_BASE_URL  = (process.env.APIGW_BASE_URL  || 'http://apigw:8082').replace(/\/$/, '');
+const KONG_ADMIN_URL  = (process.env.KONG_ADMIN_URL  || 'http://apigw:8001').replace(/\/$/, '');
+
 // Guard for endpoints that only exist in DEV (they need the Docker socket or
 // the mounted repo workspace). In k8s these are switched off in the UI too.
 function devOnly(feature) {
@@ -311,7 +318,7 @@ app.get('/api/topology', async (req, res) => {
     running.forEach(c => { stateMap[c.key] = c.state; });
 
     // Nodes — short display label + full container name
-    const nodes = [
+    let nodes = [
       { id: 'nginx',          label: 'nginx\n(gateway)',     group: 'gateway'  },
       { id: 'frontend',       label: '⚡ Vite\nFrontend',   group: 'frontend' },
       { id: 'apigw',          label: 'apigw\n(Kong)',        group: 'gateway'  },
@@ -362,7 +369,7 @@ app.get('/api/topology', async (req, res) => {
     };
 
     // Edges derived from environment variables + known architecture
-    const edges = [
+    let edges = [
       // Client → nginx
       { source: 'frontend',       target: 'nginx' },
       // nginx routes
@@ -405,11 +412,28 @@ app.get('/api/topology', async (req, res) => {
       { source: 'airflow-web',    target: 'airflow-sch',  dashed: true },
     ];
 
+    // The graph above describes the compose topology. Kubernetes differs in two
+    // ways, and drawing the compose shape there just renders permanent red:
+    //   * there is no nginx pod — the cluster's ingress terminates traffic and
+    //     lives in another namespace, which this dashboard cannot (and by design
+    //     may not) read, so the node could never be anything but "down";
+    //   * the frontend is the ecfront pod, not a Vite dev server on the host.
+    // Drop nginx and reconnect the client straight to what it fronted.
+    if (!DEV_MODE) {
+      const viaNginx = edges.filter(e => e.source === 'nginx').map(e => e.target);
+      edges = edges.filter(e => e.source !== 'nginx' && e.target !== 'nginx');
+      viaNginx.forEach(target => edges.push({ source: 'frontend', target }));
+      nodes = nodes.filter(n => n.id !== 'nginx');
+      const fe = nodes.find(n => n.id === 'frontend');
+      if (fe) { fe.label = 'ecfront\n(frontend)'; fe.group = 'frontend'; }
+    }
+
     // Attach live state to each node
     nodes.forEach(n => {
       if (n.id === 'frontend') {
-        // Checked separately; we'll mark unknown here, client will overlay with fetchFrontendStatus
-        n.state = 'frontend';
+        // DEV: the Vite dev server isn't a container — the client overlays its
+        // state via fetchFrontendStatus. k8s: it's just the ecfront pod.
+        n.state = DEV_MODE ? 'frontend' : (stateMap['ecfront'] || 'exited');
       } else {
         const cname = containerName[n.id];
         n.state = cname ? (stateMap[cname] || 'exited') : 'unknown';
@@ -621,7 +645,7 @@ app.get('/api/superadmin-token', async (req, res) => {
     if (_superadminToken && Date.now() < _superadminTokenExpiry) {
       return res.json({ token: _superadminToken });
     }
-    const r = await fetch('http://apigw:8082/api/uam/token', {
+    const r = await fetch(`${APIGW_BASE_URL}/api/uam/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ username: 'superadmin', password: 'superadmin' })
@@ -646,7 +670,7 @@ app.get('/api/seller-token', async (req, res) => {
     if (_sellerToken && Date.now() < _sellerTokenExpiry) {
       return res.json({ token: _sellerToken });
     }
-    const r = await fetch('http://apigw:8082/api/uam/token', {
+    const r = await fetch(`${APIGW_BASE_URL}/api/uam/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ username: 'healthcompany@example.com', password: 'healthcompany' })
@@ -674,7 +698,7 @@ app.get('/api/first-user-id', async (req, res) => {
     // Get an admin token first.
     let token = _superadminToken && Date.now() < _superadminTokenExpiry ? _superadminToken : null;
     if (!token) {
-      const tr = await fetch('http://apigw:8082/api/uam/token', {
+      const tr = await fetch(`${APIGW_BASE_URL}/api/uam/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ username: 'superadmin', password: 'superadmin' })
@@ -683,7 +707,7 @@ app.get('/api/first-user-id', async (req, res) => {
       const td = await tr.json();
       token = td.access_token;
     }
-    const ur = await fetch('http://apigw:8082/api/uam/users?max=100', {
+    const ur = await fetch(`${APIGW_BASE_URL}/api/uam/users?max=100`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!ur.ok) throw new Error(`users ${ur.status}`);
@@ -747,7 +771,7 @@ app.get('/api/keycloak/users/live', async (req, res) => {
   try {
     let token = _superadminToken;
     if (!token || Date.now() >= _superadminTokenExpiry) {
-      const r = await fetch('http://apigw:8082/api/uam/token', {
+      const r = await fetch(`${APIGW_BASE_URL}/api/uam/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ username: 'superadmin', password: 'superadmin' })
@@ -758,7 +782,7 @@ app.get('/api/keycloak/users/live', async (req, res) => {
       _superadminToken = token;
       _superadminTokenExpiry = Date.now() + (td.expires_in - 30) * 1000;
     }
-    const ur = await fetch('http://apigw:8082/api/uam/users?max=200', {
+    const ur = await fetch(`${APIGW_BASE_URL}/api/uam/users?max=200`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!ur.ok) throw new Error(`Users fetch failed: ${ur.status}`);
@@ -1012,7 +1036,7 @@ app.get('/api/telemetry', async (req, res) => {
 
   // 1. Kong Status
   try {
-    const kongRes = await fetch('http://apigw:8001/status');
+    const kongRes = await fetch(`${KONG_ADMIN_URL}/status`);
     if (kongRes.ok) {
       const data = await kongRes.json();
       telemetry.kong.active = data.server?.connections_active || 0;
@@ -1153,7 +1177,7 @@ async function collectMetricsSnapshot() {
     try {
       const ac = new AbortController();
       const tid = setTimeout(() => ac.abort(), 3000);
-      const kr = await fetch('http://apigw:8001/status', { signal: ac.signal });
+      const kr = await fetch(`${KONG_ADMIN_URL}/status`, { signal: ac.signal });
       clearTimeout(tid);
       if (kr.ok) { const kd = await kr.json(); kongTotal = kd.server?.total_requests || 0; }
     } catch {}
@@ -1304,7 +1328,7 @@ const wssFrontendStart    = new WebSocket.Server({ noServer: true });
 // outside DEV there is nothing behind them — refuse the upgrade rather than
 // hand back a socket that can only error. The UI hides them via /api/capabilities.
 const DEV_ONLY_WS = [
-  '/ws/exec', '/ws/ci', '/ws/tests', '/ws/vulnerability',
+  '/ws/ci', '/ws/tests', '/ws/vulnerability',
   '/ws/frontend-logs', '/ws/frontend-start',
 ];
 
@@ -1400,55 +1424,27 @@ wssExec.on('connection', async (ws, req) => {
   const rows = parseInt(params.get('rows') || '24');
   if (!containerId) { ws.close(); return; }
 
+  // Docker exec in DEV, the Kubernetes exec API (`kubectl exec -it`) when
+  // deployed — the runtime hides the difference behind one handle.
   let stream;
   try {
-    const container = docker.getContainer(containerId);
-    const exec = await container.exec({
-      Cmd: ['/bin/sh', '-c', '[ -x /bin/bash ] && exec /bin/bash || exec /bin/sh'],
-      AttachStdin: true,
-      AttachStdout: true,
-      AttachStderr: true,
-      Tty: true,
-      OpenStdin: true,
-      StdinOnce: false
-    });
-
-    stream = await exec.start({ hijack: true, stdin: true });
-
-    // Resize TTY to match client size
-    try {
-      await exec.resize({ w: cols, h: rows });
-    } catch (resizeErr) {
-      console.warn('Failed to resize terminal:', resizeErr.message);
-    }
-
-    stream.on('data', chunk => {
-      if (ws.readyState === WebSocket.OPEN) {
-        const text = chunk.toString('utf8');
+    stream = await runtime.execStream(
+      containerId, cols, rows,
+      text => {
+        if (ws.readyState !== WebSocket.OPEN) return;
         ws.send(text);
         if (text.includes('OCI runtime exec failed') || text.includes('stat /bin/sh: no such file or directory')) {
           ws.send('\r\n\x1b[33m[Note] This container does not have a shell (/bin/sh or /bin/bash) available.\r\nIt might be built from a minimal "scratch" or distroless image (like Portainer).\x1b[0m\r\n');
         }
-      }
-    });
+      },
+      err => {
+        if (ws.readyState === WebSocket.OPEN) ws.send('\r\n[exec error] ' + err.message + '\r\n');
+        ws.close();
+      },
+      () => ws.close(),
+    );
 
-    stream.on('end', () => {
-      ws.close();
-    });
-
-    stream.on('error', err => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send('\r\n[exec error] ' + err.message + '\r\n');
-      }
-      ws.close();
-    });
-
-    ws.on('message', message => {
-      if (stream && stream.writable) {
-        stream.write(message);
-      }
-    });
-
+    ws.on('message', message => stream?.write(message));
   } catch (e) {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send('\r\n[setup error] ' + e.message + '\r\n');
