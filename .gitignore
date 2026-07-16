@@ -83,3 +83,4 @@ ecpay/ecpay
 searchitem/searchitem
 geocoding/nominatim-geocode-svc
 .agent/
+docs
