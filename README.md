@@ -195,13 +195,13 @@ Copy each key into the matching environment file:
 
 Both files are gitignored, so your keys stay local and are never committed. Use the test keys for development — payments then run against Stripe's test environment, where cards such as `4242 4242 4242 4242` (any future expiry and CVC) succeed without charging real money.
 
-> **Building the `ecfront` image?** Vite inlines `VITE_*` at build time, so the publishable key has to be passed to the build rather than read from your local `.env`:
+> **Running the `ecfront` image?** No key is baked into it — the image is environment-agnostic, so the same artifact can be promoted from dev to staging to production. It reads its configuration from the environment at container start:
 >
 > ```sh
-> docker build --build-arg VITE_STRIPE_PUBLIC_KEY="pk_test_..." -t ecfront ecfront/
+> docker run -e STRIPE_PUBLIC_KEY="pk_test_..." ecfront
 > ```
 >
-> The build fails if it is missing, so an image can't silently ship without a working key. In CI the value comes from the `STRIPE_PUBLISHABLE_KEY` repository secret.
+> The entrypoint renders that into `/config.js` before nginx starts, and the app reads it at runtime. In Kubernetes, supply `STRIPE_PUBLIC_KEY` from a Secret/ConfigMap on the Deployment; a cloud deploy pipeline passes it the same way. `ecfront/.env` above is only for local `npm run dev`.
 
 ## Running Locally
 

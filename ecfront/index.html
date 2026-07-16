@@ -15,6 +15,9 @@
 
 <body>
   <div id="root"></div>
+  <!-- Runtime config, rendered from the container's environment at startup so the
+       image stays environment-agnostic. Must load before the bundle. -->
+  <script src="/config.js"></script>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

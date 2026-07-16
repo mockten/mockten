@@ -31,8 +31,9 @@ import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { STRIPE_PUBLIC_KEY } from '../config';
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
+const stripePromise = loadStripe(STRIPE_PUBLIC_KEY);
 
 export interface GeoAddress {
   geo_id: string;

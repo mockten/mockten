@@ -24,13 +24,14 @@ import Appbar from '../components/Appbar';
 import Footer from '../components/Footer';
 import apiClient from '../module/apiClient';
 import { loadStripe } from '@stripe/stripe-js';
+import { STRIPE_PUBLIC_KEY } from '../config';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
 // stripePromise is created lazily — only when the add-card form is first shown
 let _stripePromise: ReturnType<typeof loadStripe> | null = null;
 const getStripePromise = () => {
   if (!_stripePromise) {
-    _stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY as string);
+    _stripePromise = loadStripe(STRIPE_PUBLIC_KEY);
   }
   return _stripePromise;
 };

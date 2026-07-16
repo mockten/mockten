@@ -23,12 +23,9 @@ jobs:
     - name: Push the docker image
       run: |
         export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/ecfront"
-        # Vite inlines VITE_* at build time, so the publishable key must be
-        # supplied here; the repo intentionally doesn't carry it. The Dockerfile
-        # fails the build if this is empty or still a placeholder.
-        docker build \
-          --build-arg VITE_STRIPE_PUBLIC_KEY="${{ secrets.STRIPE_PUBLISHABLE_KEY }}" \
-          -t $IMAGE_TAG .
+        # No keys at build time: the image is environment-agnostic and reads its
+        # config from the environment at container start (docker-entrypoint.sh).
+        docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
   release-ecpay:
