@@ -22,9 +22,13 @@ jobs:
 
     - name: Push the docker image
       run: |
-        #export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/ecfront/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
         export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/ecfront"
-        docker build -t $IMAGE_TAG .
+        # Vite inlines VITE_* at build time, so the publishable key must be
+        # supplied here; the repo intentionally doesn't carry it. The Dockerfile
+        # fails the build if this is empty or still a placeholder.
+        docker build \
+          --build-arg VITE_STRIPE_PUBLIC_KEY="${{ secrets.STRIPE_PUBLISHABLE_KEY }}" \
+          -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
   release-ecpay:
@@ -44,8 +48,7 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/ecpay/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/ecpay:release-v${SNAPSHOT_VERSION}"
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/ecpay"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -66,8 +69,7 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/ranking/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/ranking:release-v${SNAPSHOT_VERSION}"
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/ranking"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -88,8 +90,7 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/sale/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/sale:release-v${SNAPSHOT_VERSION}"
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/sale"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -110,8 +111,7 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/shipment/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/shipment:release-v${SNAPSHOT_VERSION}"
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/shipment"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
 
@@ -404,5 +404,6 @@ jobs:
     - name: Push the docker image
       run: |
         export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/dashboard"
-        docker build -t $IMAGE_TAG .
+        # Root context so apigw/kong.yaml can be copied into the image.
+        docker build -f Dockerfile -t $IMAGE_TAG ../..
         docker push $IMAGE_TAG
