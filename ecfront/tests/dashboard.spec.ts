@@ -1,4 +1,25 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+
+/**
+ * What the dashboard under test can actually do. The panels backed by the Docker
+ * socket or the mounted repo workspace (Local CI, Security Scanning, DB
+ * export/import, …) only exist in DEV; a dashboard deployed to Kubernetes hides
+ * them on purpose. Read the capabilities so the suite is meaningful against both
+ * runtimes instead of asserting DEV-only UI everywhere.
+ */
+type Caps = {
+  mode: string;
+  ci: boolean;
+  tests: boolean;
+  security: string[];
+  dbExportImport: boolean;
+  containers: { startStop: boolean; exec: boolean };
+};
+
+async function getCaps(page: Page): Promise<Caps> {
+  const res = await page.request.get('/dashboard/api/capabilities');
+  return res.json();
+}
 
 test.describe('Dashboard Enhancements Spec', () => {
   test.beforeEach(async ({ page }) => {
@@ -8,6 +29,8 @@ test.describe('Dashboard Enhancements Spec', () => {
   });
 
   test('should load and navigate through sidebar views', async ({ page }) => {
+    const caps = await getCaps(page);
+
     // Check sidebar navigation items are visible and can navigate correctly updating the view title
     const views = [
       { name: 'Dashboard', title: 'Dashboard' },
@@ -18,9 +41,10 @@ test.describe('Dashboard Enhancements Spec', () => {
       { name: 'API Specifications', title: 'API Specifications' },
       { name: 'Access Management', title: 'Access Management' },
       { name: 'Model Performance', title: 'Model Performance' },
-      { name: 'Local CI Pipelines', title: 'Local CI Pipelines' },
-      { name: 'E2E Test Runner', title: 'E2E Test Runner' },
-      { name: 'Security Scanning', title: 'Security Scanning' }
+      // These three are DEV-only; a deployed dashboard hides them.
+      ...(caps.ci ? [{ name: 'Local CI Pipelines', title: 'Local CI Pipelines' }] : []),
+      ...(caps.tests ? [{ name: 'E2E Test Runner', title: 'E2E Test Runner' }] : []),
+      ...(caps.security.length ? [{ name: 'Security Scanning', title: 'Security Scanning' }] : []),
     ];
 
     for (const view of views) {
@@ -48,27 +72,35 @@ test.describe('Dashboard Enhancements Spec', () => {
     await expect(page.locator('#kong-top-apis-tbody')).toBeVisible();
   });
 
-  test('should run SQL Query and Export MySQL Dump', async ({ page }) => {
+  // Querying works in either runtime — the DB Viewer talks to MySQL directly.
+  test('should run SQL Query', async ({ page }) => {
     await page.locator('nav .nav-item').getByText('DB Viewer', { exact: true }).click();
     await page.waitForSelector('#mysql-tables-ul', { timeout: 10000 });
 
-    // 1. Query Execution
     await page.getByRole('button', { name: 'Query' }).click();
     await page.waitForSelector('#sql-modal-overlay.active');
-    
+
     await page.locator('#sql-query-text').fill('SELECT "Mockten Dashboard Test" AS test_col;');
     await page.getByRole('button', { name: 'Run Query' }).click();
-    
+
     // Check results table
     await page.waitForSelector('#sql-result-wrap table');
     const resultTable = page.locator('#sql-result-wrap table');
     await expect(resultTable.locator('th')).toContainText('test_col');
     await expect(resultTable.locator('td')).toContainText('Mockten Dashboard Test');
-    
+
     // Close modal
     await page.locator('#sql-modal-overlay button').first().click();
+  });
 
-    // 2. Export MySQL Dump
+  // Export shells out to `docker exec … mysqldump`, so it only exists in DEV.
+  test('should Export MySQL Dump', async ({ page }) => {
+    const caps = await getCaps(page);
+    test.skip(!caps.dbExportImport, `DB export is not available in ${caps.mode} mode`);
+
+    await page.locator('nav .nav-item').getByText('DB Viewer', { exact: true }).click();
+    await page.waitForSelector('#mysql-tables-ul', { timeout: 10000 });
+
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export' }).click();
     const download = await downloadPromise;
@@ -140,6 +172,11 @@ test.describe('Dashboard Enhancements Spec', () => {
   });
 
   test('should execute vulnerability scan (task infosec)', async ({ page }) => {
+    // Every scan runs `docker run …` against the mounted workspace, so the panel
+    // only exists in DEV; a deployed dashboard leaves scanning to the pipeline.
+    const caps = await getCaps(page);
+    test.skip(!caps.security.length, `Security scanning is not available in ${caps.mode} mode`);
+
     await page.locator('nav .nav-item').getByText('Security Scanning', { exact: true }).click();
 
     // Select "Scan All" type, then click Run
