@@ -19,7 +19,12 @@ RUN pip install --no-cache-dir \
     minio \
     scikit-learn
 
-# lightfm requires Cython; best-effort
+# lightfm requires Cython; best-effort.
+# Same landmine as recommendation/Dockerfile: lightfm compiles from source and its
+# setup.py defaults to -march=native, which bakes the builder's CPU into the .so
+# and SIGILLs on any older one. Pin a baseline ISA so this image is portable too.
+ENV LIGHTFM_NO_CFLAGS=1
+ENV CFLAGS="-march=x86-64 -mtune=generic -O3"
 RUN pip install --no-cache-dir lightfm || echo "WARNING: lightfm unavailable"
 
 # Remove compiler toolchain after pip builds to shrink the image

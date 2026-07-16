@@ -14,7 +14,7 @@ plugins:
 
 services:
   - name: dashboard-stats
-    url: http://mockten-dashboard:3001/api/stats
+    url: http://dashboard-service.default.svc.cluster.local:3001/api/stats
     routes:
       - name: dashboard-stats-route
         paths:

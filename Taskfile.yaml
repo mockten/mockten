@@ -44,7 +44,7 @@ tasks:
     desc: Verify that all containers and the React frontend process are healthy and running
     cmds:
       - |
-        for container in mysql-service.default.svc.cluster.local redis-service.default.svc.cluster.local uam-service.default.svc.cluster.local minio-service.default.svc.cluster.local apigw meilisearch-service.default.svc.cluster.local searchitem-service.default.svc.cluster.local product-service.default.svc.cluster.local cart-service.default.svc.cluster.local mockten-sync geocoding-service.default.svc.cluster.local ecpay-service.default.svc.cluster.local ranking-service.default.svc.cluster.local sale-service.default.svc.cluster.local shipment-service.default.svc.cluster.local recommendation-service.default.svc.cluster.local nginx mockten-dashboard; do
+        for container in mysql-service.default.svc.cluster.local redis-service.default.svc.cluster.local uam-service.default.svc.cluster.local minio-service.default.svc.cluster.local apigw meilisearch-service.default.svc.cluster.local searchitem-service.default.svc.cluster.local product-service.default.svc.cluster.local cart-service.default.svc.cluster.local mockten-sync geocoding-service.default.svc.cluster.local ecpay-service.default.svc.cluster.local ranking-service.default.svc.cluster.local sale-service.default.svc.cluster.local shipment-service.default.svc.cluster.local recommendation-service.default.svc.cluster.local nginx dashboard-service.default.svc.cluster.local; do
           if [ -z "$(docker ps -q -f name=$container -f status=running)" ]; then
             echo "Error: Container $container is not running!"
             exit 1

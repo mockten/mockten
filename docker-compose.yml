@@ -302,7 +302,9 @@ services:
 
   # ── Monitoring Stack ──────────────────────────────────────────────────────
   dashboard:
-    container_name: mockten-dashboard
+    # Named after the k8s Service, like the other services here: kong.yaml points
+    # at this host, and a compose-only name can't resolve in-cluster.
+    container_name: dashboard-service.default.svc.cluster.local
     image: mockten-dashboard
     mem_limit: 500m
     build:
