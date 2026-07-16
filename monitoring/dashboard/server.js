@@ -1,5 +1,4 @@
 const express = require('express');
-const Docker = require('dockerode');
 const WebSocket = require('ws');
 const path = require('path');
 const http = require('http');
@@ -41,21 +40,35 @@ function getRedis() {
   });
 }
 
-const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+// Container introspection goes through a runtime abstraction: Docker in DEV,
+// the Kubernetes API when deployed. `docker` stays available for the DEV-only
+// paths (exec, mysqldump, sync trigger) that have no k8s counterpart here.
+const { runtime, capabilities, DEV_MODE, MODE } = require('./runtime');
+const docker = runtime.raw;
+
+console.log(`Dashboard runtime mode: ${MODE} (DEV_MODE=${DEV_MODE})`);
+
+// Guard for endpoints that only exist in DEV (they need the Docker socket or
+// the mounted repo workspace). In k8s these are switched off in the UI too.
+function devOnly(feature) {
+  return (req, res, next) => {
+    if (DEV_MODE) return next();
+    res.status(501).json({
+      error: `${feature} is not available in ${MODE} mode`,
+      mode: MODE,
+    });
+  };
+}
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+// What the UI may show for this deployment shape.
+app.get('/api/capabilities', (req, res) => res.json(capabilities()));
 
 // ── Containers ────────────────────────────────────────────────────────────────
 app.get('/api/containers', async (req, res) => {
   try {
-    const containers = await docker.listContainers({ all: true });
-    res.json(containers.map(c => ({
-      id: c.Id.slice(0, 12),
-      name: c.Names[0].replace(/^\//, ''),
-      image: c.Image,
-      status: c.Status,
-      state: c.State,
-    })));
+    res.json(await runtime.list());
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -291,12 +304,11 @@ app.get('/api/topology', async (req, res) => {
     if (_topologyCache && Date.now() - _topologyCacheAt < TOPOLOGY_CACHE_TTL) {
       return res.json(_topologyCache);
     }
-    const running = await docker.listContainers({ all: true });
+    // Keyed by the runtime-agnostic canonical service key, so the same lookup
+    // works against docker container names and k8s pod labels alike.
+    const running = await runtime.list();
     const stateMap = {};
-    running.forEach(c => {
-      const name = c.Names[0].replace(/^\//, '');
-      stateMap[name] = c.State;
-    });
+    running.forEach(c => { stateMap[c.key] = c.state; });
 
     // Nodes — short display label + full container name
     const nodes = [
@@ -323,26 +335,28 @@ app.get('/api/topology', async (req, res) => {
       { id: 'airflow-sch',    label: 'Airflow\nScheduler',   group: 'pipeline' },
     ];
 
-    // Container name mapping for state lookup
+    // Node id → canonical service key (see runtime.canonicalKey). Docker names
+    // like "mysql-service.default.svc.cluster.local" / "mockten-sync" and k8s
+    // pod `app` labels both normalize to these.
     const containerName = {
       nginx:          'nginx',
       apigw:          'apigw',
-      uam:            'uam-service.default.svc.cluster.local',
-      mysql:          'mysql-service.default.svc.cluster.local',
-      redis:          'redis-service.default.svc.cluster.local',
-      minio:          'minio-service.default.svc.cluster.local',
-      meilisearch:    'meilisearch-service.default.svc.cluster.local',
-      searchitem:     'searchitem-service.default.svc.cluster.local',
-      product:        'product-service.default.svc.cluster.local',
-      cart:           'cart-service.default.svc.cluster.local',
-      ranking:        'ranking-service.default.svc.cluster.local',
-      sale:           'sale-service.default.svc.cluster.local',
-      ecpay:          'ecpay-service.default.svc.cluster.local',
-      shipment:       'shipment-service.default.svc.cluster.local',
-      geocoding:      'geocoding-service.default.svc.cluster.local',
-      recommendation: 'recommendation-service.default.svc.cluster.local',
-      sync:           'mockten-sync',
-      dashboard:      'mockten-dashboard',
+      uam:            'uam',
+      mysql:          'mysql',
+      redis:          'redis',
+      minio:          'minio',
+      meilisearch:    'meilisearch',
+      searchitem:     'searchitem',
+      product:        'product',
+      cart:           'cart',
+      ranking:        'ranking',
+      sale:           'sale',
+      ecpay:          'ecpay',
+      shipment:       'shipment',
+      geocoding:      'geocoding',
+      recommendation: 'recommendation',
+      sync:           'sync',
+      dashboard:      'dashboard',
       'airflow-web':  'airflow-webserver',
       'airflow-sch':  'airflow-scheduler',
     };
@@ -414,44 +428,30 @@ app.get('/api/topology', async (req, res) => {
 
 app.get('/api/containers/:id/stats', async (req, res) => {
   try {
-    const stats = await docker.getContainer(req.params.id).stats({ stream: false });
-    const cpu = calcCpuPercent(stats);
-    const numCpus = stats.cpu_stats.online_cpus || stats.cpu_stats.cpu_usage.percpu_usage?.length || 1;
-    const mem = stats.memory_stats;
-    const networks = stats.networks || {};
-    let rxBytes = 0, txBytes = 0;
-    Object.values(networks).forEach(n => { rxBytes += n.rx_bytes; txBytes += n.tx_bytes; });
-    res.json({
-      cpu: cpu.toFixed(2),
-      numCpus,
-      memUsage: mem.usage || 0,
-      memLimit: mem.limit || 0,
-      memPercent: mem.limit ? ((mem.usage / mem.limit) * 100).toFixed(2) : 0,
-      rxBytes, txBytes,
-    });
+    res.json(await runtime.stats(req.params.id));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-app.post('/api/containers/:id/start',   async (req, res) => { try { await docker.getContainer(req.params.id).start();   res.json({ ok: true }); } catch (e) { res.status(500).json({ error: e.message }); } });
-app.post('/api/containers/:id/stop',    async (req, res) => { try { await docker.getContainer(req.params.id).stop();    res.json({ ok: true }); } catch (e) { res.status(500).json({ error: e.message }); } });
-app.post('/api/containers/:id/restart', async (req, res) => { try { await docker.getContainer(req.params.id).restart(); res.json({ ok: true }); } catch (e) { res.status(500).json({ error: e.message }); } });
+// start/stop have no Kubernetes equivalent (a Pod is scheduled or gone), so
+// they stay DEV-only; restart works in both (k8s deletes the Pod and lets the
+// controller recreate it).
+app.post('/api/containers/:id/start', devOnly('Container start'), async (req, res) => { try { await runtime.start(req.params.id);   res.json({ ok: true }); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.post('/api/containers/:id/stop',  devOnly('Container stop'),  async (req, res) => { try { await runtime.stop(req.params.id);    res.json({ ok: true }); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.post('/api/containers/:id/restart', async (req, res) => { try { await runtime.restart(req.params.id); res.json({ ok: true }); } catch (e) { res.status(500).json({ error: e.message }); } });
 
-// System restart — all containers except nginx and mockten-dashboard
+// System restart — everything except the gateway and the dashboard itself
+// (restarting those would cut the caller off mid-request). Skipping is by
+// canonical key so it holds for both docker names and k8s pods.
 app.post('/api/system/restart', async (req, res) => {
-  const SKIP = ['nginx', 'mockten-dashboard'];
+  const SKIP = ['nginx', 'dashboard'];
   try {
-    const containers = await docker.listContainers({ all: false }); // running only
-    const targets = containers.filter(c => {
-      const name = c.Names[0].replace(/^\//, '');
-      return !SKIP.includes(name);
-    });
+    const running = (await runtime.list()).filter(c => c.state === 'running');
+    const targets = running.filter(c => !SKIP.includes(c.key));
     // Start restarts in parallel, report results
-    const results = await Promise.allSettled(
-      targets.map(c => docker.getContainer(c.Id).restart())
-    );
-    const names = targets.map(c => c.Names[0].replace(/^\//, ''));
+    const results = await Promise.allSettled(targets.map(c => runtime.restart(c.id)));
+    const names = targets.map(c => c.name);
     res.json({
       restarted: names.filter((_, i) => results[i].status === 'fulfilled'),
       failed:    names.filter((_, i) => results[i].status === 'rejected'),
@@ -461,8 +461,10 @@ app.post('/api/system/restart', async (req, res) => {
   }
 });
 
-// Sync trigger — runs /sync_script.sh inside mockten-sync container
-app.post('/api/sync/trigger', async (req, res) => {
+// Sync trigger — runs /sync_script.sh inside the mockten-sync container.
+// DEV-only: needs container exec, which the k8s deployment deliberately isn't
+// granted (no pods/exec RBAC).
+app.post('/api/sync/trigger', devOnly('Sync trigger'), async (req, res) => {
   try {
     const container = docker.getContainer('mockten-sync');
     const exec = await container.exec({
@@ -884,7 +886,10 @@ app.post('/api/db/mysql/query', async (req, res) => {
   }
 });
 
-app.get('/api/db/mysql/export', async (req, res) => {
+// Export/import shell out to `docker exec` on the mysql container for
+// mysqldump/mysql. That needs the Docker socket, so both stay DEV-only; the
+// deployed dashboard is not granted pods/exec.
+app.get('/api/db/mysql/export', devOnly('DB export'), async (req, res) => {
   try {
     const { spawn } = require('child_process');
     const child = spawn('docker', [
@@ -902,7 +907,7 @@ app.get('/api/db/mysql/export', async (req, res) => {
   }
 });
 
-app.post('/api/db/mysql/import', (req, res) => {
+app.post('/api/db/mysql/import', devOnly('DB import'), (req, res) => {
   try {
     const { spawn } = require('child_process');
     const child = spawn('docker', [
@@ -1114,18 +1119,15 @@ async function loadMetricsFromMySQL() {
 
 async function collectMetricsSnapshot() {
   try {
-    const containers = await docker.listContainers({ all: false });
+    const containers = (await runtime.list()).filter(c => c.state === 'running');
     let totalCpuSum = 0, totalMemUsage = 0, maxMemLimit = 0, numCpus = 1;
     await Promise.all(containers.map(async c => {
       try {
-        const stats = await docker.getContainer(c.Id).stats({ stream: false });
-        const cpu = calcCpuPercent(stats);
-        const n = stats.cpu_stats.online_cpus || stats.cpu_stats.cpu_usage.percpu_usage?.length || 1;
-        totalCpuSum += cpu;
-        if (n > numCpus) numCpus = n;
-        const mem = stats.memory_stats;
-        totalMemUsage += mem.usage || 0;
-        if ((mem.limit || 0) > maxMemLimit) maxMemLimit = mem.limit;
+        const stats = await runtime.stats(c.id);
+        totalCpuSum += parseFloat(stats.cpu) || 0;
+        if (stats.numCpus > numCpus) numCpus = stats.numCpus;
+        totalMemUsage += stats.memUsage || 0;
+        if ((stats.memLimit || 0) > maxMemLimit) maxMemLimit = stats.memLimit;
       } catch {}
     }));
     const aggCpu = numCpus > 0 ? totalCpuSum / numCpus : 0;
@@ -1196,16 +1198,11 @@ app.get('/api/metrics/history', (req, res) => {
   res.json(metricsHistory);
 });
 
-function calcCpuPercent(stats) {
-  const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
-  const sysDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
-  const numCpus = stats.cpu_stats.online_cpus || stats.cpu_stats.cpu_usage.percpu_usage?.length || 1;
-  if (sysDelta > 0 && cpuDelta > 0) return (cpuDelta / sysDelta) * numCpus * 100.0;
-  return 0;
-}
-
 // ── Frontend (Vite) ───────────────────────────────────────────────────────────
+// Reads the sync marker out of the mockten-sync container. DEV-only: callers
+// must fall back gracefully when there is no Docker socket.
 async function getSyncTimestamp() {
+  if (!DEV_MODE) return null;
   try {
     const container = docker.getContainer('mockten-sync');
     const exec = await container.exec({
@@ -1237,19 +1234,30 @@ async function getSyncTimestamp() {
   }
 }
 
-app.get('/api/frontend/status', async (req, res) => {
-  const socket = new net.Socket();
-  let done = false;
-  
-  const checkFrontend = new Promise((resolve) => {
+// In DEV the frontend is a Vite dev server on the host; when deployed it is the
+// ecfront pod, so report that pod's state instead of probing a socket that
+// cannot exist in-cluster.
+function checkViteDevServer() {
+  return new Promise(resolve => {
+    const socket = new net.Socket();
+    let done = false;
     socket.setTimeout(2000);
     socket.on('connect', () => { done = true; socket.destroy(); resolve(true); });
     socket.on('error',   () => { if (!done) { done = true; resolve(false); } });
     socket.on('timeout', () => { if (!done) { done = true; socket.destroy(); resolve(false); } });
     socket.connect(5173, 'host.docker.internal');
   });
+}
 
-  const running = await checkFrontend;
+app.get('/api/frontend/status', async (req, res) => {
+  let running;
+  if (DEV_MODE) {
+    running = await checkViteDevServer();
+  } else {
+    running = (await runtime.list().catch(() => []))
+      .some(c => c.key === 'ecfront' && c.state === 'running');
+  }
+
   let lastSyncMinutesAgo = null;
   let lastSyncTime = null;
 
@@ -1292,8 +1300,20 @@ const wssTests            = new WebSocket.Server({ noServer: true });
 const wssVulnerability    = new WebSocket.Server({ noServer: true });
 const wssFrontendStart    = new WebSocket.Server({ noServer: true });
 
+// These streams all need the Docker socket or the mounted repo workspace, so
+// outside DEV there is nothing behind them — refuse the upgrade rather than
+// hand back a socket that can only error. The UI hides them via /api/capabilities.
+const DEV_ONLY_WS = [
+  '/ws/exec', '/ws/ci', '/ws/tests', '/ws/vulnerability',
+  '/ws/frontend-logs', '/ws/frontend-start',
+];
+
 server.on('upgrade', (request, socket, head) => {
   const { pathname } = new URL(request.url, 'http://localhost');
+  if (!DEV_MODE && DEV_ONLY_WS.includes(pathname)) {
+    socket.destroy();
+    return;
+  }
   if (pathname === '/ws/logs') {
     wssContainer.handleUpgrade(request, socket, head, ws => wssContainer.emit('connection', ws, request));
   } else if (pathname === '/ws/frontend-logs') {
@@ -1320,25 +1340,17 @@ wssContainer.on('connection', async (ws, req) => {
   const tail = parseInt(params.get('tail') || '100');
   if (!containerId) { ws.close(); return; }
 
+  // The runtime hands us plain text (it owns Docker's stdout/stderr framing),
+  // so this is identical for container logs and pod logs.
   let logStream;
   try {
-    const container = docker.getContainer(containerId);
-    logStream = await container.logs({ stdout: true, stderr: true, follow: true, tail, timestamps: true });
-
-    logStream.on('data', chunk => {
-      // Docker multiplexes stdout/stderr: 8-byte header per frame
-      let offset = 0;
-      while (offset < chunk.length) {
-        if (chunk.length - offset < 8) break;
-        const size = chunk.readUInt32BE(offset + 4);
-        if (chunk.length - offset - 8 < size) break;
-        const payload = chunk.slice(offset + 8, offset + 8 + size);
-        if (ws.readyState === WebSocket.OPEN) ws.send(payload.toString('utf8'));
-        offset += 8 + size;
-      }
-    });
-    logStream.on('end',   () => ws.close());
-    logStream.on('error', e => { if (ws.readyState === WebSocket.OPEN) ws.send('[error] ' + e.message); });
+    logStream = await runtime.logStream(
+      containerId,
+      tail,
+      text => { if (ws.readyState === WebSocket.OPEN) ws.send(text); },
+      e    => { if (ws.readyState === WebSocket.OPEN) ws.send('[error] ' + e.message); },
+      ()   => ws.close(),
+    );
   } catch (e) {
     if (ws.readyState === WebSocket.OPEN) ws.send('[error] ' + e.message);
     ws.close();
@@ -1552,8 +1564,15 @@ wssFrontendStart.on('connection', ws => {
 });
 
 // ── Airflow API proxy ─────────────────────────────────────────────────────
-const AIRFLOW_BASE = 'http://airflow-webserver:8080/api/v1';
-const AIRFLOW_AUTH = 'Basic ' + Buffer.from('airflow:airflow').toString('base64');
+// `airflow-webserver` is the docker-compose container name; it is the one host
+// here that doesn't follow the `*-service.default.svc.cluster.local` convention
+// the rest of the platform shares, so it can't resolve in-cluster. Keep the
+// compose default, but let the deployment point it at its own Airflow service.
+const AIRFLOW_BASE =
+  process.env.AIRFLOW_BASE_URL || 'http://airflow-webserver:8080/api/v1';
+const AIRFLOW_AUTH = 'Basic ' + Buffer.from(
+  `${process.env.AIRFLOW_USER || 'airflow'}:${process.env.AIRFLOW_PASSWORD || 'airflow'}`
+).toString('base64');
 
 function airflowFetch(path, options = {}) {
   const url = new URL(AIRFLOW_BASE + path);

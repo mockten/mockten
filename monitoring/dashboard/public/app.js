@@ -7,6 +7,58 @@ let currentLogLines = [];
 let autoScroll = true;
 let frontendRunning = false;
 
+// What this deployment supports. In DEV (docker-compose) everything is on; when
+// deployed to Kubernetes the panels that need the Docker socket or the mounted
+// repo workspace are switched off. Defaults are permissive so the UI still works
+// if the probe fails (DEV behaviour is then unchanged).
+let CAPS = {
+  mode: 'docker',
+  devMode: true,
+  containers: { list: true, logs: true, stats: true, restart: true, startStop: true, exec: true },
+  syncTrigger: true, dbExportImport: true, frontendDev: true,
+  ci: true, tests: true, security: ['trivy', 'sca', 'sast', 'dast', 'all'],
+};
+
+async function loadCapabilities() {
+  try {
+    const res = await fetch('/dashboard/api/capabilities');
+    if (res.ok) CAPS = await res.json();
+  } catch { /* keep permissive defaults */ }
+}
+
+/** Hide the nav entries and controls this deployment cannot serve. */
+function applyCapabilities() {
+  const hideNav = key => {
+    document.querySelectorAll(`.nav-item[data-key="${key}"]`).forEach(el => { el.style.display = 'none'; });
+  };
+  if (!CAPS.ci) hideNav('ci');
+  if (!CAPS.tests) hideNav('tests');
+  if (!(CAPS.security && CAPS.security.length)) hideNav('vulnerability');
+
+  const hideEl = id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; };
+  if (!CAPS.syncTrigger) hideEl('btn-sync-trigger');
+  if (!CAPS.frontendDev) hideEl('frontend-card');
+
+  if (!CAPS.dbExportImport) {
+    ['btn-mysql-export', 'btn-mysql-import', 'mysql-import-file'].forEach(hideEl);
+  }
+
+  // A deployed dashboard shows the cluster it runs in — say so, so nobody
+  // wonders why Local CI / Security Scanning are missing.
+  if (CAPS.mode && CAPS.mode !== 'docker') {
+    const title = document.getElementById('view-title');
+    if (title && !document.getElementById('mode-badge')) {
+      const badge = document.createElement('span');
+      badge.id = 'mode-badge';
+      badge.textContent = CAPS.mode;
+      badge.style.cssText =
+        'margin-left:10px;padding:2px 8px;border-radius:10px;font-size:11px;' +
+        'text-transform:uppercase;background:var(--accent,#4f8cff);color:#fff;vertical-align:middle;';
+      title.appendChild(badge);
+    }
+  }
+}
+
 // ── Chart State ────────────────────────────────────────────────────────────
 let cpuChart = null;
 let memChart = null;
@@ -16,6 +68,8 @@ const timeLabels = [];
 
 // ── Init ───────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  await loadCapabilities();
+  applyCapabilities();
   initCharts();
   await loadMetricsHistory();
   fetchContainers();
@@ -42,6 +96,12 @@ window.addEventListener('load', () => {
   const validViews = ['dashboard','containers','logs','topology','db','api','keycloak','model','ci','tests','pipeline','vulnerability'];
   if (last && validViews.includes(last)) {
     const navEl = document.querySelector(`.nav-item[onclick*="'${last}'"]`);
+    // Don't restore a view this deployment hides (e.g. Local CI under k8s) —
+    // its nav entry is gone, so fall back to the dashboard.
+    if (navEl && navEl.style.display === 'none') {
+      showView('dashboard', document.querySelector('.nav-item[data-key="dashboard"]'));
+      return;
+    }
     showView(last, navEl);
   }
 });
@@ -363,9 +423,11 @@ function renderTable(containers) {
         <div class="action-btns">
           ${c.state === 'running'
             ? `<button class="btn-act btn-act-warn"  onclick="containerAction('${c.id}','restart')" title="Restart">↺</button>
-               <button class="btn-act btn-act-danger" onclick="containerAction('${c.id}','stop')"    title="Stop">■</button>
-               <button class="btn-login" onclick="openTerminal('${c.id}','${c.name.replace(/'/g, "\\'")}')" title="Terminal Login">&gt;_ ${(I18N[_currentLang]||I18N.en)['col.login']||'Login'}</button>`
-            : `<button class="btn-act btn-act-ok"    onclick="containerAction('${c.id}','start')"   title="Start">▶</button>`
+               ${CAPS.containers.startStop ? `<button class="btn-act btn-act-danger" onclick="containerAction('${c.id}','stop')"    title="Stop">■</button>` : ''}
+               ${CAPS.containers.exec ? `<button class="btn-login" onclick="openTerminal('${c.id}','${c.name.replace(/'/g, "\\'")}')" title="Terminal Login">&gt;_ ${(I18N[_currentLang]||I18N.en)['col.login']||'Login'}</button>` : ''}`
+            : (CAPS.containers.startStop
+                ? `<button class="btn-act btn-act-ok"    onclick="containerAction('${c.id}','start')"   title="Start">▶</button>`
+                : '')
           }
           <button class="btn-log" onclick="openLogs('${c.id}','${c.name.replace(/'/g, "\\'")}')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>

@@ -385,8 +385,8 @@
               <div style="display:flex; gap:10px; align-items:center;">
                 <button class="btn-action" style="background:var(--blue-bg); border-color:rgba(59,130,246,0.3); color:var(--blue)" onclick="openSqlEditorModal()">🔍 <span data-i18n="db.query">Query</span></button>
                 <button class="btn-action" id="btn-mysql-add-row" style="background:var(--green-bg); border-color:rgba(16,185,129,0.3); color:var(--green); display:none" onclick="openAddRowModal('mysql')">➕ <span data-i18n="db.addRow">Add Row</span></button>
-                <button class="btn-action" style="background:var(--green-bg); border-color:rgba(16,185,129,0.3); color:var(--green)" onclick="exportMysqlDump()">📥 <span data-i18n="btn.export">Export</span></button>
-                <button class="btn-action" style="background:var(--yellow-bg); border-color:rgba(245,158,11,0.3); color:var(--yellow)" onclick="triggerMysqlImport()">📤 <span data-i18n="db.import">Import</span></button>
+                <button class="btn-action" id="btn-mysql-export" style="background:var(--green-bg); border-color:rgba(16,185,129,0.3); color:var(--green)" onclick="exportMysqlDump()">📥 <span data-i18n="btn.export">Export</span></button>
+                <button class="btn-action" id="btn-mysql-import" style="background:var(--yellow-bg); border-color:rgba(245,158,11,0.3); color:var(--yellow)" onclick="triggerMysqlImport()">📤 <span data-i18n="db.import">Import</span></button>
                 <input type="file" id="mysql-import-file" style="display:none" onchange="handleMysqlImport(event)" accept=".sql" />
                 <input type="text" id="mysql-search" class="search-input" placeholder="Search rows..." style="width:150px" oninput="mysqlSearch()" />
               </div>
