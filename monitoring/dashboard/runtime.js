@@ -311,12 +311,22 @@ function createK8sRuntime() {
       const m = metricsByPod[id];
       const cores = (m?.containers || []).reduce((sum, c) => sum + cpuToCores(c.usage?.cpu), 0);
       const memUsage = (m?.containers || []).reduce((sum, c) => sum + memToBytes(c.usage?.memory), 0);
-      const memLimit = (pod?.spec?.containers || []).reduce(
+
+      // Denominators. Pods here usually declare no resource limits, and using a
+      // missing limit made CPU read >100% (the caller divides by numCpus) and
+      // memory read 0% (divide by a zero limit). Fall back to the node's own
+      // capacity, which os.cpus()/os.totalmem() report from inside a pod — that
+      // needs no extra RBAC, unlike reading the Node object.
+      const os = require('os');
+      const podCpuLimit = (pod?.spec?.containers || []).reduce(
+        (sum, c) => sum + (cpuToCores(c.resources?.limits?.cpu) || 0), 0);
+      const podMemLimit = (pod?.spec?.containers || []).reduce(
         (sum, c) => sum + memToBytes(c.resources?.limits?.memory), 0);
-      const numCpus = (pod?.spec?.containers || []).reduce(
-        (sum, c) => sum + (cpuToCores(c.resources?.limits?.cpu) || 0), 0) || 1;
+      const numCpus = podCpuLimit || os.cpus().length || 1;
+      const memLimit = podMemLimit || os.totalmem() || 0;
 
       return {
+        // Percent of a single core, matching the Docker runtime's semantics.
         cpu: (cores * 100).toFixed(2),
         numCpus,
         memUsage,

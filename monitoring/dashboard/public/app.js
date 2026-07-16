@@ -152,8 +152,10 @@ async function fetchContainers() {
     const rawContainers = await res.json();
     
     allContainers = rawContainers.sort((a, b) => {
-      const isBotA = a.name === 'nginx' || a.name === 'mockten-dashboard';
-      const isBotB = b.name === 'nginx' || b.name === 'mockten-dashboard';
+      // Keyed on the canonical service key, not the container/pod name, so this
+      // survives renames and works the same for docker names and k8s pods.
+      const isBotA = a.key === 'nginx' || a.key === 'dashboard';
+      const isBotB = b.key === 'nginx' || b.key === 'dashboard';
       
       if (isBotA && !isBotB) return 1;
       if (!isBotA && isBotB) return -1;
@@ -709,7 +711,7 @@ const TOPO_CONTAINER_NAME = {
   geocoding:      'geocoding-service.default.svc.cluster.local',
   recommendation: 'recommendation-service.default.svc.cluster.local',
   sync:           'mockten-sync',
-  dashboard:      'mockten-dashboard',
+  dashboard:      'dashboard-service.default.svc.cluster.local',
 };
 
 const GROUP_COLOR = {
