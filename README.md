@@ -195,6 +195,14 @@ Copy each key into the matching environment file:
 
 Both files are gitignored, so your keys stay local and are never committed. Use the test keys for development — payments then run against Stripe's test environment, where cards such as `4242 4242 4242 4242` (any future expiry and CVC) succeed without charging real money.
 
+> **Building the `ecfront` image?** Vite inlines `VITE_*` at build time, so the publishable key has to be passed to the build rather than read from your local `.env`:
+>
+> ```sh
+> docker build --build-arg VITE_STRIPE_PUBLIC_KEY="pk_test_..." -t ecfront ecfront/
+> ```
+>
+> The build fails if it is missing, so an image can't silently ship without a working key. In CI the value comes from the `STRIPE_PUBLISHABLE_KEY` repository secret.
+
 ## Running Locally
 
 First, verify that `gotask` is installed:
