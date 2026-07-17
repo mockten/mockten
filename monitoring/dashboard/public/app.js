@@ -183,15 +183,20 @@ async function fetchContainers() {
 async function fetchAllStats(containers) {
   let totalCpuSum = 0;
   let totalMemUsageSum = 0;
-  // Denominator for "Total Memory Usage": the machine's own memory, reported
-  // identically by every container (machineMemTotal), never derived from the
-  // per-container limits. Summing those double-counts (k8s: 21 pods × 9GB node
-  // = ~190GB, so usage read 3%); taking their max divides the whole stack's
-  // usage by one container's cap (DEV: 3.5GB / a 820MB container = 430%).
-  // server.js's aggregate uses the same field, so the chart's live points and
-  // its history agree.
-  let machineMemTotal = 0;
+  // Denominator for "Total Memory Usage": what the deployment is allotted, asked
+  // of the server rather than derived from the per-container limits. Deriving it
+  // was wrong both ways — summing the limits double-counts (k8s: 21 pods each
+  // reporting the 9GB node ⇒ ~190GB ⇒ 3%), taking their max divides the stack's
+  // usage by one container's cap (DEV: 3.5GB / an 820MB container ⇒ 430%). The
+  // runtime answers it properly per environment (compose mem_limit total /
+  // namespace ResourceQuota), and server.js's aggregate uses the same endpoint.
+  let memCapacityBytes = 0;
   let numCpus = 1;
+
+  try {
+    const capRes = await fetch('/dashboard/api/mem-capacity');
+    if (capRes.ok) memCapacityBytes = (await capRes.json()).bytes || 0;
+  } catch { /* leave 0; the percentage is then suppressed rather than wrong */ }
 
   await Promise.all(containers.map(async c => {
     try {
@@ -203,7 +208,6 @@ async function fetchAllStats(containers) {
 
       totalCpuSum += parseFloat(stats.cpu) || 0;
       totalMemUsageSum += parseFloat(stats.memUsage) || 0;
-      machineMemTotal = Math.max(machineMemTotal, parseFloat(stats.machineMemTotal) || 0);
       if (stats.numCpus) {
         numCpus = stats.numCpus;
       }
@@ -211,7 +215,7 @@ async function fetchAllStats(containers) {
   }));
 
   const aggCpu = numCpus > 0 ? (totalCpuSum / numCpus) : 0;
-  const aggMemPercent = machineMemTotal > 0 ? ((totalMemUsageSum / machineMemTotal) * 100) : 0;
+  const aggMemPercent = memCapacityBytes > 0 ? ((totalMemUsageSum / memCapacityBytes) * 100) : 0;
   const aggMemMB = totalMemUsageSum / 1024 / 1024;
 
   updateCharts(aggCpu, aggMemPercent, aggMemMB);

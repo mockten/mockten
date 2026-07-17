@@ -72,6 +72,18 @@ app.use(express.static(path.join(__dirname, 'public')));
 // What the UI may show for this deployment shape.
 app.get('/api/capabilities', (req, res) => res.json(capabilities()));
 
+// The denominator for "Total Memory Usage" — what this deployment is allotted,
+// answered by the runtime (compose mem_limit total / namespace ResourceQuota).
+// Served as its own endpoint because it's a property of the whole stack, not of
+// any one container, and both this server and the browser must use the same one.
+app.get('/api/mem-capacity', async (req, res) => {
+  try {
+    res.json(await runtime.memCapacity());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Containers ────────────────────────────────────────────────────────────────
 app.get('/api/containers', async (req, res) => {
   try {
@@ -1144,19 +1156,25 @@ async function loadMetricsFromMySQL() {
 async function collectMetricsSnapshot() {
   try {
     const containers = (await runtime.list()).filter(c => c.state === 'running');
-    let totalCpuSum = 0, totalMemUsage = 0, maxMemLimit = 0, numCpus = 1;
-    await Promise.all(containers.map(async c => {
-      try {
-        const stats = await runtime.stats(c.id);
-        totalCpuSum += parseFloat(stats.cpu) || 0;
-        if (stats.numCpus > numCpus) numCpus = stats.numCpus;
-        totalMemUsage += stats.memUsage || 0;
-        // The denominator is the machine's memory, not a container's cap.
-        if ((stats.machineMemTotal || 0) > maxMemLimit) maxMemLimit = stats.machineMemTotal;
-      } catch {}
-    }));
+    let totalCpuSum = 0, totalMemUsage = 0, numCpus = 1;
+    // The stack's allotted memory: the runtime knows how to ask (compose
+    // mem_limit total / namespace ResourceQuota). The browser reads the same
+    // figure from /api/mem-capacity, so the chart's history and its live points
+    // can't disagree.
+    const [_, capacity] = await Promise.all([
+      Promise.all(containers.map(async c => {
+        try {
+          const stats = await runtime.stats(c.id);
+          totalCpuSum += parseFloat(stats.cpu) || 0;
+          if (stats.numCpus > numCpus) numCpus = stats.numCpus;
+          totalMemUsage += stats.memUsage || 0;
+        } catch {}
+      })),
+      runtime.memCapacity().catch(() => ({ bytes: 0 })),
+    ]);
+    const memCapacityBytes = capacity.bytes || 0;
     const aggCpu = numCpus > 0 ? totalCpuSum / numCpus : 0;
-    const aggMemPct = maxMemLimit > 0 ? (totalMemUsage / maxMemLimit) * 100 : 0;
+    const aggMemPct = memCapacityBytes > 0 ? (totalMemUsage / memCapacityBytes) * 100 : 0;
     const aggMemMB = totalMemUsage / 1024 / 1024;
 
     // Collect telemetry

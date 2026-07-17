@@ -19,6 +19,8 @@
 // docker-compose mirrors via container_name — so those paths need no branching.
 // ─────────────────────────────────────────────────────────────────────────────
 
+const os = require('os');
+
 const K8S_NAMESPACE = process.env.K8S_NAMESPACE || 'default';
 
 // Prefer bash when the image has it, fall back to sh. Shared by both runtimes so
@@ -142,14 +144,36 @@ function createDockerRuntime() {
         // Per-container ceiling — drives this row's own bar.
         memLimit: mem.limit || 0,
         memPercent: mem.limit ? ((mem.usage / mem.limit) * 100).toFixed(2) : 0,
-        // Whole-machine memory, for the "Total Memory Usage" aggregate. It must
-        // come from the machine, not from the per-container limits: summing them
-        // double-counts, and taking the max divides the whole stack's usage by
-        // one container's cap (which read 430% in DEV). Same meaning in k8s,
-        // where it is the node's capacity.
-        machineMemTotal: require('os').totalmem(),
         rxBytes, txBytes,
       };
+    },
+
+    /**
+     * Denominator for "Total Memory Usage": what this stack is *allowed* to use.
+     * In compose that's the sum of the per-service mem_limit values — the budget
+     * we handed the stack — which is the Docker analogue of a namespace's
+     * ResourceQuota. A service with no mem_limit can use the whole machine, so
+     * the total is capped there; it can never exceed the machine.
+     */
+    async memCapacity() {
+      const machine = os.totalmem();
+      try {
+        const containers = await docker.listContainers({ all: false });
+        const limits = await Promise.all(containers.map(async c => {
+          try {
+            const info = await docker.getContainer(c.Id).inspect();
+            const lim = info?.HostConfig?.Memory || 0; // 0 = unlimited
+            return lim > 0 ? lim : machine;
+          } catch { return 0; }
+        }));
+        const sum = limits.reduce((a, b) => a + b, 0);
+        if (sum > 0) {
+          return sum < machine
+            ? { bytes: sum, source: 'compose mem_limit total' }
+            : { bytes: machine, source: 'machine memory (limits exceed it)' };
+        }
+      } catch { /* fall through */ }
+      return { bytes: machine, source: 'machine memory' };
     },
 
     async start(id)   { await docker.getContainer(id).start(); },
@@ -324,7 +348,6 @@ function createK8sRuntime() {
       // memory read 0% (divide by a zero limit). Fall back to the node's own
       // capacity, which os.cpus()/os.totalmem() report from inside a pod — that
       // needs no extra RBAC, unlike reading the Node object.
-      const os = require('os');
       const podCpuLimit = (pod?.spec?.containers || []).reduce(
         (sum, c) => sum + (cpuToCores(c.resources?.limits?.cpu) || 0), 0);
       const podMemLimit = (pod?.spec?.containers || []).reduce(
@@ -339,11 +362,47 @@ function createK8sRuntime() {
         memUsage,
         memLimit,
         memPercent: memLimit ? ((memUsage / memLimit) * 100).toFixed(2) : 0,
-        // The node's memory — same field and meaning as the Docker runtime, so
-        // the aggregate has one honest denominator in both.
-        machineMemTotal: os.totalmem(),
         // Per-pod network counters aren't exposed by metrics-server.
         rxBytes: 0, txBytes: 0,
+      };
+    },
+
+    /**
+     * Denominator for "Total Memory Usage": the memory this namespace is allotted.
+     *
+     * Read it from the namespace's ResourceQuota, not from a node. The node's
+     * capacity only happens to be right on a single-node cluster (docker-desktop):
+     * on GKE/EKS/AKS the pods are spread over many nodes, so dividing the whole
+     * namespace's usage by whichever node the dashboard landed on inflates the
+     * figure — and on a heterogeneous node pool the number would even change with
+     * rescheduling. A quota is namespace-scoped, so reading it needs no
+     * ClusterRole, and "% of what we were allotted" means the same thing on every
+     * cluster.
+     *
+     * Falls back to the node's memory when no quota exists, which keeps a
+     * quota-less local cluster reading sensibly.
+     */
+    async memCapacity() {
+      try {
+        const { core } = await init();
+        const res = await core.listNamespacedResourceQuota({ namespace: K8S_NAMESPACE });
+        for (const q of res.items || []) {
+          const hard = q.status?.hard || q.spec?.hard || {};
+          const v = hard['limits.memory'] || hard['requests.memory'];
+          if (v) {
+            return {
+              bytes: memToBytes(v),
+              source: `ResourceQuota ${q.metadata?.name} (${K8S_NAMESPACE})`,
+            };
+          }
+        }
+      } catch (e) {
+        // No quota, or no RBAC to read one — fall back rather than break the chart.
+        console.warn('[runtime] ResourceQuota unavailable:', e.message);
+      }
+      return {
+        bytes: os.totalmem(),
+        source: 'node memory (no ResourceQuota; single-node only)',
       };
     },
 
