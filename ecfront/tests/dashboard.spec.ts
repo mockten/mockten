@@ -84,6 +84,24 @@ test.describe('Dashboard Enhancements Spec', () => {
     await expect(page.locator('#frontend-card')).toBeVisible();
   });
 
+  test('Kong telemetry reports real traffic (not a silent empty)', async ({ page, request }) => {
+    // The access log used to be read with `docker exec apigw …`, which cannot
+    // work in a cluster — and since this panel isn't capability-gated, the
+    // failure rendered as "no requests recorded yet" rather than "unavailable",
+    // so it looked like the gateway had no traffic. Generate some and insist it
+    // is counted, in whichever runtime.
+    for (let i = 0; i < 3; i++) await request.get('/api/categories');
+
+    await expect(async () => {
+      const res = await request.get('/dashboard/api/telemetry');
+      expect(res.ok()).toBeTruthy();
+      const { kong } = await res.json();
+      expect(kong.topApis.length, 'topApis is empty — the access log was not read').toBeGreaterThan(0);
+      // The traffic we just made must be in there.
+      expect(kong.topApis.some((a: any) => a.path === '/api/categories')).toBeTruthy();
+    }).toPass({ timeout: 20000 });
+  });
+
   test('Total Memory Usage percentage is sane in either runtime', async ({ page }) => {
     // This number has been wrong twice, in opposite directions, and nothing here
     // noticed: summing the per-container limits gave 3.1% in k8s (21 pods each

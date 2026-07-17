@@ -205,6 +205,38 @@ function createDockerRuntime() {
       return { destroy: () => { try { stream.destroy?.(); } catch { /* already gone */ } } };
     },
 
+    /**
+     * Run a command in a container and return its stdout.
+     * Docker frames exec output with an 8-byte stdout/stderr header even when a
+     * TTY is requested, so strip it — otherwise the header bytes land inside the
+     * first line and corrupt whatever parses it.
+     */
+    async execCapture(id, cmd) {
+      const exec = await docker.getContainer(id).exec({
+        Cmd: cmd,
+        AttachStdout: true,
+        AttachStderr: true,
+      });
+      const stream = await exec.start({});
+      const raw = await new Promise((resolve, reject) => {
+        const chunks = [];
+        stream.on('data', c => chunks.push(c));
+        stream.on('end', () => resolve(Buffer.concat(chunks)));
+        stream.on('error', reject);
+      });
+
+      let out = '';
+      let offset = 0;
+      while (offset + 8 <= raw.length) {
+        const size = raw.readUInt32BE(offset + 4);
+        if (offset + 8 + size > raw.length) break;
+        out += raw.slice(offset + 8, offset + 8 + size).toString('utf8');
+        offset += 8 + size;
+      }
+      // If it wasn't framed after all, don't silently return nothing.
+      return offset === 0 ? raw.toString('utf8') : out;
+    },
+
     /** Interactive shell. Returns a handle to write stdin and tear the session down. */
     async execStream(id, cols, rows, onText, onError, onEnd) {
       const container = docker.getContainer(id);
@@ -446,6 +478,28 @@ function createK8sRuntime() {
           try { stream.destroy(); } catch { /* already destroyed */ }
         },
       };
+    },
+
+    /** Run a command in a pod and return its stdout (`kubectl exec` equivalent). */
+    async execCapture(id, cmd) {
+      const { k8s, kc, core } = await init();
+      const { PassThrough } = require('stream');
+
+      const pod = await core.readNamespacedPod({ name: id, namespace: K8S_NAMESPACE });
+      const container = pod?.spec?.containers?.[0]?.name;
+      if (!container) throw new Error(`no container found on pod ${id}`);
+
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      let out = '';
+      stdout.on('data', chunk => { out += chunk.toString('utf8'); });
+
+      return await new Promise((resolve, reject) => {
+        new k8s.Exec(kc)
+          .exec(K8S_NAMESPACE, id, container, cmd, stdout, stderr, null, false, () => resolve(out))
+          .then(conn => conn.on?.('error', reject))
+          .catch(reject);
+      });
     },
 
     /** Interactive shell, the Kubernetes equivalent of `kubectl exec -it`. */

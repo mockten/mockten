@@ -33,7 +33,38 @@ async function loginAs(page: any, email: string, password: string) {
   await expect(page.getByText('Dashboard Overview')).toBeVisible({ timeout: 10000 });
 }
 
+// Created by the Add Product test. Named once so the cleanup can't drift from it.
+const TEST_PRODUCT_NAME = 'Test Protein Powder';
+
 test.describe.serial('Seller Portal', () => {
+  // The Add Product test creates a real, active product. Without this it
+  // accumulated one row per run and surfaced in the storefront as a real item —
+  // the rest of this spec restores what it touches, only this leaked.
+  test.afterAll(async ({ request }) => {
+    try {
+      const tokenRes = await request.post('/api/uam/token', {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        form: { username: EXISTING_SELLER.email, password: EXISTING_SELLER.password },
+      });
+      if (!tokenRes.ok()) return;
+      const { access_token } = await tokenRes.json();
+
+      const listRes = await request.get('/api/seller/products?page=1&limit=100', {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      if (!listRes.ok()) return;
+      const { products = [] } = await listRes.json();
+
+      for (const p of products.filter((x: any) => x.product_name === TEST_PRODUCT_NAME)) {
+        await request.delete(`/api/seller/products/${p.product_id}`, {
+          headers: { Authorization: `Bearer ${access_token}` },
+        });
+      }
+    } catch {
+      // non-fatal: cleanup must never fail the run
+    }
+  });
+
   test.beforeAll(async ({ request }) => {
     // Delete testseller@example.com if exists so signup test can run cleanly
     try {
@@ -196,7 +227,7 @@ test.describe.serial('Seller Portal', () => {
     await page.getByRole('button', { name: 'Add Product' }).click();
     await expect(page.getByText('Add New Product')).toBeVisible({ timeout: 10000 });
 
-    await page.getByPlaceholder('e.g. Wireless Headphones').fill('Test Protein Powder');
+    await page.getByPlaceholder('e.g. Wireless Headphones').fill(TEST_PRODUCT_NAME);
     await page.getByPlaceholder('Describe your product...').fill('A great protein supplement for athletes.');
     await page.locator('#price').fill('29.99');
     await page.locator('#stock').fill('50');

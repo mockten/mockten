@@ -970,13 +970,27 @@ app.post('/api/db/mysql/import', devOnly('DB import'), (req, res) => {
   }
 });
 
-const getKongApiStats = () => {
-  return new Promise((resolve) => {
-    const { exec } = require('child_process');
-    exec('docker exec apigw tail -n 5000 /tmp/access.log', { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
-      if (err || !stdout) {
-        return resolve({ topApis: [], slowApis: [] });
-      }
+// Reads Kong's access log out of the gateway. This used to shell out to
+// `docker exec apigw …`, which can't work in a cluster — and because the panel
+// isn't capability-gated, the failure read as "no requests recorded yet" rather
+// than "unavailable", so it looked like the gateway had no traffic. Go through
+// the runtime instead: Docker exec in DEV, the Kubernetes exec API when deployed
+// (the same path the terminal uses). The gateway is found by canonical key, not
+// by the container name `apigw`, which doesn't exist in k8s.
+const getKongApiStats = async () => {
+  const empty = { topApis: [], slowApis: [] };
+  let stdout;
+  try {
+    const gw = (await runtime.list()).find(c => c.key === 'apigw' && c.state === 'running');
+    if (!gw) return empty;
+    stdout = await runtime.execCapture(gw.id, ['tail', '-n', '5000', '/tmp/access.log']);
+  } catch (e) {
+    console.warn('[telemetry] could not read Kong access log:', e.message);
+    return empty;
+  }
+  if (!stdout) return empty;
+
+  return (() => {
       const counts = {};
       const rtSums = {};
       const rtCounts = {};
@@ -1014,9 +1028,8 @@ const getKongApiStats = () => {
         })
         .sort((a, b) => b.avgMs - a.avgMs);
 
-      resolve({ topApis, slowApis });
-    });
-  });
+      return { topApis, slowApis };
+  })();
 };
 
 app.get('/api/stats', async (req, res) => {

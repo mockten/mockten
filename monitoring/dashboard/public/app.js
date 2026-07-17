@@ -406,7 +406,11 @@ function frontendAction() {
 // ── Summary ────────────────────────────────────────────────────────────────
 function updateSummary(containers) {
   const dockerRunning = containers.filter(c => c.state === 'running').length;
-  const totalRunning = dockerRunning + (frontendRunning ? 1 : 0);
+  // The +1 is only right in DEV, where Vite runs on the host and is therefore
+  // absent from the container list. In k8s the frontend is the ecfront pod,
+  // which /api/containers already returns — adding it again made Running (22)
+  // exceed Total (21), which read as though a restart had leaked a container.
+  const totalRunning = dockerRunning + (CAPS.frontendDev && frontendRunning ? 1 : 0);
   const stopped = containers.filter(c => c.state !== 'running').length;
   document.getElementById('stat-running').textContent = totalRunning;
   document.getElementById('stat-stopped').textContent = stopped;
