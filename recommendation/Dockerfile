@@ -11,9 +11,18 @@ COPY requirements.txt .
 # logs. It also makes the image non-deterministic: the same Dockerfile is fine or
 # broken depending on which runner it lands on.
 # Pin a baseline ISA so the artifact runs anywhere (local, k8s, GCP/AWS/Azure).
+# The baseline is per-architecture: -march=x86-64 is an x86-only flag, so it must
+# not leak into the arm64 build (compose builds natively on Apple Silicon).
+# TARGETARCH is provided by BuildKit.
+ARG TARGETARCH
 ENV LIGHTFM_NO_CFLAGS=1
-ENV CFLAGS="-march=x86-64 -mtune=generic -O3"
-RUN pip install --no-cache-dir -r requirements.txt
+RUN case "${TARGETARCH:-amd64}" in \
+      amd64) export CFLAGS="-march=x86-64 -mtune=generic -O3" ;; \
+      arm64) export CFLAGS="-march=armv8-a -mtune=generic -O3" ;; \
+      *)     export CFLAGS="-O3" ;; \
+    esac && \
+    echo "Building lightfm with CFLAGS=$CFLAGS (TARGETARCH=${TARGETARCH:-unset})" && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: lean runtime (no compiler toolchain, only libgomp1 for OpenMP .so)
 FROM python:3.11-slim
