@@ -466,7 +466,7 @@ func handleSellerProducts(c *gin.Context) {
 	}
 	offset := (page - 1) * limit
 
-	countRow := db.QueryRow("SELECT COUNT(*) FROM Product WHERE seller_id = ?", sellerID)
+	countRow := db.QueryRow("SELECT COUNT(*) FROM Product WHERE seller_id = ? AND deleted_at IS NULL", sellerID)
 	var total int
 	if err := countRow.Scan(&total); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
@@ -477,7 +477,9 @@ func handleSellerProducts(c *gin.Context) {
 		SELECT p.product_id, p.product_name, p.price, p.product_condition, COALESCE(s.stocks, 0), p.is_active, COALESCE(p.summary, ''), COALESCE(p.category_id, '')
 		FROM Product p
 		LEFT JOIN Stock s ON p.product_id = s.product_id
-		WHERE p.seller_id = ?
+		-- Inactive products stay listed (that switch is the seller's own), but a
+		-- retired one must be gone, or Delete is just a second Deactivate.
+		WHERE p.seller_id = ? AND p.deleted_at IS NULL
 		ORDER BY p.product_name
 		LIMIT ? OFFSET ?`
 
@@ -579,10 +581,28 @@ func handleDeleteProduct(c *gin.Context) {
 	}
 
 	productID := c.Param("id")
-	_, err = db.Exec("DELETE FROM Product WHERE product_id=? AND seller_id=?", productID, sellerID)
+	// Retire the product instead of deleting the row.
+	//
+	// A hard DELETE removed it from MySQL but left it in MeiliSearch forever: the
+	// sync finds what to drop from the index by SELECTing Product and batching the
+	// is_active=0 rows, so once the row is gone there is nothing to select and no
+	// delete is ever emitted. The product stayed searchable and 404'd when opened.
+	// It also orphaned Transaction rows — buyers' order history.
+	//
+	// Setting is_active=0 alongside deleted_at means the existing sync path clears
+	// the index for us (last_update bumps via ON UPDATE, so it gets picked up), and
+	// deleted_at is what hides it from the seller's list — without it, Delete would
+	// merely be a second Deactivate button.
+	res, err := db.Exec(
+		"UPDATE Product SET deleted_at = NOW(), is_active = 0 WHERE product_id=? AND seller_id=? AND deleted_at IS NULL",
+		productID, sellerID)
 	if err != nil {
 		log.Printf("failed to delete product: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
 		return
 	}
 

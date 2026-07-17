@@ -398,7 +398,8 @@ LEFT JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
 LEFT JOIN USER_ATTRIBUTE ua_store ON ue.ID = ua_store.USER_ID AND ua_store.NAME = 'storeName'
 LEFT JOIN Geo g ON p.geo_id = g.geo_id
 LEFT JOIN TimeSale ts ON p.sale_id = ts.id
-WHERE p.product_id = ?
+-- A retired product must not be reachable, even by direct link.
+WHERE p.product_id = ? AND p.deleted_at IS NULL
 LIMIT 1
 `
 

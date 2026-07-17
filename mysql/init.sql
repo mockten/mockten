@@ -68,7 +68,15 @@ CREATE TABLE IF NOT EXISTS Product (
   last_update DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   sale_flag TINYINT(1) NOT NULL DEFAULT 0,
   sale_id VARCHAR(36) NULL,
+  -- is_active is the seller's own on/off switch: an inactive product stays in
+  -- their list and can be switched back on.
   is_active TINYINT(1) NOT NULL DEFAULT 1,
+  -- deleted_at retires a product for good. Deleting the row outright would strip
+  -- it from the sync's SELECT, so the sync could never tell MeiliSearch to drop
+  -- it and the product stayed searchable (and 404'd when opened) forever. It
+  -- would also orphan Transaction rows, i.e. buyers' order history. Keeping the
+  -- row lets the existing is_active=0 path clean the index, and history resolves.
+  deleted_at DATETIME NULL,
   KEY idx_product_category (category_id),
   KEY idx_product_geo (geo_id),
   KEY idx_product_last_update (last_update)
