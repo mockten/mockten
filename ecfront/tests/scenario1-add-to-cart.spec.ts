@@ -1,14 +1,21 @@
 import { test, expect } from '@playwright/test';
 import { execSync } from 'child_process';
 
+// Best-effort stock reset so a re-run starts from a known quantity. This is
+// scaffolding, not part of the scenario: it needs the Docker socket, so it can't
+// work where the platform is deployed, and the test is written to pass on the
+// seeded stock alone. Left as a no-op there rather than given a k8s path — the
+// alternative (a reset endpoint in the product API) would mean shipping a
+// test-only mutation route into a real deployment.
 test.beforeAll(() => {
   try {
     // Reset Lemongrass stock to 50 in MySQL
     execSync(`docker exec -i mysql-service.default.svc.cluster.local mysql --ssl-mode=DISABLED -umocktenusr -pmocktenpassword mocktendb -e "UPDATE Stock SET stocks = 50 WHERE product_id = '580414f1-e962-4f6c-a461-d88d168e7cb1';"`);
     // Force Meilisearch sync
     execSync(`docker exec -i mockten-sync /sync_script.sh`);
-  } catch (e) {
-    console.warn('Failed to reset stock via docker exec. Continuing test...', e);
+  } catch {
+    // Expected without a Docker socket (i.e. against a deployed platform).
+    console.info('[scenario1] stock reset skipped: no Docker socket. Using seeded stock.');
   }
 });
 

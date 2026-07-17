@@ -236,7 +236,14 @@ test.describe('Dashboard Enhancements Spec', () => {
     }, { timeout: 15000 });
   });
 
-  test('should respond 200 to reset-stock endpoint (critical for ie2e)', async ({ request }) => {
+  test('should respond 200 to reset-stock endpoint (critical for ie2e)', async ({ page, request }) => {
+    // reset-stock is a Vite dev-server middleware (ecfront/vite.config.ts, gated
+    // on TEST_MODE), not a platform API — so it cannot exist where the frontend
+    // is a built bundle. It's test scaffolding, not a user-facing scenario, so
+    // skip rather than invent a k8s equivalent.
+    const caps = await getCaps(page);
+    test.skip(!caps.frontendDev, `reset-stock is a Vite dev-server route; absent in ${caps.mode} mode`);
+
     // This endpoint is the linchpin for ie2e stock reset — if it's broken, Buy Now is disabled
     const res = await request.post('/api/test/reset-stock');
     expect(res.status()).toBe(200);

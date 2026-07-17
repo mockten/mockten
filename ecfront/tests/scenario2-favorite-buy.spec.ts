@@ -5,7 +5,13 @@ test.beforeEach(async () => {
   // Prefer HTTP endpoint (works inside Docker ie2e where docker exec is unavailable)
   const baseUrl = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost';
   try {
-    const res = await fetch(`${baseUrl}/api/test/reset-stock`, { signal: AbortSignal.timeout(10000) });
+    // POST: the endpoint is POST-only, so a GET here 404'd, fell through to the
+    // docker-exec fallback, and — where there is no Docker either — left the
+    // stock un-reset with only a console.warn.
+    const res = await fetch(`${baseUrl}/api/test/reset-stock`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(10000),
+    });
     if (!res.ok) throw new Error(`reset-stock returned ${res.status}`);
   } catch {
     // Fallback: direct docker exec (host-only)
