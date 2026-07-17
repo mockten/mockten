@@ -128,6 +128,27 @@ test.describe('Admin Portal', () => {
     await expect(page.locator('table tbody')).toContainText('superadmin', { timeout: 10000 });
   });
 
+  test('14. Header search filters the Overview flagged-orders table', async ({ page }) => {
+    // The Overview table used to render the unfiltered list even while the
+    // header search narrowed everything else, so typing did nothing here.
+    await loginAsAdmin(page);
+    const rows = page.locator('table tbody tr');
+    await expect(rows.first()).toBeVisible({ timeout: 15000 });
+    const before = await rows.count();
+
+    // "eu-order" only matches the EU-destination flagged order.
+    await page.getByPlaceholder('Search users...').fill('eu-order');
+    await expect(async () => {
+      expect(await rows.count()).toBeLessThan(before);
+    }).toPass({ timeout: 10000 });
+    await expect(page.locator('table tbody')).toContainText('eu-order');
+    await expect(page.locator('table tbody')).not.toContainText('flag-rapid');
+
+    // A search matching nothing must show the empty state, not every row.
+    await page.getByPlaceholder('Search users...').fill('zzz-no-such-order');
+    await expect(page.locator('table tbody')).toContainText('No flagged orders', { timeout: 10000 });
+  });
+
   test('12. superadmin cannot be suspended or deleted (protected root admin)', async ({ page }) => {
     await loginAsAdmin(page);
     await openSection(page, 'User Management');

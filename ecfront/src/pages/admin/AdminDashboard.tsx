@@ -394,7 +394,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {orders.slice(0, 5).map((order) => (
+                      {filteredOrders.slice(0, 5).map((order) => (
                         <TableRow key={order.order_id}>
                           <TableCell className="font-mono text-xs">{order.order_id}</TableCell>
                           <TableCell>{order.user_id}</TableCell>
@@ -403,7 +403,7 @@ export function AdminDashboard({ onLogout, onCreateUser, onEditUser }: AdminDash
                           <TableCell className="text-slate-500">{formatLocalTimestamp(order.created_at)}</TableCell>
                         </TableRow>
                       ))}
-                      {!loading && orders.length === 0 && (
+                      {!loading && filteredOrders.length === 0 && (
                         <TableRow><TableCell colSpan={5} className="text-center text-slate-500 py-8">No flagged orders</TableCell></TableRow>
                       )}
                     </TableBody>
