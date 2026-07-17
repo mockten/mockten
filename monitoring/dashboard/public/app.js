@@ -43,19 +43,26 @@ function applyCapabilities() {
     ['btn-mysql-export', 'btn-mysql-import', 'mysql-import-file'].forEach(hideEl);
   }
 
-  // A deployed dashboard shows the cluster it runs in — say so, so nobody
-  // wonders why Local CI / Security Scanning are missing.
-  if (CAPS.mode && CAPS.mode !== 'docker') {
-    const title = document.getElementById('view-title');
-    if (title && !document.getElementById('mode-badge')) {
-      const badge = document.createElement('span');
-      badge.id = 'mode-badge';
-      badge.textContent = CAPS.mode;
-      badge.style.cssText =
-        'margin-left:10px;padding:2px 8px;border-radius:10px;font-size:11px;' +
-        'text-transform:uppercase;background:var(--accent,#4f8cff);color:#fff;vertical-align:middle;';
-      title.appendChild(badge);
-    }
+  // Say which runtime this is, always and in both modes. The two dashboards look
+  // deliberately different (k8s hides Local CI / E2E / Security Scanning and the
+  // Vite card), and both are reachable on localhost — so without a label it's
+  // genuinely impossible to tell whether something is missing by design or
+  // broken. Anchored to the logo, not #view-title, because showView() rewrites
+  // that element's textContent on every navigation and would wipe the badge.
+  const logo = document.querySelector('.logo');
+  if (logo && !document.getElementById('mode-badge')) {
+    const isDev = CAPS.mode === 'docker';
+    const badge = document.createElement('span');
+    badge.id = 'mode-badge';
+    badge.textContent = isDev ? 'DEV' : 'K8S';
+    badge.title = isDev
+      ? 'Docker Compose (task build) — every panel is available'
+      : 'Kubernetes — Local CI, E2E Runner and Security Scanning are hidden by design';
+    badge.style.cssText =
+      'margin-left:8px;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;' +
+      'letter-spacing:0.5px;vertical-align:middle;color:#fff;background:' +
+      (isDev ? '#10b981' : '#6366f1') + ';';
+    logo.appendChild(badge);
   }
 }
 

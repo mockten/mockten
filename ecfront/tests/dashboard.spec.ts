@@ -57,6 +57,33 @@ test.describe('Dashboard Enhancements Spec', () => {
     }
   });
 
+  test('mode badge names the runtime and survives navigation', async ({ page }) => {
+    // The DEV and k8s dashboards deliberately differ, and both answer on
+    // localhost — without a label you cannot tell "hidden by design" from
+    // "broken". The badge used to be appended to #view-title, which showView()
+    // rewrites on every navigation, so it vanished on the first click.
+    const caps = await getCaps(page);
+    const badge = page.locator('#mode-badge');
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveText(caps.mode === 'docker' ? 'DEV' : 'K8S');
+
+    await page.locator('nav .nav-item').getByText('Topology', { exact: true }).click();
+    await expect(page.locator('#view-title')).toContainText('Service Topology');
+    await expect(badge).toBeVisible(); // must outlive the title rewrite
+  });
+
+  test('DEV exposes the workspace-backed panels (Local CI, E2E, Security)', async ({ page }) => {
+    // The counterpart to the k8s gating: in DEV all three must be present. Guards
+    // against over-hiding, which would be invisible to every other test here.
+    const caps = await getCaps(page);
+    test.skip(caps.mode !== 'docker', 'DEV-only assertion');
+
+    for (const name of ['Local CI Pipelines', 'E2E Test Runner', 'Security Scanning']) {
+      await expect(page.locator('nav .nav-item').getByText(name, { exact: true })).toBeVisible();
+    }
+    await expect(page.locator('#frontend-card')).toBeVisible();
+  });
+
   test('should load System Load & API Gateway Telemetry chart and Top 5 APIs table', async ({ page }) => {
     // Ensure we are on the Dashboard view
     await page.locator('nav .nav-item').getByText('Dashboard', { exact: true }).click();
