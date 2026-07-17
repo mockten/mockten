@@ -921,9 +921,6 @@ export function SellerPortal() {
                                     .then(d => { if (Array.isArray(d)) setEditCategories(d); })
                                     .catch(() => {});
                                 }}>Edit</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => {
-                                  setShowAddProduct(true);
-                                }}>Duplicate</DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   data-testid={product.is_active === 1 ? "menu-deactivate" : "menu-activate"}
