@@ -1151,7 +1151,8 @@ async function collectMetricsSnapshot() {
         totalCpuSum += parseFloat(stats.cpu) || 0;
         if (stats.numCpus > numCpus) numCpus = stats.numCpus;
         totalMemUsage += stats.memUsage || 0;
-        if ((stats.memLimit || 0) > maxMemLimit) maxMemLimit = stats.memLimit;
+        // The denominator is the machine's memory, not a container's cap.
+        if ((stats.machineMemTotal || 0) > maxMemLimit) maxMemLimit = stats.machineMemTotal;
       } catch {}
     }));
     const aggCpu = numCpus > 0 ? totalCpuSum / numCpus : 0;

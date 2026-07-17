@@ -183,14 +183,14 @@ async function fetchContainers() {
 async function fetchAllStats(containers) {
   let totalCpuSum = 0;
   let totalMemUsageSum = 0;
-  // The ceiling is the largest limit any one container reports, NOT their sum —
-  // summing treats each container's view of the same machine as extra capacity.
-  // It's especially wrong in k8s, where pods declare no limits and every pod
-  // reports the whole node: 21 pods × 9GB made the denominator ~190GB and the
-  // usage read 3% instead of 65%. server.js's aggregate already takes the max;
-  // this is the same figure, so the two must agree or the chart's live points
-  // and its history disagree.
-  let maxMemLimit = 0;
+  // Denominator for "Total Memory Usage": the machine's own memory, reported
+  // identically by every container (machineMemTotal), never derived from the
+  // per-container limits. Summing those double-counts (k8s: 21 pods × 9GB node
+  // = ~190GB, so usage read 3%); taking their max divides the whole stack's
+  // usage by one container's cap (DEV: 3.5GB / a 820MB container = 430%).
+  // server.js's aggregate uses the same field, so the chart's live points and
+  // its history agree.
+  let machineMemTotal = 0;
   let numCpus = 1;
 
   await Promise.all(containers.map(async c => {
@@ -203,7 +203,7 @@ async function fetchAllStats(containers) {
 
       totalCpuSum += parseFloat(stats.cpu) || 0;
       totalMemUsageSum += parseFloat(stats.memUsage) || 0;
-      maxMemLimit = Math.max(maxMemLimit, parseFloat(stats.memLimit) || 0);
+      machineMemTotal = Math.max(machineMemTotal, parseFloat(stats.machineMemTotal) || 0);
       if (stats.numCpus) {
         numCpus = stats.numCpus;
       }
@@ -211,7 +211,7 @@ async function fetchAllStats(containers) {
   }));
 
   const aggCpu = numCpus > 0 ? (totalCpuSum / numCpus) : 0;
-  const aggMemPercent = maxMemLimit > 0 ? ((totalMemUsageSum / maxMemLimit) * 100) : 0;
+  const aggMemPercent = machineMemTotal > 0 ? ((totalMemUsageSum / machineMemTotal) * 100) : 0;
   const aggMemMB = totalMemUsageSum / 1024 / 1024;
 
   updateCharts(aggCpu, aggMemPercent, aggMemMB);

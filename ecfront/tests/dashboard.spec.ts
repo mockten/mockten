@@ -84,6 +84,41 @@ test.describe('Dashboard Enhancements Spec', () => {
     await expect(page.locator('#frontend-card')).toBeVisible();
   });
 
+  test('Total Memory Usage percentage is sane in either runtime', async ({ page }) => {
+    // This number has been wrong twice, in opposite directions, and nothing here
+    // noticed: summing the per-container limits gave 3.1% in k8s (21 pods each
+    // reporting the whole node), then taking their max gave 430% in DEV (the
+    // stack's usage over one 820MB container's cap). The denominator must be the
+    // machine's memory, so the figure has to land in a believable range in both.
+    await page.locator('nav .nav-item').getByText('Dashboard', { exact: true }).click();
+    const card = page.locator('.card', { hasText: 'Total Memory Usage' });
+    await expect(card).toBeVisible();
+
+    // Sample across several live refreshes and require EVERY reading to be sane.
+    // Not expect.toPass(): that retries until something succeeds, so the card's
+    // first (server-rendered, correct) value would mask the wrong figure the
+    // client computes a few seconds later — which is exactly how 430% shipped.
+    const seen: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      const text = await card.innerText();
+      const m = text.match(/([\d.]+)\s*MB\s*\(([\d.]+)%\)/);
+      if (m) {
+        const mb = parseFloat(m[1]);
+        const pct = parseFloat(m[2]);
+        if (mb > 0) {
+          seen.push(pct);
+          // A real fraction of the machine: not ~0 (denominator over-counted by
+          // summing every container's view) and never >100 (denominator smaller
+          // than what's being measured).
+          expect(pct, `memory % out of range (samples: ${seen.join(', ')})`).toBeGreaterThan(1);
+          expect(pct, `memory % over 100 (samples: ${seen.join(', ')})`).toBeLessThanOrEqual(100);
+        }
+      }
+      await page.waitForTimeout(2500);
+    }
+    expect(seen.length, 'never read a memory figure').toBeGreaterThan(0);
+  });
+
   test('should load System Load & API Gateway Telemetry chart and Top 5 APIs table', async ({ page }) => {
     // Ensure we are on the Dashboard view
     await page.locator('nav .nav-item').getByText('Dashboard', { exact: true }).click();

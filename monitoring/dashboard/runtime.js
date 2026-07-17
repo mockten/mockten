@@ -139,8 +139,15 @@ function createDockerRuntime() {
         cpu: cpu.toFixed(2),
         numCpus,
         memUsage: mem.usage || 0,
+        // Per-container ceiling — drives this row's own bar.
         memLimit: mem.limit || 0,
         memPercent: mem.limit ? ((mem.usage / mem.limit) * 100).toFixed(2) : 0,
+        // Whole-machine memory, for the "Total Memory Usage" aggregate. It must
+        // come from the machine, not from the per-container limits: summing them
+        // double-counts, and taking the max divides the whole stack's usage by
+        // one container's cap (which read 430% in DEV). Same meaning in k8s,
+        // where it is the node's capacity.
+        machineMemTotal: require('os').totalmem(),
         rxBytes, txBytes,
       };
     },
@@ -332,6 +339,9 @@ function createK8sRuntime() {
         memUsage,
         memLimit,
         memPercent: memLimit ? ((memUsage / memLimit) * 100).toFixed(2) : 0,
+        // The node's memory — same field and meaning as the Docker runtime, so
+        // the aggregate has one honest denominator in both.
+        machineMemTotal: os.totalmem(),
         // Per-pod network counters aren't exposed by metrics-server.
         rxBytes: 0, txBytes: 0,
       };
