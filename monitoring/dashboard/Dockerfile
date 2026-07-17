@@ -35,5 +35,6 @@ COPY monitoring/dashboard/server.js .
 COPY monitoring/dashboard/runtime.js .
 COPY monitoring/dashboard/public/ ./public/
 COPY apigw/kong.yaml /app/kong.yaml
+COPY uam/realm-export-dev.json /app/realm-export-dev.json
 EXPOSE 3001
 CMD ["node", "server.js"]

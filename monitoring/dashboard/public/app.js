@@ -176,7 +176,14 @@ async function fetchContainers() {
 async function fetchAllStats(containers) {
   let totalCpuSum = 0;
   let totalMemUsageSum = 0;
-  let totalMemLimitSum = 0;
+  // The ceiling is the largest limit any one container reports, NOT their sum —
+  // summing treats each container's view of the same machine as extra capacity.
+  // It's especially wrong in k8s, where pods declare no limits and every pod
+  // reports the whole node: 21 pods × 9GB made the denominator ~190GB and the
+  // usage read 3% instead of 65%. server.js's aggregate already takes the max;
+  // this is the same figure, so the two must agree or the chart's live points
+  // and its history disagree.
+  let maxMemLimit = 0;
   let numCpus = 1;
 
   await Promise.all(containers.map(async c => {
@@ -189,7 +196,7 @@ async function fetchAllStats(containers) {
 
       totalCpuSum += parseFloat(stats.cpu) || 0;
       totalMemUsageSum += parseFloat(stats.memUsage) || 0;
-      totalMemLimitSum += parseFloat(stats.memLimit) || 0;
+      maxMemLimit = Math.max(maxMemLimit, parseFloat(stats.memLimit) || 0);
       if (stats.numCpus) {
         numCpus = stats.numCpus;
       }
@@ -197,7 +204,7 @@ async function fetchAllStats(containers) {
   }));
 
   const aggCpu = numCpus > 0 ? (totalCpuSum / numCpus) : 0;
-  const aggMemPercent = totalMemLimitSum > 0 ? ((totalMemUsageSum / totalMemLimitSum) * 100) : 0;
+  const aggMemPercent = maxMemLimit > 0 ? ((totalMemUsageSum / maxMemLimit) * 100) : 0;
   const aggMemMB = totalMemUsageSum / 1024 / 1024;
 
   updateCharts(aggCpu, aggMemPercent, aggMemMB);
@@ -540,18 +547,21 @@ function populateLogSelect() {
 
   sel.innerHTML = '<option value="">Select a source...</option>';
 
-  // Always add the Vite frontend option first
-  const feOpt = document.createElement('option');
-  feOpt.value = '__frontend__';
-  feOpt.textContent = '⚡ Vite Frontend (npm run dev)';
-  if (current === '__frontend__') feOpt.selected = true;
-  sel.appendChild(feOpt);
+  // The Vite dev server only exists in DEV (`task build` runs it on the host), so
+  // offering it on a deployed dashboard just yields an empty log pane.
+  if (CAPS.frontendDev) {
+    const feOpt = document.createElement('option');
+    feOpt.value = '__frontend__';
+    feOpt.textContent = '⚡ Vite Frontend (npm run dev)';
+    if (current === '__frontend__') feOpt.selected = true;
+    sel.appendChild(feOpt);
 
-  // Add a visual separator
-  const sep = document.createElement('option');
-  sep.disabled = true;
-  sep.textContent = '── Docker Containers ──';
-  sel.appendChild(sep);
+    // Add a visual separator
+    const sep = document.createElement('option');
+    sep.disabled = true;
+    sep.textContent = '── Docker Containers ──';
+    sel.appendChild(sep);
+  }
 
   // Add all containers
   allContainers.forEach(c => {
@@ -3161,7 +3171,14 @@ async function initKeycloakView() {
       fetch('/dashboard/api/keycloak/users/live').catch(() => null),
     ]);
     kcData = await res.json();
-    if (kcData.error) throw new Error(kcData.error);
+    // The realm export and the live Keycloak users are two independent sources.
+    // Losing the file (it isn't mounted outside DEV) used to throw here and blank
+    // the whole panel — including the live users, which had loaded fine. Degrade
+    // to whatever is available instead.
+    if (!kcData || kcData.error) {
+      console.warn('[keycloak] realm export unavailable:', kcData && kcData.error);
+      kcData = { users: [], clients: [], roles: [], groups: [] };
+    }
 
     // Merge live Keycloak users (includes Google SSO) into kcData.users
     if (liveRes && liveRes.ok) {
