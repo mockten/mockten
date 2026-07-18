@@ -170,7 +170,6 @@ To enable Google sign-up / sign-in, create an OAuth 2.0 Web application client i
 
 Once the client is created, copy its Client ID and Client Secret into `uam/uam.env` (copy `uam/uam.env.example` to create it).
 
-
 ## Facebook Authentication Setup
 To enable Facebook sign-up / sign-in, create an app in [Facebook Developers](https://developers.facebook.com/apps/).
 <img width="2016" height="754" alt="CleanShot 2025-07-22 at 16 38 38@2x" src="https://github.com/user-attachments/assets/b4b95c3b-b75d-4a2e-bf05-464df6c0c09e" />
