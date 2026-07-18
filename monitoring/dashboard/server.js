@@ -43,7 +43,7 @@ function getRedis() {
 // Container introspection goes through a runtime abstraction: Docker in DEV,
 // the Kubernetes API when deployed. `docker` stays available for the DEV-only
 // paths (exec, mysqldump, sync trigger) that have no k8s counterpart here.
-const { runtime, capabilities, DEV_MODE, MODE, CLOUD_MODE } = require('./runtime');
+const { runtime, capabilities, DEV_MODE, MODE, CLOUD_MODE, publicUrls } = require('./runtime');
 const docker = runtime.raw;
 
 console.log(`Dashboard runtime mode: ${MODE} (DEV_MODE=${DEV_MODE})`);
@@ -834,6 +834,52 @@ app.get('/api/recommendation/status', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+/**
+ * Is this environment actually usable? Two things have to hold, and when one
+ * doesn't the caller needs to know *which* — "not ready" on its own sends people
+ * looking in the wrong place.
+ *
+ * HTTPS is only a condition in cloud. Dev is served over plain HTTP by design,
+ * so asserting it there would report a permanent, meaningless failure.
+ */
+app.get('/api/ready', async (req, res) => {
+  const conditions = [];
+
+  // The recommendation model. An untrained model still answers, with empty
+  // results, so "the service is up" is not the same as "the model is ready".
+  try {
+    const r = await fetch('http://recommendation-service.default.svc.cluster.local:8080/model/status',
+      { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) throw new Error(`status ${r.status}`);
+    const s = await r.json();
+    conditions.push({
+      name: 'Recommendation model',
+      ok: Boolean(s.is_trained),
+      detail: s.is_trained ? 'trained' : 'not trained yet',
+    });
+  } catch (err) {
+    conditions.push({ name: 'Recommendation model', ok: false, detail: `unreachable: ${err.message}` });
+  }
+
+  if (CLOUD_MODE) {
+    const url = publicUrls().storefront;
+    try {
+      // Any HTTP answer proves TLS terminated; only the handshake matters here,
+      // so a 4xx from the app still counts as "HTTPS works".
+      const r = await fetch(url, { signal: AbortSignal.timeout(5000), redirect: 'manual' });
+      conditions.push({
+        name: 'HTTPS',
+        ok: r.status < 500,
+        detail: r.status < 500 ? `serving (${r.status})` : `storefront returned ${r.status}`,
+      });
+    } catch (err) {
+      conditions.push({ name: 'HTTPS', ok: false, detail: `no TLS response: ${err.message}` });
+    }
+  }
+
+  res.json({ ready: conditions.every(c => c.ok), conditions });
 });
 
 app.post('/api/recommendation/train', async (req, res) => {

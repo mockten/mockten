@@ -98,6 +98,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadMetricsHistory();
   fetchContainers();
   fetchFrontendStatus();
+  fetchReady();
   fetchTelemetry();
   autoRefreshTimer = setInterval(() => {
     const isDashboardActive = document.getElementById('view-dashboard').classList.contains('active');
@@ -107,6 +108,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       fetchContainers();
       fetchFrontendStatus();
     }
+
+    if (isDashboardActive) fetchReady();
     
     if (isDashboardActive) {
       fetchTelemetry();
@@ -377,6 +380,37 @@ function refresh() {
   const btn = document.querySelector('.btn-refresh svg');
   btn.style.animation = 'spin 0.5s linear';
   setTimeout(() => btn.style.animation = '', 600);
+}
+
+// ── Environment readiness ──────────────────────────────────────────────────
+/**
+ * READY only when every condition holds. When it doesn't, name the condition
+ * that is outstanding — "PENDING" alone tells you to go looking, not where.
+ */
+async function fetchReady() {
+  const value = document.getElementById('stat-ready');
+  const detail = document.getElementById('ready-detail');
+  const icon = document.getElementById('ready-icon');
+  if (!value || !detail || !icon) return;
+
+  try {
+    const res = await fetch('/dashboard/api/ready');
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    const { ready, conditions } = await res.json();
+
+    value.textContent = ready ? 'READY' : 'PENDING';
+    value.style.color = ready ? 'var(--green)' : 'var(--yellow)';
+    icon.style.background = ready ? 'var(--green-bg)' : 'var(--yellow-bg)';
+    icon.style.color = ready ? 'var(--green)' : 'var(--yellow)';
+    detail.textContent = ready
+      ? conditions.map(c => c.name).join(' · ')
+      : conditions.filter(c => !c.ok).map(c => `${c.name}: ${c.detail}`).join(' · ');
+  } catch (err) {
+    // Say it's unknown rather than claiming PENDING — we didn't measure anything.
+    value.textContent = '–';
+    value.style.color = 'var(--text-muted)';
+    detail.textContent = `readiness unavailable: ${err.message}`;
+  }
 }
 
 // ── Frontend Status ────────────────────────────────────────────────────────
@@ -5535,7 +5569,7 @@ const I18N = {
     'col.ended': 'Ended', 'col.duration': 'Total Duration',
     'col.task': 'Task', 'col.retries': 'Retries',
     // Dashboard cards
-    'dash.running': 'Running', 'dash.stopped': 'Stopped / Exited', 'dash.totalContainers': 'Total Containers',
+    'dash.running': 'Running', 'dash.stopped': 'Stopped / Exited', 'dash.totalContainers': 'Total Containers', 'dash.ready': 'Environment',
     'dash.totalCpu': 'Total CPU Usage', 'dash.totalMemory': 'Total Memory Usage',
     'dash.kong': 'API Gateway (Kong)', 'dash.mysql': 'MySQL Database',
     'dash.redis': 'Redis Cache', 'dash.mongo': 'MongoDB Document DB',
@@ -5628,7 +5662,7 @@ const I18N = {
     'pipeline.runHistory': '実行履歴', 'pipeline.stageTiming': 'ステージタイミング',
     'col.state': '状態', 'col.runId': '実行ID', 'col.started': '開始', 'col.ended': '終了',
     'col.duration': '所要時間', 'col.task': 'タスク', 'col.retries': 'リトライ',
-    'dash.running': '実行中', 'dash.stopped': '停止 / 終了', 'dash.totalContainers': 'コンテナ合計',
+    'dash.running': '実行中', 'dash.stopped': '停止 / 終了', 'dash.totalContainers': 'コンテナ合計', 'dash.ready': '環境',
     'dash.totalCpu': 'CPU使用率合計', 'dash.totalMemory': 'メモリ使用量合計',
     'dash.kong': 'APIゲートウェイ (Kong)', 'dash.mysql': 'MySQLデータベース',
     'dash.redis': 'Redisキャッシュ', 'dash.mongo': 'MongoDBドキュメントDB',
@@ -5713,7 +5747,7 @@ const I18N = {
     'pipeline.runHistory': '运行历史', 'pipeline.stageTiming': '阶段耗时',
     'col.state': '状态', 'col.runId': '运行ID', 'col.started': '开始时间', 'col.ended': '结束时间',
     'col.duration': '总耗时', 'col.task': '任务', 'col.retries': '重试次数',
-    'dash.running': '运行中', 'dash.stopped': '已停止 / 已退出', 'dash.totalContainers': '容器总数',
+    'dash.running': '运行中', 'dash.stopped': '已停止 / 已退出', 'dash.totalContainers': '容器总数', 'dash.ready': '环境',
     'dash.totalCpu': 'CPU总使用率', 'dash.totalMemory': '内存总使用量',
     'dash.kong': 'API网关 (Kong)', 'dash.mysql': 'MySQL数据库',
     'dash.redis': 'Redis缓存', 'dash.mongo': 'MongoDB文档数据库',

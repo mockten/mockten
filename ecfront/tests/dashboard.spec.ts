@@ -95,6 +95,38 @@ test.describe('Dashboard Enhancements Spec', () => {
     }
   });
 
+  test('readiness card reports the environment, and says what is missing', async ({ page, request }) => {
+    const res = await request.get(dash('/api/ready'));
+    expect(res.ok()).toBeTruthy();
+    const { ready, conditions } = await res.json();
+
+    // Always judged on the model; HTTPS only where it means something. In dev
+    // the stack is plain HTTP by design, so an HTTPS condition there would be a
+    // permanent false alarm.
+    const names = conditions.map((c: any) => c.name);
+    expect(names).toContain('Recommendation model');
+    const caps = await getCaps(page);
+    const isCloud = (caps as any).deployment === 'cloud';
+    expect(names.includes('HTTPS')).toBe(isCloud);
+
+    // "ready" must follow the conditions rather than being reported separately.
+    expect(ready).toBe(conditions.every((c: any) => c.ok));
+
+    await page.locator('nav .nav-item').getByText('Dashboard', { exact: true }).click();
+    const card = page.locator('#ready-card');
+    await expect(card).toBeVisible();
+    await expect(page.locator('#stat-ready')).toHaveText(ready ? 'READY' : 'PENDING');
+
+    if (!ready) {
+      // PENDING on its own sends people hunting; the outstanding condition has
+      // to be named on the card.
+      const detail = await page.locator('#ready-detail').innerText();
+      for (const c of conditions.filter((x: any) => !x.ok)) {
+        expect(detail).toContain(c.name);
+      }
+    }
+  });
+
   test('mode badge names the runtime and survives navigation', async ({ page }) => {
     // The DEV and k8s dashboards deliberately differ, and both answer on
     // localhost — without a label you cannot tell "hidden by design" from
