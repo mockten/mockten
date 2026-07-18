@@ -13,7 +13,13 @@ done
 echo "MySQL is up. Starting Keycloak..."
 
 mkdir -p /opt/keycloak/data/import
-if [ "$DEV_MODE" = "true" ]; then
+# Three realms, and the deployment shape decides which. Cloud is checked first
+# because it is the narrower condition: it splits the portals across four hosts,
+# so its client origins cannot be baked in and are substituted below.
+if [ "$MOCKTEN_MODE" = "cloud" ]; then
+  echo "MOCKTEN_MODE is cloud. Using realm-export-cloud.json..."
+  cp /opt/keycloak/staging/realm-export-cloud.json /opt/keycloak/data/import/realm-export.json
+elif [ "$DEV_MODE" = "true" ]; then
   echo "DEV_MODE is true. Using realm-export-dev.json..."
   cp /opt/keycloak/staging/realm-export-dev.json /opt/keycloak/data/import/realm-export.json
 else
@@ -27,6 +33,31 @@ fi
 # secret is ever baked into the pushed image. A key that is not set is left as its
 # placeholder, so the realm still imports for local dev without that SSO provider.
 IMPORT_FILE=/opt/keycloak/data/import/realm-export.json
+
+# The cloud realm ships with PUBLIC_BASE_DOMAIN in place of the real domain, so
+# no personal domain is committed. Substitute it the same way as the OAuth keys
+# below. Without this the client would still only trust http://localhost, and
+# every SSO round trip would come back to a redirect_uri the realm rejects.
+if [ "$MOCKTEN_MODE" = "cloud" ]; then
+  if [ -n "$PUBLIC_BASE_DOMAIN" ]; then
+    esc_domain=$(printf '%s' "$PUBLIC_BASE_DOMAIN" | sed -e 's/[\\&/]/\\&/g')
+    sed -i "s/PUBLIC_BASE_DOMAIN/${esc_domain}/g" "$IMPORT_FILE"
+    # Confirm it actually happened rather than trusting sed's exit code. A silent
+    # no-op here imports a realm that only trusts the literal host
+    # "PUBLIC_BASE_DOMAIN", which fails at login time, far from the cause.
+    if grep -q 'PUBLIC_BASE_DOMAIN' "$IMPORT_FILE"; then
+      echo "ERROR: PUBLIC_BASE_DOMAIN is still present in the realm import after substitution." >&2
+      exit 1
+    fi
+    echo "Substituted PUBLIC_BASE_DOMAIN into the cloud realm import."
+  else
+    echo "ERROR: MOCKTEN_MODE=cloud but PUBLIC_BASE_DOMAIN is not set." >&2
+    echo "ERROR: The realm would only trust the literal host 'PUBLIC_BASE_DOMAIN'," >&2
+    echo "ERROR: so every login would fail with redirect_uri_mismatch. Refusing to start." >&2
+    exit 1
+  fi
+fi
+
 for key in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET FACEBOOK_CLIENT_ID FACEBOOK_CLIENT_SECRET; do
   val="${!key}"
   if [ -n "$val" ]; then

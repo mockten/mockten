@@ -19,6 +19,7 @@ USER keycloak
 # via envFrom; for local Compose they come from the gitignored uam/uam.env.
 COPY --chown=keycloak:keycloak realm-export.json /opt/keycloak/staging/realm-export.json
 COPY --chown=keycloak:keycloak realm-export-dev.json /opt/keycloak/staging/realm-export-dev.json
+COPY --chown=keycloak:keycloak realm-export-cloud.json /opt/keycloak/staging/realm-export-cloud.json
 COPY docker-entrypoint.sh /opt/keycloak/docker-entrypoint.sh
 
 EXPOSE 80
