@@ -169,7 +169,6 @@ To enable Google sign-up / sign-in, create an OAuth 2.0 Web application client i
 | Authorized Redirect URIs | `http://localhost/api/uam/broker/google/endpoint`     |
 
 Once the client is created, copy its Client ID and Client Secret into `uam/uam.env` (copy `uam/uam.env.example` to create it).
-<img width="1186" height="508" alt="CleanShot 2025-07-22 at 16 42 09@2x" src="https://github.com/user-attachments/assets/cd983364-6a7e-443f-909c-3f29277d6ad9" />
 
 
 ## Facebook Authentication Setup
