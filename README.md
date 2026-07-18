@@ -174,8 +174,6 @@ Once the client is created, copy its Client ID and Client Secret into `uam/uam.e
 To enable Facebook sign-up / sign-in, create an app in [Facebook Developers](https://developers.facebook.com/apps/).
 <img width="2016" height="754" alt="CleanShot 2025-07-22 at 16 38 38@2x" src="https://github.com/user-attachments/assets/b4b95c3b-b75d-4a2e-bf05-464df6c0c09e" />
 Once the app is created, copy its App ID and App Secret into `uam/uam.env` (copy `uam/uam.env.example` to create it).
-<img width="1016" height="512" alt="CleanShot 2025-07-22 at 16 41 40@2x" src="https://github.com/user-attachments/assets/892e19be-445d-4752-a5d3-6eb12192278f" />
-
 
 ## Payment (Stripe) Setup
 Card payments are processed with [Stripe](https://stripe.com/). Create a free Stripe account, and while the dashboard is in **Test mode** open **Developers → API keys** to find your **Publishable key** (`pk_test_…`) and **Secret key** (`sk_test_…`).
