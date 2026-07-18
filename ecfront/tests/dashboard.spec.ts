@@ -1,4 +1,41 @@
 import { test, expect, Page } from '@playwright/test';
+import { resolveDashboardTarget, dashboardUrl } from '../src/dashboardTarget';
+
+/**
+ * In dev the dashboard is proxied under localhost/dashboard; in cloud it has its
+ * own host and is served at the root. dash() hides that difference so the specs
+ * below read the same in both. Set DASHBOARD_BASE_URL to point at a deployment.
+ */
+const TARGET = resolveDashboardTarget(process.env);
+const dash = (path: string) => dashboardUrl(path, TARGET);
+
+/**
+ * Cloud requires an admin login (the console can exec into pods, so it is not
+ * open to the internet). Dev and local k8s are open and skip this entirely.
+ * Credentials come from the environment — never from the repo.
+ */
+async function loginIfRequired(page: Page) {
+  const caps = await page.request.get(dash('/api/capabilities'));
+  if (!caps.ok()) return;
+  const { authRequired } = await caps.json();
+  if (!authRequired) return;
+
+  const email = process.env.DASHBOARD_ADMIN_USER;
+  const password = process.env.DASHBOARD_ADMIN_PASSWORD;
+  if (!email || !password) {
+    throw new Error(
+      'This dashboard requires a login, but DASHBOARD_ADMIN_USER / ' +
+      'DASHBOARD_ADMIN_PASSWORD are not set.',
+    );
+  }
+
+  const res = await page.request.post(dash('/api/auth/login'), {
+    data: { email, password },
+  });
+  if (!res.ok()) {
+    throw new Error(`Dashboard login failed: ${res.status()} ${await res.text()}`);
+  }
+}
 
 /**
  * What the dashboard under test can actually do. The panels backed by the Docker
@@ -17,14 +54,15 @@ type Caps = {
 };
 
 async function getCaps(page: Page): Promise<Caps> {
-  const res = await page.request.get('/dashboard/api/capabilities');
+  const res = await page.request.get(dash('/api/capabilities'));
   return res.json();
 }
 
 test.describe('Dashboard Enhancements Spec', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to the Dashboard
-    await page.goto('/dashboard/');
+    await loginIfRequired(page);
+    await page.goto(dash('/'));
     await expect(page.locator('.logo')).toContainText('mockten');
   });
 
@@ -93,7 +131,7 @@ test.describe('Dashboard Enhancements Spec', () => {
     for (let i = 0; i < 3; i++) await request.get('/api/categories');
 
     await expect(async () => {
-      const res = await request.get('/dashboard/api/telemetry');
+      const res = await request.get(dash('/api/telemetry'));
       expect(res.ok()).toBeTruthy();
       const { kong } = await res.json();
       expect(kong.topApis.length, 'topApis is empty — the access log was not read').toBeGreaterThan(0);
@@ -198,7 +236,7 @@ test.describe('Dashboard Enhancements Spec', () => {
     await expect(runHistorySection).toBeVisible({ timeout: 10000 });
 
     // API should return run data (not empty / not "Loading...")
-    const resp = await request.get('/dashboard/api/pipeline/runs?limit=5');
+    const resp = await request.get(dash('/api/pipeline/runs?limit=5'));
     expect(resp.status()).toBe(200);
     const body = await resp.json();
     expect(body).toHaveProperty('dag_runs');
@@ -215,7 +253,7 @@ test.describe('Dashboard Enhancements Spec', () => {
 
   test('should show DashboardMetrics table in DB Viewer (MySQL persistence)', async ({ page, request }) => {
     // Verify DashboardMetrics exists in the MySQL tables API
-    const apiRes = await request.get('/dashboard/api/db/mysql/tables');
+    const apiRes = await request.get(dash('/api/db/mysql/tables'));
     expect(apiRes.status()).toBe(200);
     const tables = await apiRes.json();
     expect(Array.isArray(tables)).toBe(true);
@@ -253,7 +291,7 @@ test.describe('Dashboard Enhancements Spec', () => {
 
   test('dashboard should be reachable and not 502 (memory regression guard)', async ({ page }) => {
     // 502 means dashboard OOM-killed — this test catches mem_limit regressions
-    const res = await page.goto('/dashboard/');
+    const res = await page.goto(dash('/'));
     expect(res?.status()).toBeLessThan(500);
     await expect(page.locator('.logo')).toContainText('mockten', { timeout: 10000 });
   });
