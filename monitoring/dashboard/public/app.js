@@ -43,6 +43,23 @@ function applyCapabilities() {
     ['btn-mysql-export', 'btn-mysql-import', 'mysql-import-file'].forEach(hideEl);
   }
 
+  // Portal links. In dev everything shares one origin, so the same-origin paths
+  // baked into index.html are right. In cloud the four portals live on separate
+  // hosts under a domain that must not appear in this repo, so the server hands
+  // them to us via /api/capabilities and we rewrite the hrefs here.
+  const urls = CAPS.urls || {};
+  const setNav = (key, href) => {
+    if (!href) return;
+    document.querySelectorAll(`.nav-item[data-key="${key}"]`).forEach(el => { el.href = href; });
+  };
+  setNav('mockten', urls.storefront);
+  setNav('seller', urls.sales);
+  setNav('admin', urls.admin);
+
+  // The auth backdoor mints tokens without a password. That is a test affordance
+  // for a private stack, not something to expose on the public internet.
+  if (CAPS.deployment === 'cloud') hideNav('backdoor');
+
   // Say which runtime this is, always and in both modes. The two dashboards look
   // deliberately different (k8s hides Local CI / E2E / Security Scanning and the
   // Vite card), and both are reachable on localhost — so without a label it's

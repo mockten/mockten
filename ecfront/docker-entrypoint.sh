@@ -22,7 +22,12 @@ escape_js() {
 cat > "$CONFIG_FILE" <<EOF
 // Generated at container start by docker-entrypoint.sh — do not edit.
 window.__APP_CONFIG__ = {
-  STRIPE_PUBLIC_KEY: "$(escape_js "${STRIPE_PUBLIC_KEY}")"
+  STRIPE_PUBLIC_KEY: "$(escape_js "${STRIPE_PUBLIC_KEY}")",
+  // Empty in dev, where every portal shares one origin. In cloud these tell the
+  // SPA which portal this host serves and how to build the other hosts' URLs,
+  // so no domain is ever baked into the bundle. See src/portalHost.ts.
+  MOCKTEN_MODE: "$(escape_js "${MOCKTEN_MODE}")",
+  PUBLIC_BASE_DOMAIN: "$(escape_js "${PUBLIC_BASE_DOMAIN}")"
 };
 EOF
 

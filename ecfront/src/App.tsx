@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import TermsPage from './pages/TermsPage';
 import CancellationPolicyPage from './pages/CancellationPolicy';
 import AboutUsPage from './pages/AboutUsPages';
@@ -34,9 +34,33 @@ import { CreateUserPage } from './pages/admin/CreateUserPage';
 import { EditUserPage } from './pages/admin/EditUserPage';
 import PrivateRoute from './PrivateRoute';
 import { AuthProvider } from './Auth';
+import { redirectTarget } from './portalHost';
 
 
 import './App.css';
+
+/**
+ * Keeps each cloud host to its own portal. Outside cloud, redirectTarget()
+ * always returns null and this renders nothing and navigates nowhere, so dev
+ * behaviour is untouched.
+ *
+ * Same-origin targets go through the router so we don't reload the SPA;
+ * cross-host targets have to be a real navigation. Both use replace semantics
+ * so the wrong-host URL doesn't sit in the back stack and bounce the user.
+ */
+const HostGate: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    const target = redirectTarget(location.pathname);
+    if (!target) return;
+    if (target.startsWith('/')) navigate(target, { replace: true });
+    else window.location.replace(target);
+  }, [location.pathname, navigate]);
+
+  return null;
+};
 
 const AdminLoginPageWrapper: React.FC = () => {
   const navigate = useNavigate();
@@ -84,6 +108,7 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
       <Router>
+        <HostGate />
         <Routes>
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/cancellation-policy" element={<CancellationPolicyPage />} />
