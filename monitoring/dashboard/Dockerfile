@@ -33,6 +33,7 @@ COPY monitoring/dashboard/package.json .
 RUN npm install --omit=dev
 COPY monitoring/dashboard/server.js .
 COPY monitoring/dashboard/runtime.js .
+COPY monitoring/dashboard/auth.js .
 COPY monitoring/dashboard/public/ ./public/
 COPY apigw/kong.yaml /app/kong.yaml
 COPY uam/realm-export-dev.json /app/realm-export-dev.json

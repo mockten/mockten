@@ -43,6 +43,42 @@ function detectDevMode() {
 const DEV_MODE = detectDevMode();
 const MODE = DEV_MODE ? 'docker' : 'k8s';
 
+// ── Deployment shape — deliberately NOT the same axis as MODE ────────────────
+//
+// MODE answers "how do I inspect containers" (Docker socket vs Kubernetes API).
+// MOCKTEN_MODE answers "what shape is this deployment" — which URLs the portals
+// live on, whether the console needs a login, whether READY applies.
+//
+// They are orthogonal, and the combination that proves it is a *local* k8s
+// cluster: MODE=k8s (talk to the API server) but MOCKTEN_MODE=dev (localhost,
+// no public domain, no login). Folding one into the other would send local k8s
+// down the dockerode path and break the container list, logs and terminal.
+const CLOUD_MODE = String(process.env.MOCKTEN_MODE || '').trim().toLowerCase() === 'cloud';
+
+// No scheme, no trailing dot — e.g. "mockten.dpdns.org". Only meaningful in
+// cloud; the domain is never baked into an image, so the same artifact can be
+// pointed at whatever domain the operator brings.
+const PUBLIC_BASE_DOMAIN = String(process.env.PUBLIC_BASE_DOMAIN || '')
+  .trim().replace(/^https?:\/\//, '').replace(/\/+$/, '').replace(/\.$/, '');
+
+/**
+ * Where each surface lives. Derived from the one domain rather than injected as
+ * four separate variables, so adding a cloud never means adding more config.
+ * In dev everything is same-origin on localhost, which is what it is today.
+ */
+function publicUrls() {
+  if (!CLOUD_MODE || !PUBLIC_BASE_DOMAIN) {
+    return { storefront: '/', sales: '/seller/login', admin: '/admin', dashboard: '/dashboard' };
+  }
+  const d = PUBLIC_BASE_DOMAIN;
+  return {
+    storefront: `https://${d}`,
+    sales: `https://sales.${d}`,
+    admin: `https://admin.${d}`,
+    dashboard: `https://dashboard.${d}`,
+  };
+}
+
 /**
  * Canonical service key shared by both runtimes, so callers (topology, UI) can
  * identify a service without caring how it is packaged.
@@ -70,6 +106,14 @@ function capabilities() {
   return {
     mode: MODE,
     devMode: DEV_MODE,
+    // Deployment shape (see CLOUD_MODE) — separate from `mode` above, which is
+    // the container runtime.
+    deployment: CLOUD_MODE ? 'cloud' : 'dev',
+    publicBaseDomain: PUBLIC_BASE_DOMAIN || null,
+    urls: publicUrls(),
+    // The console is only exposed to the internet in cloud, so that's the only
+    // place it demands a login.
+    authRequired: CLOUD_MODE,
     containers: {
       list: true,
       logs: true,
@@ -542,4 +586,8 @@ function createK8sRuntime() {
 
 const runtime = DEV_MODE ? createDockerRuntime() : createK8sRuntime();
 
-module.exports = { runtime, capabilities, canonicalKey, DEV_MODE, MODE, K8S_NAMESPACE };
+module.exports = {
+  runtime, capabilities, canonicalKey, publicUrls,
+  DEV_MODE, MODE, K8S_NAMESPACE,
+  CLOUD_MODE, PUBLIC_BASE_DOMAIN,
+};

@@ -43,7 +43,7 @@ function getRedis() {
 // Container introspection goes through a runtime abstraction: Docker in DEV,
 // the Kubernetes API when deployed. `docker` stays available for the DEV-only
 // paths (exec, mysqldump, sync trigger) that have no k8s counterpart here.
-const { runtime, capabilities, DEV_MODE, MODE } = require('./runtime');
+const { runtime, capabilities, DEV_MODE, MODE, CLOUD_MODE } = require('./runtime');
 const docker = runtime.raw;
 
 console.log(`Dashboard runtime mode: ${MODE} (DEV_MODE=${DEV_MODE})`);
@@ -66,6 +66,15 @@ function devOnly(feature) {
     });
   };
 }
+
+// Authentication guard. Mounted before the static console and every API route
+// below, so a newly added route cannot accidentally ship unauthenticated.
+// A no-op unless MOCKTEN_MODE=cloud — DEV and local k8s stay open.
+const auth = require('./auth').install(app, {
+  enabled: CLOUD_MODE,
+  apigwBaseUrl: APIGW_BASE_URL,
+});
+console.log(`Dashboard auth: ${auth.enabled ? 'required (cloud)' : 'open (dev/local)'}`);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -1366,6 +1375,14 @@ const DEV_ONLY_WS = [
 
 server.on('upgrade', (request, socket, head) => {
   const { pathname } = new URL(request.url, 'http://localhost');
+  // WebSockets carry cookies, so the same session check applies here. Without
+  // this the express guard would protect the console while /ws/exec still
+  // handed out an unauthenticated shell into any pod.
+  if (!auth.allowsUpgrade(request)) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+    socket.destroy();
+    return;
+  }
   if (!DEV_MODE && DEV_ONLY_WS.includes(pathname)) {
     socket.destroy();
     return;
