@@ -70,15 +70,35 @@ for key in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET FACEBOOK_CLIENT_ID FACEBOOK_CLI
   fi
 done
 
-exec /opt/keycloak/bin/kc.sh start-dev \
-  --import-realm \
-  --db=mysql \
-  --db-url=jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/mocktendb \
-  --db-username=mocktenusr \
-  --db-password=mocktenpassword \
-  --db-pool-initial-size=1 \
-  --db-pool-min-size=1 \
-  --db-pool-max-size=5 \
-  --cache=local \
-  --http-port=80 \
-  --log-level=WARN
+if [ "$MOCKTEN_MODE" = "cloud" ]; then
+  echo "Starting Keycloak in production mode (cloud)..."
+  exec /opt/keycloak/bin/kc.sh start \
+    --import-realm \
+    --db=mysql \
+    --db-url=jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/mocktendb \
+    --db-username=mocktenusr \
+    --db-password=mocktenpassword \
+    --db-pool-initial-size=1 \
+    --db-pool-min-size=1 \
+    --db-pool-max-size=5 \
+    --cache=local \
+    --http-port=80 \
+    --http-enabled=true \
+    --proxy=edge \
+    --hostname-strict=false \
+    --log-level=WARN
+else
+  echo "Starting Keycloak in dev mode..."
+  exec /opt/keycloak/bin/kc.sh start-dev \
+    --import-realm \
+    --db=mysql \
+    --db-url=jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/mocktendb \
+    --db-username=mocktenusr \
+    --db-password=mocktenpassword \
+    --db-pool-initial-size=1 \
+    --db-pool-min-size=1 \
+    --db-pool-max-size=5 \
+    --cache=local \
+    --http-port=80 \
+    --log-level=WARN
+fi
