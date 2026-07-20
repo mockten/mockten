@@ -1,3 +1,28 @@
+// ── API base ───────────────────────────────────────────────────────────────
+/**
+ * Where this console's own API lives.
+ *
+ * In dev the dashboard is reverse-proxied under one origin at /dashboard, and
+ * the proxy strips that prefix before the app sees it. In cloud the dashboard
+ * has a host to itself and is served at the root, where /dashboard/api/... does
+ * not exist. Hardcoding the dev shape made every request 404 in cloud, which
+ * left the capabilities probe failing and the UI falling back to its permissive
+ * DEV defaults — so a cloud console rendered as if it were DEV, with empty
+ * cards.
+ *
+ * Derived from where this page is actually served rather than from
+ * /api/capabilities: fetching capabilities is itself subject to the prefix, so
+ * using it to decide the prefix would be circular. The path we were loaded from
+ * is self-describing and available before any request.
+ */
+const API_BASE = (() => {
+  const p = window.location.pathname;
+  const i = p.indexOf('/dashboard/');
+  if (i !== -1) return p.slice(0, i) + '/dashboard';
+  if (p === '/dashboard') return '/dashboard';
+  return '';
+})();
+
 // ── State ──────────────────────────────────────────────────────────────────
 let allContainers = [];
 let statsCache = {};
@@ -21,7 +46,7 @@ let CAPS = {
 
 async function loadCapabilities() {
   try {
-    const res = await fetch('/dashboard/api/capabilities');
+    const res = await fetch(`${API_BASE}/api/capabilities`);
     if (res.ok) CAPS = await res.json();
   } catch { /* keep permissive defaults */ }
 }
@@ -174,7 +199,7 @@ function showView(name, el) {
 // ── Fetch Containers ───────────────────────────────────────────────────────
 async function fetchContainers() {
   try {
-    const res = await fetch('/dashboard/api/containers');
+    const res = await fetch(`${API_BASE}/api/containers`);
     if (!res.ok) throw new Error(res.statusText);
     const rawContainers = await res.json();
     
@@ -214,13 +239,13 @@ async function fetchAllStats(containers) {
   let numCpus = 1;
 
   try {
-    const capRes = await fetch('/dashboard/api/mem-capacity');
+    const capRes = await fetch(`${API_BASE}/api/mem-capacity`);
     if (capRes.ok) memCapacityBytes = (await capRes.json()).bytes || 0;
   } catch { /* leave 0; the percentage is then suppressed rather than wrong */ }
 
   await Promise.all(containers.map(async c => {
     try {
-      const res = await fetch(`/dashboard/api/containers/${c.id}/stats`);
+      const res = await fetch(`${API_BASE}/api/containers/${c.id}/stats`);
       if (!res.ok) return;
       const stats = await res.json();
       statsCache[c.id] = stats;
@@ -343,7 +368,7 @@ function updateCharts(totalCpu, totalMemPercent, totalMemMB) {
 
 async function loadMetricsHistory() {
   try {
-    const res = await fetch('/dashboard/api/metrics/history');
+    const res = await fetch(`${API_BASE}/api/metrics/history`);
     if (!res.ok) return;
     const h = await res.json();
     if (!h.timestamps || h.timestamps.length === 0) return;
@@ -394,7 +419,7 @@ async function fetchReady() {
   if (!value || !detail || !icon) return;
 
   try {
-    const res = await fetch('/dashboard/api/ready');
+    const res = await fetch(`${API_BASE}/api/ready`);
     if (!res.ok) throw new Error(`status ${res.status}`);
     const { ready, conditions } = await res.json();
 
@@ -416,7 +441,7 @@ async function fetchReady() {
 // ── Frontend Status ────────────────────────────────────────────────────────
 async function fetchFrontendStatus() {
   try {
-    const res = await fetch('/dashboard/api/frontend/status');
+    const res = await fetch(`${API_BASE}/api/frontend/status`);
     const data = await res.json();
     frontendRunning = data.running;
     const el = document.getElementById('stat-frontend');
@@ -554,7 +579,7 @@ async function containerAction(id, action) {
   if (row) row.style.opacity = '0.5';
 
   try {
-    const res = await fetch(`/dashboard/api/containers/${id}/${action}`, { method: 'POST' });
+    const res = await fetch(`${API_BASE}/api/containers/${id}/${action}`, { method: 'POST' });
     if (!res.ok) throw new Error((await res.json()).error);
     showToast(`Container ${action}ed successfully`, 'success');
   } catch (e) {
@@ -591,7 +616,7 @@ async function executeSystemRestart() {
 
   showToast('System restart in progress...', 'info');
   try {
-    const res = await fetch('/dashboard/api/system/restart', { method: 'POST' });
+    const res = await fetch(`${API_BASE}/api/system/restart`, { method: 'POST' });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     const count = data.restarted?.length || 0;
@@ -663,7 +688,7 @@ function startLogStream() {
 
   // ── Vite frontend log ──
   if (id === '__frontend__') {
-    const wsUrl = `${proto}://${location.host}/dashboard/ws/frontend-logs`;
+    const wsUrl = `${proto}://${location.host}${API_BASE}/ws/frontend-logs`;
     setLogStatus(true);
     currentLogWs = new WebSocket(wsUrl);
     currentLogWs.onmessage = (e) => {
@@ -688,7 +713,7 @@ function startLogStream() {
   }
 
   // ── Docker container log ──
-  const wsUrl = `${proto}://${location.host}/dashboard/ws/logs?id=${id}&tail=${tail}`;
+  const wsUrl = `${proto}://${location.host}${API_BASE}/ws/logs?id=${id}&tail=${tail}`;
   setLogStatus(true);
   currentLogWs = new WebSocket(wsUrl);
 
@@ -802,10 +827,10 @@ const GROUP_COLOR = {
 
 async function fetchTopology() {
   try {
-    const res = await fetch('/dashboard/api/topology');
+    const res = await fetch(`${API_BASE}/api/topology`);
     const data = await res.json();
     // Overlay frontend status
-    const feRes = await fetch('/dashboard/api/frontend/status');
+    const feRes = await fetch(`${API_BASE}/api/frontend/status`);
     const feData = await feRes.json();
     const feNode = data.nodes.find(n => n.id === 'frontend');
     if (feNode) feNode.state = feData.running ? 'running' : 'exited';
@@ -1045,7 +1070,7 @@ async function initDbView() {
 async function loadMysqlTables() {
   const ul = document.getElementById('mysql-tables-ul');
   try {
-    const res = await fetch('/dashboard/api/db/mysql/tables');
+    const res = await fetch(`${API_BASE}/api/db/mysql/tables`);
     const tables = await res.json();
     if (tables.error) throw new Error(tables.error);
     ul.innerHTML = tables.map(t => `
@@ -1074,7 +1099,7 @@ async function loadMysqlTable(table, offset = 0) {
 
   const params = new URLSearchParams({ limit: mysqlLimit, offset, search });
   try {
-    const res = await fetch(`/dashboard/api/db/mysql/table/${table}?${params}`);
+    const res = await fetch(`${API_BASE}/api/db/mysql/table/${table}?${params}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
@@ -1138,7 +1163,7 @@ async function loadRedisKeys() {
   const ul = document.getElementById('redis-keys-ul');
   ul.innerHTML = '<div class="loading-row"><div class="spinner"></div></div>';
   try {
-    const res = await fetch(`/dashboard/api/db/redis/keys?pattern=${encodeURIComponent(pattern)}`);
+    const res = await fetch(`${API_BASE}/api/db/redis/keys?pattern=${encodeURIComponent(pattern)}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     document.getElementById('redis-total').textContent = `(${data.total} total)`;
@@ -1169,7 +1194,7 @@ async function loadRedisKey(key) {
   wrap.innerHTML = '<div class="loading-row"><div class="spinner"></div>Loading...</div>';
 
   try {
-    const res = await fetch(`/dashboard/api/db/redis/key?key=${encodeURIComponent(key)}`);
+    const res = await fetch(`${API_BASE}/api/db/redis/key?key=${encodeURIComponent(key)}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
@@ -1412,7 +1437,7 @@ async function submitAddRow(event) {
     }
   });
 
-  let endpoint = `/dashboard/api/db/mysql/table/${modalTableOrCollection}`;
+  let endpoint = `${API_BASE}/api/db/mysql/table/${modalTableOrCollection}`;
 
   let method = 'POST';
   let bodyPayload = payload;
@@ -1460,7 +1485,7 @@ async function deleteMysqlRow(idx) {
   try {
     const params = new URLSearchParams();
     pkNames.forEach((k, i) => { params.append('pkNames[]', k); params.append('pkValues[]', pkValues[i]); });
-    const res = await fetch(`/dashboard/api/db/mysql/table/${mysqlCurrentTable}?${params}`, {
+    const res = await fetch(`${API_BASE}/api/db/mysql/table/${mysqlCurrentTable}?${params}`, {
       method: 'DELETE'
     });
     const result = await res.json();
@@ -1507,7 +1532,7 @@ function openTerminal(containerId, name) {
   termInstance.write('Connecting to container terminal...\r\n');
 
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const wsUrl = `${proto}://${location.host}/dashboard/ws/exec?id=${containerId}&cols=${cols}&rows=${rows}`;
+  const wsUrl = `${proto}://${location.host}${API_BASE}/ws/exec?id=${containerId}&cols=${cols}&rows=${rows}`;
   termWs = new WebSocket(wsUrl);
 
   termWs.onopen = () => {
@@ -1559,7 +1584,7 @@ async function triggerSync(event) {
   const tracker = startProgressBar('sync', 'sync-progress-container', 'sync-progress-bar', 'sync-progress-pct', 3);
 
   try {
-    const res = await fetch('/dashboard/api/sync/trigger', { method: 'POST' });
+    const res = await fetch(`${API_BASE}/api/sync/trigger`, { method: 'POST' });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     showToast('Database to Meilisearch sync completed', 'success');
@@ -1592,7 +1617,7 @@ async function runSql() {
   wrap.innerHTML = '<div style="padding: 20px; text-align: center;"><div class="spinner"></div>Running Query...</div>';
 
   try {
-    const res = await fetch('/dashboard/api/db/mysql/query', {
+    const res = await fetch(`${API_BASE}/api/db/mysql/query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sql })
@@ -1619,7 +1644,7 @@ async function runSql() {
 
 function exportMysqlDump() {
   showToast('Generating database export...', 'info');
-  window.location.href = '/dashboard/api/db/mysql/export';
+  window.location.href = `${API_BASE}/api/db/mysql/export`;
 }
 
 function triggerMysqlImport() {
@@ -1635,7 +1660,7 @@ async function handleMysqlImport(event) {
   showToast('Importing SQL dump...', 'info');
 
   try {
-    const res = await fetch('/dashboard/api/db/mysql/import', {
+    const res = await fetch(`${API_BASE}/api/db/mysql/import`, {
       method: 'POST',
       body: file
     });
@@ -2812,7 +2837,7 @@ async function initApiView() {
   const list = document.getElementById('api-list-ul');
   list.innerHTML = '<div class="loading-row"><div class="spinner"></div></div>';
   try {
-    const res = await fetch('/dashboard/api/kong/spec');
+    const res = await fetch(`${API_BASE}/api/kong/spec`);
     apiSpecs = await res.json();
     if (apiSpecs.error) throw new Error(apiSpecs.error);
 
@@ -2935,7 +2960,7 @@ function selectApiRoute(sIdx, rIdx, methodOverride) {
 
     // Async-fill __superadmin_token__ — only targets Authorization inputs
     if (schema.some(f => f.default === '__superadmin_token__')) {
-      fetch('/dashboard/api/superadmin-token').then(r => r.json()).then(d => {
+      fetch(`${API_BASE}/api/superadmin-token`).then(r => r.json()).then(d => {
         document.querySelectorAll('.api-gui-input[data-sentinel="__superadmin_token__"]').forEach(el => {
           el.value = `Bearer ${d.token}`;
         });
@@ -3169,7 +3194,7 @@ async function sendTestRequest() {
     let authToken = null;
     if (!skipAutoAuth) {
       try {
-        const tr = await fetch('/dashboard/api/superadmin-token');
+        const tr = await fetch(`${API_BASE}/api/superadmin-token`);
         if (tr.ok) { const td = await tr.json(); authToken = td.token; }
       } catch {}
     }
@@ -3233,8 +3258,8 @@ async function initKeycloakView() {
   if (kcData) return;
   try {
     const [res, liveRes] = await Promise.all([
-      fetch('/dashboard/api/keycloak/info'),
-      fetch('/dashboard/api/keycloak/users/live').catch(() => null),
+      fetch(`${API_BASE}/api/keycloak/info`),
+      fetch(`${API_BASE}/api/keycloak/users/live`).catch(() => null),
     ]);
     kcData = await res.json();
     // The realm export and the live Keycloak users are two independent sources.
@@ -3361,8 +3386,8 @@ async function initModelView() {
 async function _loadModelUsers() {
   try {
     const [kcRes, liveRes] = await Promise.all([
-      fetch('/dashboard/api/keycloak/info'),
-      fetch('/dashboard/api/keycloak/users/live').catch(() => null),
+      fetch(`${API_BASE}/api/keycloak/info`),
+      fetch(`${API_BASE}/api/keycloak/users/live`).catch(() => null),
     ]);
     const kcData = kcRes.ok ? await kcRes.json() : { users: [] };
     const liveUsers = (liveRes && liveRes.ok) ? await liveRes.json() : [];
@@ -3495,7 +3520,7 @@ async function fetchModelMetrics() {
   const updatedEl = document.getElementById('model-metrics-updated');
   if (!grid) return;
   try {
-    const res = await fetch('/dashboard/api/recommendation/metrics');
+    const res = await fetch(`${API_BASE}/api/recommendation/metrics`);
     if (!res.ok) throw new Error('No metrics');
     const m = await res.json();
     if (updatedEl && m.trained_at) {
@@ -3537,7 +3562,7 @@ async function fetchModelStatus() {
   const statusVal = document.getElementById('model-status-val');
   const trainedVal = document.getElementById('model-trained-val');
   try {
-    const res = await fetch('/dashboard/api/recommendation/status');
+    const res = await fetch(`${API_BASE}/api/recommendation/status`);
     const data = await res.json();
     if (data.is_training_in_progress) {
       statusVal.textContent = 'Training...';
@@ -3562,7 +3587,7 @@ async function trainModel() {
   const tracker = startProgressBar('model', 'model-progress-container', 'model-progress-bar', 'model-progress-pct', 5);
 
   try {
-    const res = await fetch('/dashboard/api/recommendation/train', { method: 'POST' });
+    const res = await fetch(`${API_BASE}/api/recommendation/train`, { method: 'POST' });
     const data = await res.json();
     showToast(data.message || 'Model training started!', 'success');
     
@@ -3570,7 +3595,7 @@ async function trainModel() {
     const interval = setInterval(async () => {
       attempts++;
       try {
-        const sRes = await fetch('/dashboard/api/recommendation/status');
+        const sRes = await fetch(`${API_BASE}/api/recommendation/status`);
         const sData = await sRes.json();
         fetchModelStatus(); // update UI display
         if (!sData.is_training_in_progress || attempts > 20) {
@@ -3620,7 +3645,7 @@ async function fetchModelRecommendations() {
 
   try {
     const [res, catMap] = await Promise.all([
-      fetch(`/dashboard/api/recommend?user_id=${userId}&limit=10`),
+      fetch(`${API_BASE}/api/recommend?user_id=${userId}&limit=10`),
       _fetchCategoryMap(),
     ]);
     const data = await res.json();
@@ -3961,7 +3986,7 @@ function runCIPipeline() {
   document.getElementById('ci-status').innerHTML = '<div class="dot-streaming"></div><span style="color:var(--blue);">Running</span>';
 
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  ciWs = new WebSocket(`${proto}://${location.host}/dashboard/ws/ci`);
+  ciWs = new WebSocket(`${proto}://${location.host}${API_BASE}/ws/ci`);
   ciProgressTimer = setInterval(() => { if (ciWs) updateCIProgress(); }, 1000);
 
   let _lineBuf = '';
@@ -4234,7 +4259,7 @@ function startTestRunner(spec) {
   renderTestScenarioList();
 
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  testsWs = new WebSocket(`${proto}://${location.host}/dashboard/ws/tests?spec=${encodeURIComponent(spec)}`);
+  testsWs = new WebSocket(`${proto}://${location.host}${API_BASE}/ws/tests?spec=${encodeURIComponent(spec)}`);
   testProgressTimer = setInterval(() => { if (testsWs) updateTestProgress(); }, 1000);
 
   let _lineBuf = '';
@@ -4736,7 +4761,7 @@ function _setVulnScanBtn(activeType) {
 function _runSingleScanWs(type) {
   return new Promise((resolve) => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${proto}://${location.host}/dashboard/ws/vulnerability?type=${type}`);
+    const ws = new WebSocket(`${proto}://${location.host}${API_BASE}/ws/vulnerability?type=${type}`);
     vulnWs = ws;
     let _lineBuf = '';
     let _passed = false;
@@ -4922,7 +4947,7 @@ const telemetryHistory = { mysql: [], redis: [], kong: [], timestamps: [] };
 
 async function fetchTelemetry() {
   try {
-    const res = await fetch('/dashboard/api/telemetry');
+    const res = await fetch(`${API_BASE}/api/telemetry`);
     const data = await res.json();
 
     const dbEl = document.getElementById('tel-kong-db');
@@ -5172,7 +5197,7 @@ function initPipelineView() {
 
 async function loadPipelineStatus() {
   try {
-    const r = await fetch('/dashboard/api/pipeline/status');
+    const r = await fetch(`${API_BASE}/api/pipeline/status`);
     const data = await r.json();
     const el = document.getElementById('pipeline-dag-status');
     if (el) {
@@ -5191,7 +5216,7 @@ async function loadPipelineRuns() {
   container.innerHTML = '<div style="color:var(--text-secondary);font-size:13px;text-align:center;padding:24px;">Loading...</div>';
 
   try {
-    const r = await fetch('/dashboard/api/pipeline/runs?limit=15');
+    const r = await fetch(`${API_BASE}/api/pipeline/runs?limit=15`);
     const data = await r.json();
     const runs = data.dag_runs || [];
 
@@ -5268,7 +5293,7 @@ async function fetchTaskInstances(runId) {
   table.innerHTML = '<tr><td colspan="5" style="color:var(--text-secondary);text-align:center;padding:16px;">Loading...</td></tr>';
 
   try {
-    const r = await fetch(`/dashboard/api/pipeline/runs/${encodeURIComponent(runId)}/tasks`);
+    const r = await fetch(`${API_BASE}/api/pipeline/runs/${encodeURIComponent(runId)}/tasks`);
     const data = await r.json();
     const tasks = (data.task_instances || []).sort((a, b) =>
       TASK_ORDER.indexOf(a.task_id) - TASK_ORDER.indexOf(b.task_id));
@@ -5350,7 +5375,7 @@ function fmtDuration(ms) {
 
 async function triggerPipeline() {
   try {
-    const r = await fetch('/dashboard/api/pipeline/trigger', { method: 'POST' });
+    const r = await fetch(`${API_BASE}/api/pipeline/trigger`, { method: 'POST' });
     const data = await r.json();
     if (r.ok) {
       showToast('Pipeline triggered: ' + (data.dag_run_id || ''), 'success');
@@ -5377,7 +5402,7 @@ async function showTaskLog(runId, taskId, tryNumber) {
 
   try {
     const r = await fetch(
-      `/dashboard/api/pipeline/task-logs?runId=${encodeURIComponent(runId)}&taskId=${encodeURIComponent(taskId)}&try=${tryNumber}`
+      `${API_BASE}/api/pipeline/task-logs?runId=${encodeURIComponent(runId)}&taskId=${encodeURIComponent(taskId)}&try=${tryNumber}`
     );
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || data.error);
@@ -5435,7 +5460,7 @@ async function openLayerModal(layer) {
   setLayerDataState('empty');
 
   try {
-    const r = await fetch(`/dashboard/api/pipeline/layer/${layer}/files`);
+    const r = await fetch(`${API_BASE}/api/pipeline/layer/${layer}/files`);
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || data.error);
     document.getElementById('layer-modal-bucket').textContent = data.bucket || '';
@@ -5489,7 +5514,7 @@ function renderLayerFileList(layer, files) {
 async function loadLayerData(layer, file) {
   setLayerDataState('loading');
   try {
-    const r = await fetch(`/dashboard/api/pipeline/layer/${layer}/data?file=${encodeURIComponent(file)}`);
+    const r = await fetch(`${API_BASE}/api/pipeline/layer/${layer}/data?file=${encodeURIComponent(file)}`);
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || data.error);
     renderLayerDataTable(data.schema || [], data.rows || []);
@@ -5831,7 +5856,7 @@ let _superadminEmailCache = null;
 async function _fetchSuperadminEmail() {
   if (_superadminEmailCache) return;
   try {
-    const tr = await fetch('/dashboard/api/superadmin-token');
+    const tr = await fetch(`${API_BASE}/api/superadmin-token`);
     if (!tr.ok) return;
     const td = await tr.json();
     const r = await fetch('/api/uam/userinfo', { headers: { Authorization: `Bearer ${td.token}` } });
@@ -5848,7 +5873,7 @@ async function _fetchFirstGeoId() {
   await _fetchSuperadminEmail();
   if (!_superadminEmailCache) return;
   try {
-    const tr = await fetch('/dashboard/api/superadmin-token');
+    const tr = await fetch(`${API_BASE}/api/superadmin-token`);
     if (!tr.ok) return;
     const td = await tr.json();
     const r = await fetch(`/api/geo?user_id=${encodeURIComponent(_superadminEmailCache)}`, {
@@ -5867,7 +5892,7 @@ let _firstPaymentMethodIdCache = null;
 async function _fetchFirstPaymentMethodId() {
   if (_firstPaymentMethodIdCache) return;
   try {
-    const tr = await fetch('/dashboard/api/superadmin-token');
+    const tr = await fetch(`${API_BASE}/api/superadmin-token`);
     if (!tr.ok) return;
     const td = await tr.json();
     const r = await fetch('/api/payment-method', { headers: { Authorization: `Bearer ${td.token}` } });
@@ -5885,7 +5910,7 @@ async function _fetchSellerToken() {
   try {
     // Use the dashboard's server-side token proxy (reliable, no browser Origin
     // check) instead of calling Keycloak directly from the browser.
-    const r = await fetch('/dashboard/api/seller-token');
+    const r = await fetch(`${API_BASE}/api/seller-token`);
     if (!r.ok) return;
     const d = await r.json();
     _sellerTokenCache = d.token || '';
@@ -5897,7 +5922,7 @@ let _firstUserIdCache = null;
 async function _fetchFirstUserId() {
   if (_firstUserIdCache) return;
   try {
-    const r = await fetch('/dashboard/api/first-user-id');
+    const r = await fetch(`${API_BASE}/api/first-user-id`);
     if (!r.ok) return;
     const d = await r.json();
     _firstUserIdCache = d.id || '';

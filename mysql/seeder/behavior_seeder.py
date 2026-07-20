@@ -21,6 +21,13 @@ MYSQL_USER = os.getenv("MYSQL_USER", "mocktenusr")
 MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "mocktenpassword")
 MYSQL_DB = os.getenv("MYSQL_DB", "mocktendb")
 RANKING_API = os.getenv("RANKING_API", "http://localhost/api/ranking/update")
+# Same treatment as RANKING_API. This was hardcoded, which made seeding a remote
+# cluster silently train nothing: the POST went to whatever was listening on the
+# local port 80 and reported success, so the log said the model had been trained
+# while the target environment's model stayed empty.
+RECOMMENDATION_TRAIN_API = os.getenv(
+    "RECOMMENDATION_TRAIN_API", "http://localhost/api/recommendation/train"
+)
 
 ACOUSTIC_GUITAR_PRODUCT_ID = os.getenv("ACOUSTIC_GUITAR_PRODUCT_ID", "9f9a6e2a-0cd8-4228-b80c-7b2fbfd5db6b")
 
@@ -196,9 +203,11 @@ def main():
             
             # Trigger recommendation model training
             try:
-                print("Triggering recommendation model training...")
-                train_url = "http://localhost/api/recommendation/train"
-                resp = requests.post(train_url, json={}, timeout=5)
+                # Name the target: "training triggered" against the wrong host
+                # reads as success, which is how a remote cluster ended up with
+                # an untrained model while this log said otherwise.
+                print(f"Triggering recommendation model training at {RECOMMENDATION_TRAIN_API} ...")
+                resp = requests.post(RECOMMENDATION_TRAIN_API, json={}, timeout=5)
                 if resp.status_code == 200:
                     print("Successfully triggered recommendation model training.")
                 else:
