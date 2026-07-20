@@ -219,7 +219,12 @@ function install(app, { enabled, apigwBaseUrl }) {
     if (PUBLIC_PATHS.has(req.path)) return next();
     if (sessionFrom(req)) return next();
     // XHR gets a 401 to act on; a browser navigation gets the login page.
-    if (req.path.startsWith('/api/')) {
+    // /ws/ counts as the former: a real upgrade never reaches this middleware
+    // (Node routes it to the 'upgrade' event, guarded by allowsUpgrade below),
+    // but a plain GET to a /ws/ path does, and answering it with a redirect is
+    // misleading — WebSocket clients don't follow redirects, so 401 is the
+    // honest answer for anything under /ws/.
+    if (req.path.startsWith('/api/') || req.path.startsWith('/ws/')) {
       return res.status(401).json({ error: 'Authentication required.' });
     }
     res.redirect('./login');
