@@ -23,6 +23,22 @@ const API_BASE = (() => {
   return '';
 })();
 
+/**
+ * Where the *platform* API lives, as opposed to this console's own.
+ *
+ * These are two different services. /api/containers is the dashboard; /api/uam,
+ * /api/categories, /api/search are the gateway. In dev both answer on one
+ * origin so a bare /api/... reached the gateway via nginx. In cloud the
+ * dashboard owns its host, so that same path lands on the dashboard's own
+ * Express — the console ends up interrogating itself and gets a 404 or its own
+ * auth error.
+ *
+ * Both go through this origin: the server relays /api/gw/* to the gateway
+ * in-cluster. That keeps every request same-origin (no CORS on the gateway or
+ * on Keycloak) and keeps one code path for both deployments.
+ */
+const PLATFORM_API = `${API_BASE}/api/gw`;
+
 // ── State ──────────────────────────────────────────────────────────────────
 let allContainers = [];
 let statsCache = {};
@@ -2291,7 +2307,7 @@ const API_SCHEMAS = {
     { name: 'description',      location: 'body', type: 'string',  desc: 'Product description',                                     desc_ja: '商品説明',                   desc_zh: '商品描述',         required: false, default: 'High-dose vitamin C supplement.' },
     { name: 'price',            location: 'body', type: 'number',  desc: 'Selling price in JPY',                                    desc_ja: '販売価格（円）',             desc_zh: '售价（日元）',     required: true,  default: 1980 },
     { name: 'comparePrice',     location: 'body', type: 'number',  desc: 'Original price (> price triggers sale flag)',             desc_ja: '元の価格（priceより高いとセール扱い）', desc_zh: '原价（高于price则触发促销）', required: false, default: 0 },
-    { name: 'category_id',      location: 'body', type: 'string',  desc: 'Category ID from /api/seller/categories',                 desc_ja: '/api/seller/categoriesのカテゴリID', desc_zh: '来自/api/seller/categories的分类ID', required: true, default: '1' },
+    { name: 'category_id',      location: 'body', type: 'string',  desc: 'Category ID from /api/seller/categories',                 desc_ja: `${PLATFORM_API}/seller/categoriesのカテゴリID`, desc_zh: '来自/api/seller/categories的分类ID', required: true, default: '1' },
     { name: 'product_condition',location: 'body', type: 'string',  desc: '"new" or "used" (defaults to "new")',                     desc_ja: '"new"または"used"（デフォルト: "new"）', desc_zh: '"new"或"used"（默认"new"）', required: false, default: 'new' },
     { name: 'stock',            location: 'body', type: 'integer', desc: 'Initial stock quantity',                                  desc_ja: '初期在庫数',                 desc_zh: '初始库存数量',     required: true,  default: 100 },
     { name: 'status',           location: 'body', type: 'boolean', desc: 'Active status (true = active)',                           desc_ja: '公開状態（true=有効）',       desc_zh: '上架状态（true=上架）', required: false, default: true }
@@ -2769,11 +2785,11 @@ const API_RESPONSE_SCHEMAS = {
 // Overrides the path used in the Test Request form when the Kong route path
 // differs from the actual service endpoint (e.g. Kong /api/sale → /api/sale/active).
 const API_TEST_PATH_OVERRIDES = {
-  'GET /api/sale': '/api/sale/active',
+  'GET /api/sale': `${PLATFORM_API}/sale/active`,
   // The ranking-update handler lives at /api/ranking/update (Kong prefix-matches /api/ranking).
-  'POST /api/ranking': '/api/ranking/update',
+  'POST /api/ranking': `${PLATFORM_API}/ranking/update`,
   // "Update payment method" is really "set as default", served at /default.
-  'PUT /api/payment-method': '/api/payment-method/default',
+  'PUT /api/payment-method': `${PLATFORM_API}/payment-method/default`,
 };
 
 function _normalizePath(path) {
@@ -3179,14 +3195,19 @@ async function sendTestRequest() {
       }
     }
 
-    let url = path;
+    // These paths come from kong.yaml, so they are gateway routes and must go
+    // through the platform proxy — not to this console, which is what a bare
+    // /api/... resolves to once the dashboard has a host of its own.
+    let url = path.startsWith('/api/')
+      ? `${PLATFORM_API}${path.slice('/api'.length)}`
+      : path;
     const qStr = queryParams.toString();
     if (qStr) {
       url += (url.includes('?') ? '&' : '?') + qStr;
     }
 
     // Endpoints that require form-urlencoded (OAuth2 token endpoints)
-    const isFormEncoded = url === '/api/uam/token';
+    const isFormEncoded = url === `${PLATFORM_API}/uam/token`;
     // Skip auto-auth if the schema provides an explicit Authorization header, or it's the auth endpoint itself
     const skipAutoAuth = isFormEncoded || 'Authorization' in explicitHeaders;
 
@@ -3628,7 +3649,7 @@ let _categoryMapCache = null;
 async function _fetchCategoryMap() {
   if (_categoryMapCache) return _categoryMapCache;
   try {
-    const r = await fetch('/api/categories');
+    const r = await fetch(`${PLATFORM_API}/categories`);
     const d = await r.json();
     _categoryMapCache = {};
     (Array.isArray(d) ? d : []).forEach(c => {
@@ -5833,7 +5854,7 @@ let _firstProductNameCache = null;
 async function _fetchFirstProduct() {
   if (_firstProductIdCache) return;
   try {
-    const r = await fetch('/api/search');
+    const r = await fetch(`${PLATFORM_API}/search`);
     const d = await r.json();
     const item = d.items?.[0];
     if (item) {
@@ -5859,7 +5880,7 @@ async function _fetchSuperadminEmail() {
     const tr = await fetch(`${API_BASE}/api/superadmin-token`);
     if (!tr.ok) return;
     const td = await tr.json();
-    const r = await fetch('/api/uam/userinfo', { headers: { Authorization: `Bearer ${td.token}` } });
+    const r = await fetch(`${PLATFORM_API}/uam/userinfo`, { headers: { Authorization: `Bearer ${td.token}` } });
     if (!r.ok) return;
     const d = await r.json();
     _superadminEmailCache = d.email || d.preferred_username || '';
@@ -5876,7 +5897,7 @@ async function _fetchFirstGeoId() {
     const tr = await fetch(`${API_BASE}/api/superadmin-token`);
     if (!tr.ok) return;
     const td = await tr.json();
-    const r = await fetch(`/api/geo?user_id=${encodeURIComponent(_superadminEmailCache)}`, {
+    const r = await fetch(`${PLATFORM_API}/geo?user_id=${encodeURIComponent(_superadminEmailCache)}`, {
       headers: { Authorization: `Bearer ${td.token}` }
     });
     if (!r.ok) return;
@@ -5895,7 +5916,7 @@ async function _fetchFirstPaymentMethodId() {
     const tr = await fetch(`${API_BASE}/api/superadmin-token`);
     if (!tr.ok) return;
     const td = await tr.json();
-    const r = await fetch('/api/payment-method', { headers: { Authorization: `Bearer ${td.token}` } });
+    const r = await fetch(`${PLATFORM_API}/payment-method`, { headers: { Authorization: `Bearer ${td.token}` } });
     if (!r.ok) return;
     const d = await r.json();
     const first = Array.isArray(d) ? d[0] : null;
@@ -5936,7 +5957,7 @@ async function _fetchFirstSellerProductId() {
   try {
     await _fetchSellerToken();
     if (!_sellerTokenCache) return;
-    const r = await fetch('/api/seller/products?limit=1', { headers: { Authorization: `Bearer ${_sellerTokenCache}` } });
+    const r = await fetch(`${PLATFORM_API}/seller/products?limit=1`, { headers: { Authorization: `Bearer ${_sellerTokenCache}` } });
     if (!r.ok) return;
     const d = await r.json();
     const first = d.products?.[0];

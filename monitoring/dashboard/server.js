@@ -657,6 +657,60 @@ function parseKongYaml() {
   }
 }
 
+// ── Platform API proxy ───────────────────────────────────────────────────────
+/**
+ * The console calls two different APIs: its own (/api/containers, /api/ready,
+ * …) and the platform's, through the gateway (/api/uam/*, /api/categories, …).
+ *
+ * In dev both answer on one origin, so the SPA could address the platform with
+ * a bare /api/... and nginx routed it to the gateway. In cloud the dashboard
+ * owns its host, so that same path resolves to the dashboard's own Express and
+ * the gateway is never reached — the console silently talks to itself.
+ *
+ * Rather than have the SPA build cross-origin URLs (which needs CORS on both
+ * the gateway and Keycloak), the browser keeps talking to this origin and the
+ * server relays in-cluster. Same-origin in both deployments, one code path in
+ * the SPA, and no new public surface: this sits behind the same auth guard as
+ * everything else.
+ */
+// Keep non-JSON bodies (multipart file uploads, form posts) intact as a Buffer.
+// express.json() above only handles application/json and leaves req.body empty
+// for everything else, which would silently drop an upload's payload.
+app.use('/api/gw', express.raw({ type: req => !/application\/json/i.test(req.headers['content-type'] || ''), limit: '25mb' }));
+
+app.all('/api/gw/*', async (req, res) => {
+  const upstreamPath = req.originalUrl.replace(/^\/api\/gw/, '/api');
+  const url = `${APIGW_BASE_URL}${upstreamPath}`;
+
+  // Pass the caller's Authorization through — several gateway routes need a
+  // bearer token, and the panels that call them already obtain one.
+  const headers = {};
+  if (req.headers.authorization) headers.authorization = req.headers.authorization;
+  if (req.headers['content-type']) headers['content-type'] = req.headers['content-type'];
+
+  const init = { method: req.method, headers };
+  if (!['GET', 'HEAD'].includes(req.method)) {
+    // express.json() has already consumed the body for JSON requests; anything
+    // else arrives as a Buffer via express.raw() below.
+    init.body = Buffer.isBuffer(req.body)
+      ? req.body
+      : (req.body && Object.keys(req.body).length ? JSON.stringify(req.body) : undefined);
+    if (init.body && !headers['content-type']) headers['content-type'] = 'application/json';
+  }
+
+  try {
+    const r = await fetch(url, init);
+    const buf = Buffer.from(await r.arrayBuffer());
+    const ct = r.headers.get('content-type');
+    if (ct) res.set('content-type', ct);
+    res.status(r.status).send(buf);
+  } catch (err) {
+    // Name the upstream: "the console cannot reach the gateway" is a different
+    // problem from "the gateway said no", and they get diagnosed differently.
+    res.status(502).json({ error: `Gateway unreachable at ${APIGW_BASE_URL}: ${err.message}` });
+  }
+});
+
 // ── REST API Extensions ───────────────────────────────────────────────────────
 // Cache superadmin token (expires ~5min; refresh on demand)
 let _superadminToken = null;
