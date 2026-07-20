@@ -2082,7 +2082,7 @@ const API_SCHEMAS = {
   ],
   'GET /api/uam/auth': [
     { name: 'response_type', location: 'query', type: 'string', desc: 'Must be "code" for authorization code flow', desc_ja: '認可コードフローには"code"を指定',          desc_zh: '授权码流程必须填"code"',          required: true,  default: 'code' },
-    { name: 'redirect_uri',  location: 'query', type: 'string', desc: 'Callback URL after login',                   desc_ja: 'ログイン後のコールバックURL',              desc_zh: '登录后的回调URL',                 required: true,  default: 'http://localhost/callback' },
+    { name: 'redirect_uri',  location: 'query', type: 'string', desc: 'Callback URL after login',                   desc_ja: 'ログイン後のコールバックURL',              desc_zh: '登录后的回调URL',                 required: true,  default: (CAPS.urls && CAPS.urls.storefront ? CAPS.urls.storefront.replace(/\/$/, '') : window.location.origin) + '/callback' },
     { name: 'scope',         location: 'query', type: 'string', desc: 'Requested scopes (space-separated)',          desc_ja: 'リクエストするスコープ（スペース区切り）', desc_zh: '请求的范围（空格分隔）',           required: false, default: 'openid profile email' },
     { name: 'state',         location: 'query', type: 'string', desc: 'Random string for CSRF protection',           desc_ja: 'CSRF対策用ランダム文字列',               desc_zh: 'CSRF防护用随机字符串',             required: false, default: '' },
     { name: 'nonce',         location: 'query', type: 'string', desc: 'Nonce embedded in ID token',                  desc_ja: 'IDトークンに埋め込まれるnonce',          desc_zh: '嵌入ID令牌的nonce值',              required: false, default: '' },
@@ -2307,7 +2307,7 @@ const API_SCHEMAS = {
     { name: 'description',      location: 'body', type: 'string',  desc: 'Product description',                                     desc_ja: '商品説明',                   desc_zh: '商品描述',         required: false, default: 'High-dose vitamin C supplement.' },
     { name: 'price',            location: 'body', type: 'number',  desc: 'Selling price in JPY',                                    desc_ja: '販売価格（円）',             desc_zh: '售价（日元）',     required: true,  default: 1980 },
     { name: 'comparePrice',     location: 'body', type: 'number',  desc: 'Original price (> price triggers sale flag)',             desc_ja: '元の価格（priceより高いとセール扱い）', desc_zh: '原价（高于price则触发促销）', required: false, default: 0 },
-    { name: 'category_id',      location: 'body', type: 'string',  desc: 'Category ID from /api/seller/categories',                 desc_ja: `${PLATFORM_API}/seller/categoriesのカテゴリID`, desc_zh: '来自/api/seller/categories的分类ID', required: true, default: '1' },
+    { name: 'category_id',      location: 'body', type: 'string',  desc: 'Category ID from /api/seller/categories',                 desc_ja: '/api/seller/categoriesのカテゴリID', desc_zh: '来自/api/seller/categories的分类ID', required: true, default: '1' },
     { name: 'product_condition',location: 'body', type: 'string',  desc: '"new" or "used" (defaults to "new")',                     desc_ja: '"new"または"used"（デフォルト: "new"）', desc_zh: '"new"或"used"（默认"new"）', required: false, default: 'new' },
     { name: 'stock',            location: 'body', type: 'integer', desc: 'Initial stock quantity',                                  desc_ja: '初期在庫数',                 desc_zh: '初始库存数量',     required: true,  default: 100 },
     { name: 'status',           location: 'body', type: 'boolean', desc: 'Active status (true = active)',                           desc_ja: '公開状態（true=有効）',       desc_zh: '上架状态（true=上架）', required: false, default: true }
@@ -2785,11 +2785,11 @@ const API_RESPONSE_SCHEMAS = {
 // Overrides the path used in the Test Request form when the Kong route path
 // differs from the actual service endpoint (e.g. Kong /api/sale → /api/sale/active).
 const API_TEST_PATH_OVERRIDES = {
-  'GET /api/sale': `${PLATFORM_API}/sale/active`,
+  'GET /api/sale': '/api/sale/active',
   // The ranking-update handler lives at /api/ranking/update (Kong prefix-matches /api/ranking).
-  'POST /api/ranking': `${PLATFORM_API}/ranking/update`,
+  'POST /api/ranking': '/api/ranking/update',
   // "Update payment method" is really "set as default", served at /default.
-  'PUT /api/payment-method': `${PLATFORM_API}/payment-method/default`,
+  'PUT /api/payment-method': '/api/payment-method/default',
 };
 
 function _normalizePath(path) {
@@ -3198,9 +3198,20 @@ async function sendTestRequest() {
     // These paths come from kong.yaml, so they are gateway routes and must go
     // through the platform proxy — not to this console, which is what a bare
     // /api/... resolves to once the dashboard has a host of its own.
-    let url = path.startsWith('/api/')
-      ? `${PLATFORM_API}${path.slice('/api'.length)}`
-      : path;
+    //
+    // Except when the gateway's upstream is this console: routing
+    // browser → dashboard → Kong → dashboard just to come back here costs a
+    // round trip and loses the session, because the relay deliberately does not
+    // forward the console's cookie to the gateway. Call ourselves directly.
+    const upstreamIsSelf = /\/\/dashboard-service\b/.test(svc.url || '');
+    let url;
+    if (!path.startsWith('/api/')) {
+      url = path;
+    } else if (upstreamIsSelf) {
+      url = `${API_BASE}${path}`;
+    } else {
+      url = `${PLATFORM_API}${path.slice('/api'.length)}`;
+    }
     const qStr = queryParams.toString();
     if (qStr) {
       url += (url.includes('?') ? '&' : '?') + qStr;
