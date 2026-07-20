@@ -70,6 +70,22 @@ for key in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET FACEBOOK_CLIENT_ID FACEBOOK_CLI
   fi
 done
 
+# Cloud runs Keycloak in production mode behind a TLS-terminating ingress.
+#
+# start-dev would serve fine, but it does not trust X-Forwarded-* — Keycloak
+# would conclude it is running on plain HTTP and hand Google an http:// redirect
+#_uri, which the provider rejects. Hence production mode plus:
+#
+#   --proxy-headers=xforwarded  trust the ingress's X-Forwarded-* headers.
+#                               (The old --proxy=edge spelling was removed in
+#                               Keycloak 25; it crashes on boot with 26.)
+#   --hostname=https://<domain> pin the frontend URL instead of deriving it from
+#                               request headers, so the redirect_uri is https://
+#                               by construction rather than by trusting a header.
+#
+# --hostname-strict is deliberately absent: passing a full URL to --hostname
+# already fixes the scheme, and leaving strict at its default keeps Keycloak
+# from resolving the hostname off request headers.
 if [ "$MOCKTEN_MODE" = "cloud" ]; then
   echo "Starting Keycloak in production mode (cloud)..."
   exec /opt/keycloak/bin/kc.sh start \
@@ -84,8 +100,8 @@ if [ "$MOCKTEN_MODE" = "cloud" ]; then
     --cache=local \
     --http-port=80 \
     --http-enabled=true \
-    --proxy=edge \
-    --hostname-strict=false \
+    --proxy-headers=xforwarded \
+    --hostname=https://${PUBLIC_BASE_DOMAIN} \
     --log-level=WARN
 else
   echo "Starting Keycloak in dev mode..."

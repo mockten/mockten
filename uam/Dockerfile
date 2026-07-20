@@ -1,4 +1,9 @@
-FROM quay.io/keycloak/keycloak:latest
+# Pinned, not :latest. Keycloak removes CLI options across majors — :latest
+# silently moved us onto 26.x, where the old --proxy=edge spelling no longer
+# exists, and the container crash-looped on a build that had changed nothing.
+# A build that passed yesterday must not break today because upstream released.
+# Pinned to a full patch version: the floating 26.7 tag would still drift.
+FROM quay.io/keycloak/keycloak:26.7.0
 
 ENV KEYCLOAK_ADMIN=admin
 ENV KEYCLOAK_ADMIN_PASSWORD=admin
