@@ -151,10 +151,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (isDashboardActive) fetchReady();
-    
+
     if (isDashboardActive) {
       fetchTelemetry();
     }
+
+    // Access Management's live users change out of band (a sign-up, a new
+    // admin); refresh them while the panel is open so it isn't stuck on its
+    // first read until a full page reload.
+    if (document.getElementById('view-keycloak')?.classList.contains('active')) refreshKcUsers();
   }, 5000);
 });
 
@@ -418,6 +423,9 @@ async function loadMetricsHistory() {
 function refresh() {
   fetchContainers();
   fetchFrontendStatus();
+  // The refresh button should refresh whatever the operator is looking at, not
+  // only the container list — Access Management's user list included.
+  if (document.getElementById('view-keycloak')?.classList.contains('active')) refreshKcUsers();
   const btn = document.querySelector('.btn-refresh svg');
   btn.style.animation = 'spin 0.5s linear';
   setTimeout(() => btn.style.animation = '', 600);
@@ -3301,26 +3309,45 @@ async function sendTestRequest() {
 // ── Keycloak info ───────────────────────────────────────────────────────────────
 let kcData = null;
 async function initKeycloakView() {
-  if (kcData) return;
   try {
-    const [res, liveRes] = await Promise.all([
-      fetch(`${API_BASE}/api/keycloak/info`),
-      fetch(`${API_BASE}/api/keycloak/users/live`).catch(() => null),
-    ]);
-    kcData = await res.json();
-    // The realm export and the live Keycloak users are two independent sources.
-    // Losing the file (it isn't mounted outside DEV) used to throw here and blank
-    // the whole panel — including the live users, which had loaded fine. Degrade
-    // to whatever is available instead.
-    if (!kcData || kcData.error) {
-      console.warn('[keycloak] realm export unavailable:', kcData && kcData.error);
-      kcData = { users: [], clients: [], roles: [], groups: [] };
+    // The realm export (clients/roles/groups) is immutable, so load it once.
+    // The live users are not — a sign-up or a new admin changes them — so they
+    // are refreshed separately, below and on every timer tick. Loading the whole
+    // panel once was why a new user only appeared after a full page reload.
+    if (!kcData) {
+      const res = await fetch(`${API_BASE}/api/keycloak/info`);
+      kcData = await res.json();
+      // Losing the file (it isn't mounted outside DEV) used to throw here and
+      // blank the whole panel. Degrade to whatever is available instead.
+      if (!kcData || kcData.error) {
+        console.warn('[keycloak] realm export unavailable:', kcData && kcData.error);
+        kcData = { users: [], clients: [], roles: [], groups: [] };
+      }
+      // Keep the file-defined users apart from the live ones so a refresh can
+      // rebuild the list without doubling them.
+      kcData.staticUsers = [...(kcData.users || [])];
+      renderKcClients(kcData.clients);
+      renderKcRolesAndGroups(kcData.roles, kcData.groups);
     }
+    await refreshKcUsers();
+  } catch (e) {
+    showToast('Keycloak config error: ' + e.message, 'error');
+  }
+}
 
-    // Merge live Keycloak users (includes Google SSO) into kcData.users
+/**
+ * Re-fetch the live Keycloak users and rebuild the table. Called when the panel
+ * opens, on the auto-refresh tick while it's visible, and from the refresh
+ * button — so the list reflects sign-ups without a full page reload.
+ */
+async function refreshKcUsers() {
+  if (!kcData) return;
+  let users = [...(kcData.staticUsers || [])];
+  try {
+    const liveRes = await fetch(`${API_BASE}/api/keycloak/users/live`).catch(() => null);
     if (liveRes && liveRes.ok) {
       const liveUsers = await liveRes.json();
-      const staticUsernames = new Set((kcData.users || []).map(u => u.username));
+      const staticUsernames = new Set(users.map(u => u.username));
       const extra = liveUsers
         .filter(u => u.username && !staticUsernames.has(u.username) && !u.username.startsWith('service-account-'))
         .map(u => ({
@@ -3333,15 +3360,11 @@ async function initKeycloakView() {
           realmRoles: [],
           attributes: {},
         }));
-      kcData.users = [...(kcData.users || []), ...extra];
+      users = [...users, ...extra];
     }
-
-    renderKcUsers(kcData.users);
-    renderKcClients(kcData.clients);
-    renderKcRolesAndGroups(kcData.roles, kcData.groups);
-  } catch (e) {
-    showToast('Keycloak config error: ' + e.message, 'error');
-  }
+  } catch { /* keep the static users if the live fetch fails */ }
+  kcData.users = users;
+  renderKcUsers(kcData.users);
 }
 
 function renderKcUsers(users) {
