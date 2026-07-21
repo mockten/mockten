@@ -429,6 +429,14 @@ function refresh() {
  * that is outstanding — "PENDING" alone tells you to go looking, not where.
  */
 async function fetchReady() {
+  const card = document.getElementById('ready-card');
+  // Readiness is a cloud concern: it answers "is the public deployment usable"
+  // (model trained AND HTTPS serving). In DEV the stack is always local and
+  // HTTPS never applies, so the card is noise — hide it and don't poll.
+  if (CAPS.deployment !== 'cloud') {
+    if (card) card.style.display = 'none';
+    return;
+  }
   const value = document.getElementById('stat-ready');
   const detail = document.getElementById('ready-detail');
   const icon = document.getElementById('ready-icon');
@@ -1262,6 +1270,12 @@ function switchDbTab(tabName) {
   // Hide add buttons until a table/collection is loaded
   const mysqlAdd = document.getElementById('btn-mysql-add-row');
   if (mysqlAdd) mysqlAdd.style.display = 'none';
+
+  // Redis keys are loaded once at DB-view init. If keys were written after that
+  // (a cart, a ranking counter), the panel keeps showing the empty first read
+  // because nothing reloads it. MySQL sidesteps this — you click a table to see
+  // rows — but Redis has no such trigger, so refresh it whenever its tab opens.
+  if (tabName === 'redis') loadRedisKeys();
 }
 
 // ─── Add Row Modal & Submissions ──────────────────────────────────────────────

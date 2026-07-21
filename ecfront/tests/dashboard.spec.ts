@@ -114,6 +114,15 @@ test.describe('Dashboard Enhancements Spec', () => {
 
     await page.locator('nav .nav-item').getByText('Dashboard', { exact: true }).click();
     const card = page.locator('#ready-card');
+
+    // The card is a cloud concern — "is the public deployment usable". In dev
+    // the stack is always local and HTTPS never applies, so the card is hidden
+    // as noise rather than shown permanently green.
+    if (!isCloud) {
+      await expect(card).toBeHidden();
+      return;
+    }
+
     await expect(card).toBeVisible();
     await expect(page.locator('#stat-ready')).toHaveText(ready ? 'READY' : 'PENDING');
 
