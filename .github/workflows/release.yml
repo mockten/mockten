@@ -429,3 +429,28 @@ jobs:
         export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/seeder"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
+
+  # Cut a GitHub Release for whatever ref this workflow was dispatched on (any
+  # branch — this is workflow_dispatch, so no main required). The tag is the same
+  # 1.<run_number> baked into the dashboard image above, so the version the
+  # dashboard shows always maps to a real Release. Idempotent: a re-run reuses the
+  # run number, so an existing tag is skipped instead of failing the run.
+  create-release:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+
+    - name: Create GitHub Release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        VERSION="1.${{ github.run_number }}"
+        if gh release view "$VERSION" >/dev/null 2>&1; then
+          echo "Release $VERSION already exists, skipping."
+        else
+          gh release create "$VERSION" --title "$VERSION" \
+            --generate-notes --target "${{ github.sha }}"
+        fi
