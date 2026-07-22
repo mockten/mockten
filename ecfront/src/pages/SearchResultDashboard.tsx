@@ -1002,7 +1002,7 @@ const SearchResultNew: React.FC = () => {
                             color: 'black',
                           }}
                         >
-                          ${Math.round(product.price * (1 - product.discount_rate))}
+                          ${(product.price * (1 - product.discount_rate)).toFixed(2)}
                         </Typography>
                       </Box>
                     ) : (

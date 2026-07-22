@@ -826,7 +826,7 @@ const ItemDetailNew: React.FC = () => {
                       ${product.price.toLocaleString()}
                     </Typography>
                     <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '22px', color: 'black' }}>
-                      ${Math.round(product.price * (1 - product.discount_rate)).toLocaleString()}
+                      ${(product.price * (1 - product.discount_rate)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                     </Typography>
                   </Box>
                 ) : (

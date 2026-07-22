@@ -82,9 +82,11 @@ const MyCartConfirm: React.FC = () => {
 
       const res = await apiClient.post('/api/payment', {
         payment_method_id: selectedCardId,
-        amount: Math.round(orderSummary.total),
-        subtotal: Math.round(orderSummary.subtotal),
-        shipping: Math.round(orderSummary.shipping),
+        // Cent precision, not whole dollars: rounding a discounted low-price
+        // item to the dollar erased the discount from the charge.
+        amount: Math.round(orderSummary.total * 100) / 100,
+        subtotal: Math.round(orderSummary.subtotal * 100) / 100,
+        shipping: Math.round(orderSummary.shipping * 100) / 100,
         items: cartItems.map((item: any) => ({
           product_id: item.productId || item.id,
           quantity: item.quantity,
@@ -356,7 +358,7 @@ const MyCartConfirm: React.FC = () => {
                           ${item.price.toLocaleString()}
                         </Typography>
                         <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
-                          ${Math.round(item.price * (1 - item.discountRate)).toLocaleString()}
+                          ${(item.price * (1 - item.discountRate)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                         </Typography>
                       </Box>
                     ) : (

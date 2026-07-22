@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -92,9 +93,13 @@ type CartItemReq struct {
 
 type CheckoutRequest struct {
 	PaymentMethodID string        `json:"payment_method_id"`
-	Amount          int64         `json:"amount"` // typically calculated by backend but for mockup here
-	Subtotal        int64         `json:"subtotal"`
-	Shipping        int64         `json:"shipping"`
+	// Money is float, not int: a percentage discount on a low-priced item
+	// produces cents (a $3 item at 10% is $2.70). Rounding these to whole
+	// dollars made the discount vanish below a certain price. The Order/Payment
+	// columns are already DECIMAL(12,2), so these carry straight through.
+	Amount          float64       `json:"amount"`
+	Subtotal        float64       `json:"subtotal"`
+	Shipping        float64       `json:"shipping"`
 	Items           []CartItemReq `json:"items"`
 	TransactionIDs  []string      `json:"transaction_ids"` // shipment-leg transaction ids, used to link the Order
 }
@@ -395,7 +400,7 @@ func handleCreatePayment(c *gin.Context) {
 
 	// Create PaymentIntent
 	params := &stripe.PaymentIntentParams{
-		Amount:        stripe.Int64(req.Amount * 100), // convert to cents assuming USD
+		Amount:        stripe.Int64(int64(math.Round(req.Amount * 100))), // dollars → cents (USD); round at the cent, not the dollar
 		Currency:      stripe.String(string(stripe.CurrencyUSD)),
 		PaymentMethod: stripe.String(spmID),
 		Confirm:       stripe.Bool(true),

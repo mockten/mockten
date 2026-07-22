@@ -296,7 +296,7 @@ const CartListNew: React.FC = () => {
   const calculateSubtotal = () => {
     return cartItems.reduce((total, item) => {
       const activePrice = item.saleFlag && item.discountRate && item.discountRate > 0
-        ? Math.round(item.price * (1 - item.discountRate))
+        ? Math.round(item.price * (1 - item.discountRate) * 100) / 100
         : item.price;
       return total + (activePrice * item.quantity);
     }, 0);
@@ -462,7 +462,7 @@ const CartListNew: React.FC = () => {
                           ${item.price.toLocaleString()}
                         </Typography>
                         <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '18px', color: 'black' }}>
-                          ${Math.round(item.price * (1 - item.discountRate)).toLocaleString()}
+                          ${(item.price * (1 - item.discountRate)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                         </Typography>
                       </Box>
                     ) : (

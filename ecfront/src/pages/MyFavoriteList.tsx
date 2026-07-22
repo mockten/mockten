@@ -221,7 +221,7 @@ const FavoritesListNew: React.FC = () => {
     const selectedShip = item.shippingOptions.find(opt => opt.label === item.selectedShippingLabel) || item.shippingOptions[0];
     
     const discountedPrice = item.saleFlag && item.discountRate && item.discountRate > 0
-      ? Math.round(item.price * (1 - item.discountRate))
+      ? Math.round(item.price * (1 - item.discountRate) * 100) / 100
       : item.price;
 
     const purchaseItem = {
@@ -407,7 +407,7 @@ const FavoritesListNew: React.FC = () => {
                           ${item.price.toLocaleString()}
                         </Typography>
                         <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '18px', color: 'black' }}>
-                          ${Math.round(item.price * (1 - item.discountRate)).toLocaleString()}
+                          ${(item.price * (1 - item.discountRate)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                         </Typography>
                       </Box>
                     ) : (

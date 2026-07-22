@@ -682,7 +682,7 @@ const MyCartCheckout: React.FC = () => {
                             ${item.price.toLocaleString()}
                           </Typography>
                           <Typography sx={{ fontFamily: 'Noto Sans', fontWeight: 'bold', fontSize: '12px', color: 'black' }}>
-                            ${Math.round(item.price * (1 - item.discountRate)).toLocaleString()}
+                            ${(item.price * (1 - item.discountRate)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                           </Typography>
                         </Box>
                       ) : (
