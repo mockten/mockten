@@ -37,5 +37,13 @@ COPY monitoring/dashboard/auth.js .
 COPY monitoring/dashboard/public/ ./public/
 COPY apigw/kong.yaml /app/kong.yaml
 COPY uam/realm-export-dev.json /app/realm-export-dev.json
+
+# The deployed version, baked in by CI (docker build --build-arg APP_VERSION=$VERSION).
+# No default on purpose: DEV builds (task build / docker compose) don't pass it, so
+# APP_VERSION stays empty and the dashboard hides the version badge — only the K8S
+# images that CI publishes carry a value.
+ARG APP_VERSION
+ENV APP_VERSION=${APP_VERSION}
+
 EXPOSE 3001
 CMD ["node", "server.js"]

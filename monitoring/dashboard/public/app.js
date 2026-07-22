@@ -121,6 +121,20 @@ function applyCapabilities() {
       'letter-spacing:0.5px;vertical-align:middle;color:#fff;background:' +
       (isDev ? '#10b981' : '#6366f1') + ';';
     logo.appendChild(badge);
+
+    // Running image version, next to the K8S badge. Only in k8s and only when CI
+    // actually baked one in (DEV builds pass no --build-arg, so appVersion is
+    // empty and no version label appears).
+    if (!isDev && CAPS.appVersion && !document.getElementById('version-badge')) {
+      const ver = document.createElement('span');
+      ver.id = 'version-badge';
+      ver.textContent = 'v' + CAPS.appVersion;
+      ver.title = 'Deployed image version (APP_VERSION)';
+      ver.style.cssText =
+        'margin-left:6px;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;' +
+        'letter-spacing:0.5px;vertical-align:middle;color:#c7d2fe;background:#312e81;';
+      logo.appendChild(ver);
+    }
   }
 }
 

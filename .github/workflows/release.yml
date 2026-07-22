@@ -400,7 +400,32 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/dashboard"
-        # Root context so apigw/kong.yaml can be copied into the image.
-        docker build -f Dockerfile -t $IMAGE_TAG ../..
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/dashboard"
+        # Root context so apigw/kong.yaml can be copied into the image. The running
+        # version is baked in (ARG APP_VERSION) so the dashboard can display it.
+        docker build -f Dockerfile --build-arg APP_VERSION="$VERSION" \
+          -t "$BASE:latest" -t "$BASE:$VERSION" ../..
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
+
+  release-seeder:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: mysql/seeder
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v2
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push the docker image
+      run: |
+        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/seeder"
+        docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG

@@ -537,10 +537,15 @@ jobs:
 
     - name: Build and push container
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository }}/dashboard:latest"
-        # Root context so apigw/kong.yaml can be copied into the image.
-        docker build -f Dockerfile -t $IMAGE_TAG ../..
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository }}/dashboard"
+        # Root context so apigw/kong.yaml can be copied into the image. The
+        # running version is baked in (Dockerfile ARG APP_VERSION) so the
+        # dashboard can display it; both :latest and :$VERSION are published.
+        docker build -f Dockerfile --build-arg APP_VERSION="$VERSION" \
+          -t "$BASE:latest" -t "$BASE:$VERSION" ../..
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   build_cart:
     runs-on: ubuntu-22.04
@@ -638,4 +643,81 @@ jobs:
         export IMAGE_TAG="ghcr.io/${{ github.repository }}/airflow:latest"
         docker build -t $IMAGE_TAG .
         docker push $IMAGE_TAG
+
+  build_seeder:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: mysql/seeder
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+    - name: Compile check
+      run: python -m py_compile behavior_seeder.py
+
+  push_snapshot_container_seeder:
+    needs: [build_seeder]
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: mysql/seeder
+    env:
+      MAJOR_VERSION: 0
+      MINOR_VERSION: 0
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v1
+
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+    - name: Build and push container
+      run: |
+        export IMAGE_TAG="ghcr.io/${{ github.repository }}/seeder:latest"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+
+  # Cut a GitHub Release once the build/test jobs are green. The tag is the same
+  # $VERSION baked into the dashboard image (1.<run_number>), so the version shown
+  # in the dashboard matches a real release. Idempotent: a workflow re-run reuses
+  # the run number, so an existing tag is left alone instead of failing the job.
+  create_release:
+    needs:
+      - build_ecfront
+      - build_ecpay
+      - build_ranking
+      - build_sale
+      - build_shipment
+      - build_searchitem
+      - build_product
+      - build_geocoding
+      - build_dashboard
+      - build_cart
+      - build_seeder
+      - test_recommendation
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+
+    - name: Create GitHub Release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        VERSION="1.${{ github.run_number }}"
+        if gh release view "$VERSION" >/dev/null 2>&1; then
+          echo "Release $VERSION already exists, skipping."
+        else
+          gh release create "$VERSION" --title "$VERSION" \
+            --generate-notes --target "${{ github.sha }}"
+        fi
 

@@ -106,6 +106,9 @@ function capabilities() {
   return {
     mode: MODE,
     devMode: DEV_MODE,
+    // The image version CI baked in (Dockerfile ARG APP_VERSION). Empty in DEV
+    // builds, which never pass the build-arg; the UI only shows it when set.
+    appVersion: process.env.APP_VERSION || null,
     // Deployment shape (see CLOUD_MODE) — separate from `mode` above, which is
     // the container runtime.
     deployment: CLOUD_MODE ? 'cloud' : 'dev',
