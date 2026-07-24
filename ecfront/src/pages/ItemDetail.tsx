@@ -453,7 +453,15 @@ const ItemDetailNew: React.FC = () => {
     }
     
     const fee = selectedShipping.fee * quantity;
-    const itemSubtotal = product.price * quantity;
+    // Charge the sale price, not the list price. Buying straight from the detail
+    // page used product.price and dropped the discount entirely, so a discounted
+    // item was checked out at full price (a scam). Match cart/favorite: price at
+    // the cent (a percentage discount lands on cents) and carry saleFlag/discountRate
+    // so the checkout shows the markdown too.
+    const rate = product.discount_rate ?? 0;
+    const onSale = rate > 0;
+    const unitPrice = onSale ? Math.round(product.price * (1 - rate) * 100) / 100 : product.price;
+    const itemSubtotal = unitPrice * quantity;
 
     const singleItem = {
       id: product.product_id,
@@ -461,6 +469,8 @@ const ItemDetailNew: React.FC = () => {
       name: product.name,
       description: product.description,
       price: product.price,
+      saleFlag: onSale,
+      discountRate: rate,
       quantity: quantity,
       shipping_fee: selectedShipping.fee,
       shipping_type: selectedShipping.label,

@@ -37,6 +37,12 @@ type Item struct {
 	ReviewCount  int     `json:"review_count"`
 	Condition    string  `json:"condition"`
 	CategoryName string  `json:"category_name"`
+	// The sale service indexes these into MeiliSearch (see sale ProductItem), but
+	// this struct used to drop them, so the search listing never showed a discount
+	// even though the detail page did. Surface them so the storefront can mark the
+	// sale price on search results too.
+	SaleFlag     bool    `json:"sale_flag"`
+	DiscountRate float64 `json:"discount_rate"`
 }
 
 var (
