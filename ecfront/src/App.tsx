@@ -1,0 +1,155 @@
+import React from 'react';
+import { BrowserRouter as Router, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import TermsPage from './pages/TermsPage';
+import CancellationPolicyPage from './pages/CancellationPolicy';
+import AboutUsPage from './pages/AboutUsPages';
+import CareerPage from './pages/CareerPage';
+import ContactUsPage from './pages/ContactUsPage';
+import IRPage from './pages/IRPage';
+import UserGuidePage from './pages/UserGuidePage';
+import Dashboard from './pages/Dashboard';
+import SearchResultDashboard from './pages/SearchResultDashboard';
+import UserLogin from './pages/UserLogin';
+import UserSignUp from './pages/UserSignUp';
+import AccountSettings from './pages/AccountSettings';
+import AddressSettings from './pages/AddressesSettings';
+import CreditCardSettings from './pages/CreditCardSettings';
+import ItemDetail from './pages/ItemDetail';
+import ItemReview from './pages/ItemReview';
+import { SellerLoginPage } from './pages/seller/src/components/SellerLoginPage';
+import { SellerPortal } from './pages/seller/src/components/SellerPortal';
+import { SellerSignUpPage } from './pages/seller/src/components/SellerSignUpPage';
+import MyCartList from './pages/MyCartList';
+import MyCartCheckout from './pages/MyCartCheckout';
+import MyCartConfirm from './pages/MyCartConfirm';
+import MyCartOrderComplete from './pages/MyCartOrderComplete';
+import MyFavoriteList from './pages/MyFavoriteList';
+import OrderHistory from './pages/OrderHistory';
+import AdminCreateSeller from './pages/admin/AdminCreateSeller';
+import AdminUpdateSeller from './pages/admin/AdminUpdateSeller';
+import AdminDeleteSeller from './pages/admin/AdminDeleteSeller';
+import { AdminLoginPage } from './pages/admin/AdminLoginPage';
+import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { CreateUserPage } from './pages/admin/CreateUserPage';
+import { EditUserPage } from './pages/admin/EditUserPage';
+import PrivateRoute from './PrivateRoute';
+import { AuthProvider } from './Auth';
+import { redirectTarget } from './portalHost';
+
+
+import './App.css';
+
+/**
+ * Keeps each cloud host to its own portal. Outside cloud, redirectTarget()
+ * always returns null and this renders nothing and navigates nowhere, so dev
+ * behaviour is untouched.
+ *
+ * Same-origin targets go through the router so we don't reload the SPA;
+ * cross-host targets have to be a real navigation. Both use replace semantics
+ * so the wrong-host URL doesn't sit in the back stack and bounce the user.
+ */
+const HostGate: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    const target = redirectTarget(location.pathname);
+    if (!target) return;
+    if (target.startsWith('/')) navigate(target, { replace: true });
+    else window.location.replace(target);
+  }, [location.pathname, navigate]);
+
+  return null;
+};
+
+const AdminLoginPageWrapper: React.FC = () => {
+  const navigate = useNavigate();
+  return (
+    <AdminLoginPage
+      onLogin={() => navigate('/admin/dashboard')}
+    />
+  );
+};
+
+const AdminDashboardWrapper: React.FC = () => {
+  const navigate = useNavigate();
+  return (
+    <AdminDashboard
+      onLogout={() => navigate('/admin/login')}
+      onCreateUser={() => navigate('/admin/user/create')}
+      onEditUser={(userId) => navigate(`/admin/user/edit/${userId}`)}
+    />
+  );
+};
+
+const CreateUserPageWrapper: React.FC = () => {
+  const navigate = useNavigate();
+  return (
+    <CreateUserPage
+      onBack={() => navigate('/admin/dashboard')}
+      onUserCreated={() => navigate('/admin/dashboard')}
+    />
+  );
+};
+
+const EditUserPageWrapper: React.FC = () => {
+  const navigate = useNavigate();
+  const { userId } = useParams<{ userId: string }>();
+  return (
+    <EditUserPage
+      userId={userId || ''}
+      onBack={() => navigate('/admin/dashboard')}
+      onUserUpdated={() => navigate('/admin/dashboard')}
+    />
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <Router>
+        <HostGate />
+        <Routes>
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/cancellation-policy" element={<CancellationPolicyPage />} />
+          <Route path="/about-us" element={<AboutUsPage />} />
+          <Route path="/career" element={<CareerPage />} />
+          <Route path="/contact-us" element={<ContactUsPage />} />
+          <Route path="/ir" element={<IRPage />} />
+          <Route path="/user-guide" element={<UserGuidePage />} />
+          <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path="/search" element={<PrivateRoute><SearchResultDashboard /></PrivateRoute>} />
+          <Route path="/user/login" element={<UserLogin />} />
+          <Route path="/user/signup" element={<UserSignUp />} />
+          <Route path="/user/account" element={<PrivateRoute><AccountSettings /></PrivateRoute>} />
+          <Route path="/user/address" element={<PrivateRoute><AddressSettings /></PrivateRoute>} />
+          <Route path="/user/payment" element={<PrivateRoute><CreditCardSettings /></PrivateRoute>} />
+          <Route path="/item/:id" element={<PrivateRoute><ItemDetail /></PrivateRoute>} />
+          <Route path="/item/:id/review" element={<PrivateRoute><ItemReview /></PrivateRoute>} />
+          <Route path="/cart/list" element={<PrivateRoute><MyCartList /></PrivateRoute>} />
+          <Route path="/cart/checkout" element={<PrivateRoute><MyCartCheckout /></PrivateRoute>} />
+          <Route path="/cart/confirm" element={<PrivateRoute><MyCartConfirm /></PrivateRoute>} />
+          <Route path="/cart/complete" element={<PrivateRoute><MyCartOrderComplete /></PrivateRoute>} />
+          <Route path="/fav/list" element={<PrivateRoute><MyFavoriteList /></PrivateRoute>} />
+          <Route path="/order-history" element={<PrivateRoute><OrderHistory /></PrivateRoute>} />
+
+          <Route path="/seller/login" element={<SellerLoginPage />} />
+          <Route path="/seller/signup" element={<SellerSignUpPage />} />
+          <Route path="/seller/portal" element={<SellerPortal />} />
+
+          <Route path="/admin" element={<AdminLoginPageWrapper />} />
+          <Route path="/admin/" element={<AdminLoginPageWrapper />} />
+          <Route path="/admin/login" element={<AdminLoginPageWrapper />} />
+          <Route path="/admin/dashboard" element={<AdminDashboardWrapper />} />
+          <Route path="/admin/user/create" element={<CreateUserPageWrapper />} />
+          <Route path="/admin/user/edit/:userId" element={<EditUserPageWrapper />} />
+          <Route path="/admin/seller/create" element={<AdminCreateSeller />} />
+          <Route path="/admin/seller/edit" element={<AdminUpdateSeller />} />
+          <Route path="/admin/seller/delete" element={<AdminDeleteSeller />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
+  );
+};
+
+export default App;

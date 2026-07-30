@@ -57,6 +57,14 @@ services:
       DEV_MODE: "true"
       JAVA_OPTS_APPEND: "-Xms128m -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+DisableExplicitGC"
       KC_LOG_LEVEL: "WARN"
+    # OAuth secrets for the Google/Facebook identity providers are injected into
+    # the realm import at startup (see uam/docker-entrypoint.sh) instead of being
+    # baked into the image. Provide them locally in the gitignored uam/uam.env
+    # (copy uam/uam.env.example). The file is optional: without it the app still
+    # boots, only social login is disabled. In Kubernetes use a Secret + envFrom.
+    env_file:
+      - path: ./uam/uam.env
+        required: false
     networks:
       - mockten_nw
     tty: true
@@ -86,7 +94,10 @@ services:
     image: apigw
     build:
       context: ./apigw
-    mem_limit: 200m
+    # Kong idles around 165–170MiB and grows past 360MiB under burst traffic, so
+    # the old 200m cap left no headroom: the workers were SIGKILLed and the
+    # gateway returned 502s (e.g. under the Dashboard's API Specification forms).
+    mem_limit: 600m
     networks:
       - mockten_nw
     ports:
@@ -107,9 +118,12 @@ services:
     image: meilisearch
     build:
       context: ./meilisearch
-    mem_limit: 60m
+    # The index is rebuilt from MySQL on every start (there is no volume), and a
+    # 60m cap couldn't complete that indexing pass: meilisearch was SIGKILLed
+    # mid-batch, leaving an empty index and an empty /api/search.
+    mem_limit: 256m
     environment:
-      MEILI_MAX_INDEXING_MEMORY: "32Mb"
+      MEILI_MAX_INDEXING_MEMORY: "96Mb"
       MEILI_MAX_INDEXING_THREADS: "1"
     networks:
       - mockten_nw
@@ -288,21 +302,30 @@ services:
 
   # ── Monitoring Stack ──────────────────────────────────────────────────────
   dashboard:
-    container_name: mockten-dashboard
+    # Named after the k8s Service, like the other services here: kong.yaml points
+    # at this host, and a compose-only name can't resolve in-cluster.
+    container_name: dashboard-service.default.svc.cluster.local
     image: mockten-dashboard
     mem_limit: 500m
     build:
-      context: ./monitoring/dashboard
+      # Root context so the image can include apigw/kong.yaml (the API
+      # Specifications panel parses it); see monitoring/dashboard/Dockerfile.
+      context: .
+      dockerfile: monitoring/dashboard/Dockerfile
     environment:
       - NODE_OPTIONS=--max-old-space-size=350
       - HOST_WORKSPACE_PATH=${HOST_WORKSPACE_PATH:-${PWD}}
+      # Local compose run: talk to the Docker socket and enable the panels that
+      # need it (Local CI, E2E runner, Security Scanning, exec, DB export/import).
+      # The k8s deployment leaves this false and uses the Kubernetes API instead.
+      - DEV_MODE=true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./ecfront2.log:/app/ecfront2.log:ro
+      - ./ecfront.log:/app/ecfront.log:ro
       - ./apigw/kong.yaml:/app/kong.yaml:ro
       - ./uam/realm-export-dev.json:/app/realm-export-dev.json:ro
-      - ./ecfront2/tests:/app/tests:ro
-      - ./ecfront2:/app/ecfront2
+      - ./ecfront/tests:/app/tests:ro
+      - ./ecfront:/app/ecfront
       - ./Taskfile.yaml:/app/Taskfile.yaml:ro
       - ./.github/workflows/ci.yml:/app/.github/workflows/ci.yml:ro
       - ./:${HOST_WORKSPACE_PATH:-${PWD}}

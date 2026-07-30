@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS TimeSale (
 
 INSERT INTO TimeSale (id, name, start_date, end_date, discount_rate)
 VALUES
-('f1234567-abcd-1234-abcd-1234567890ab', 'Mockten Super Sale', '2026-06-01 00:00:00', '2026-06-30 23:59:59', 0.10),
+('f1234567-abcd-1234-abcd-1234567890ab', 'Mockten Super Sale', '2026-06-01 00:00:00', '2036-06-01 23:59:59', 0.10),
 ('f2345678-abcd-1234-abcd-1234567890ab', "Father's day Sale", '2026-06-14 00:00:00', '2026-06-28 23:59:59', 0.30),
 ('f3456789-abcd-1234-abcd-1234567890ab', 'June Deals', '2026-06-01 00:00:00', '2026-06-30 23:59:59', 0.20),
 ('f456789a-abcd-1234-abcd-1234567890ab', 'July Hot Deals', '2026-06-01 00:00:00', '2026-07-31 23:59:59', 0.15)
@@ -32,6 +32,18 @@ CREATE TABLE IF NOT EXISTS Seller (
   seller_name VARCHAR(255),
   description TEXT,
   last_update DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS AuditLog (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  action VARCHAR(128) NOT NULL,
+  actor VARCHAR(255) NOT NULL,
+  actor_type VARCHAR(16) NOT NULL DEFAULT 'system',
+  target VARCHAR(255),
+  status ENUM('success','failed','warning') NOT NULL DEFAULT 'success',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_audit_created (created_at),
+  INDEX idx_audit_actor_type (actor_type)
 );
 
 CREATE TABLE IF NOT EXISTS Category (
@@ -56,7 +68,15 @@ CREATE TABLE IF NOT EXISTS Product (
   last_update DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   sale_flag TINYINT(1) NOT NULL DEFAULT 0,
   sale_id VARCHAR(36) NULL,
+  -- is_active is the seller's own on/off switch: an inactive product stays in
+  -- their list and can be switched back on.
   is_active TINYINT(1) NOT NULL DEFAULT 1,
+  -- deleted_at retires a product for good. Deleting the row outright would strip
+  -- it from the sync's SELECT, so the sync could never tell MeiliSearch to drop
+  -- it and the product stayed searchable (and 404'd when opened) forever. It
+  -- would also orphan Transaction rows, i.e. buyers' order history. Keeping the
+  -- row lets the existing is_active=0 path clean the index, and history resolves.
+  deleted_at DATETIME NULL,
   KEY idx_product_category (category_id),
   KEY idx_product_geo (geo_id),
   KEY idx_product_last_update (last_update)
@@ -428,12 +448,15 @@ VALUES
 ON DUPLICATE KEY UPDATE
   stocks = VALUES(stocks);
 
+-- Per-10km distance component (added to a fixed handling base and capped in the
+-- geocoding service). Tuned so domestic orders land around $4-8 and the longest
+-- intercontinental routes hit the cap (~$30 standard) rather than $100+.
 INSERT INTO ShippingRate (country_code, shipping_type, rate_per_10km)
 VALUES
-('JP', 'standard', 0.08),
-('JP', 'express',  0.16),
-('SG', 'standard', 0.10),
-('SG', 'express',  0.20)
+('JP', 'standard', 0.020),
+('JP', 'express',  0.040),
+('SG', 'standard', 0.025),
+('SG', 'express',  0.050)
 ON DUPLICATE KEY UPDATE
   rate_per_10km = VALUES(rate_per_10km);
 
@@ -1712,3 +1735,30 @@ SET p.avg_review = r.avg_review,
 --     p.review_count = 0
 -- WHERE r.product_id IS NULL
 --   AND (p.avg_review <> 0.0 OR p.review_count <> 0);
+-- Seed audit-log entries so the Admin Portal Activity Logs is populated on first load.
+INSERT INTO AuditLog (action, actor, actor_type, target, status, created_at) VALUES
+  ('Admin Login', 'superadmin@example.com', 'admin', NULL, 'success', NOW() - INTERVAL 2 HOUR),
+  ('User Created', 'superadmin@example.com', 'admin', 'newseller@example.com', 'success', NOW() - INTERVAL 90 MINUTE),
+  ('Seller Login', 'auto_parts@example.com', 'seller', NULL, 'success', NOW() - INTERVAL 70 MINUTE),
+  ('Product Created', 'auto_parts@example.com', 'seller', 'Brake Pad Set', 'success', NOW() - INTERVAL 65 MINUTE),
+  ('Failed Login Attempt', 'unknown@example.com', 'customer', NULL, 'failed', NOW() - INTERVAL 45 MINUTE),
+  ('Order Placed', 'shopper@example.com', 'customer', 'order-demo-0001', 'success', NOW() - INTERVAL 30 MINUTE),
+  ('User Deleted', 'superadmin@example.com', 'admin', 'spam@example.com', 'warning', NOW() - INTERVAL 20 MINUTE);
+
+-- Seed a flagged order shipping to an EU country so Admin Order Monitoring's
+-- "Unusual location (EU)" detection demonstrably fires on real data.
+INSERT INTO Geo (geo_id, user_id, country_code, prefecture, city, is_primary) VALUES
+  ('eu-geo-de-0001', 'eu_shopper@example.com', 'DE', 'Bavaria', 'Munich', 1);
+INSERT INTO `Transaction` (transaction_id, product_id, geo_id, status, leg_type, quantity, created_at) VALUES
+  ('eu-txn-0001', (SELECT product_id FROM Product LIMIT 1), 'eu-geo-de-0001', 'booked', 'air', 1, NOW() - INTERVAL 35 MINUTE);
+INSERT INTO `Order` (order_id, user_id, currency, subtotal_amount, shipping_amount, total_amount, quantity, status, transactions_json, created_at) VALUES
+  ('eu-order-de-0001', 'eu_shopper@example.com', 'USD', 18.00, 6.00, 24.00, 1, 'paid', '["eu-txn-0001"]', NOW() - INTERVAL 35 MINUTE);
+
+-- Seed a canceled order (→ "Failed / canceled") and a burst of 3 rapid orders
+-- from one customer within 15 minutes (→ "Multiple rapid orders") so Order
+-- Monitoring demonstrates the full range of real detection reasons.
+INSERT INTO `Order` (order_id, user_id, currency, subtotal_amount, shipping_amount, total_amount, quantity, status, transactions_json, created_at) VALUES
+  ('flag-canceled-0001', 'refund_case@example.com', 'USD', 30.00, 5.00, 35.00, 1, 'canceled', '[]', NOW() - INTERVAL 40 MINUTE),
+  ('flag-rapid-0001', 'rapid_buyer@example.com', 'USD', 8.00, 2.00, 10.00, 1, 'paid', '[]', NOW() - INTERVAL 12 MINUTE),
+  ('flag-rapid-0002', 'rapid_buyer@example.com', 'USD', 9.00, 2.00, 11.00, 1, 'paid', '[]', NOW() - INTERVAL 10 MINUTE),
+  ('flag-rapid-0003', 'rapid_buyer@example.com', 'USD', 7.00, 2.00, 9.00, 1, 'paid', '[]', NOW() - INTERVAL 8 MINUTE);

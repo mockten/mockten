@@ -6,20 +6,56 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	_ "github.com/go-sql-driver/mysql" // registers the "mysql" sql driver used by initDB
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stripe/stripe-go/v74"
 	"github.com/stripe/stripe-go/v74/customer"
 	"github.com/stripe/stripe-go/v74/paymentintent"
 	"github.com/stripe/stripe-go/v74/paymentmethod"
 )
+
+const (
+	logFilePath = "/var/log/apl/apl.log"
+	// MySQLHost is the DSN template used by initDB.
+	MySQLHost = "%v:%v@tcp(%v)/%v"
+)
+
+func init() {
+	loggingSettings(logFilePath)
+}
+
+// loggingSettings initializes logging to both stdout and a log file.
+func loggingSettings(logFile string) {
+	logfile, _ := os.OpenFile(filepath.Clean(logFile), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+	log.SetOutput(io.MultiWriter(os.Stdout, logfile))
+}
+
+// exportMetrics serves Prometheus metrics on :9100 (run in a goroutine).
+func exportMetrics() {
+	http.Handle("/metrics", promhttp.Handler())
+	if err := http.ListenAndServe(":9100", nil); err != nil {
+		log.Fatalf("metrics goroutine fail:%v", err)
+	}
+}
+
+func main() {
+	// Expose Prometheus metrics, then serve the payment REST API (Gin, :8080).
+	go exportMetrics()
+	startHttpServer()
+}
 
 // Global DB connection pool — opened once at startup, reused across all handlers
 var ecpayDB *sql.DB
@@ -57,9 +93,13 @@ type CartItemReq struct {
 
 type CheckoutRequest struct {
 	PaymentMethodID string        `json:"payment_method_id"`
-	Amount          int64         `json:"amount"` // typically calculated by backend but for mockup here
-	Subtotal        int64         `json:"subtotal"`
-	Shipping        int64         `json:"shipping"`
+	// Money is float, not int: a percentage discount on a low-priced item
+	// produces cents (a $3 item at 10% is $2.70). Rounding these to whole
+	// dollars made the discount vanish below a certain price. The Order/Payment
+	// columns are already DECIMAL(12,2), so these carry straight through.
+	Amount          float64       `json:"amount"`
+	Subtotal        float64       `json:"subtotal"`
+	Shipping        float64       `json:"shipping"`
 	Items           []CartItemReq `json:"items"`
 	TransactionIDs  []string      `json:"transaction_ids"` // shipment-leg transaction ids, used to link the Order
 }
@@ -71,7 +111,14 @@ type UserContext struct {
 
 // Extract user details from Authorization Header token or fallback to mock
 func getUser(c *gin.Context) UserContext {
-	authHeader := c.GetHeader("Authorization")
+	return parseUserFromAuthHeader(c.GetHeader("Authorization"))
+}
+
+// parseUserFromAuthHeader derives the acting user from a Bearer JWT's claims
+// (email / preferred_username / sub) without verifying the signature — the API
+// gateway is responsible for authentication. It returns a mock testuser when the
+// header is missing or malformed so local/test flows still work.
+func parseUserFromAuthHeader(authHeader string) UserContext {
 	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
 		token := authHeader[7:]
 		parts := strings.Split(token, ".")
@@ -353,7 +400,7 @@ func handleCreatePayment(c *gin.Context) {
 
 	// Create PaymentIntent
 	params := &stripe.PaymentIntentParams{
-		Amount:        stripe.Int64(req.Amount * 100), // convert to cents assuming USD
+		Amount:        stripe.Int64(int64(math.Round(req.Amount * 100))), // dollars → cents (USD); round at the cent, not the dollar
 		Currency:      stripe.String(string(stripe.CurrencyUSD)),
 		PaymentMethod: stripe.String(spmID),
 		Confirm:       stripe.Bool(true),

@@ -1,1 +1,4 @@
+# Local OAuth secrets — injected at runtime, never committed or baked into the image.
+uam.env
+# Legacy build-time secrets file (no longer used; kept ignored for safety).
 config.json

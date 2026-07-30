@@ -115,7 +115,7 @@ func (s *RedisCartStore) updateCart(ctx context.Context, userID string, mutate f
 		}
 		if errors.Is(err, redis.TxFailedErr) {
 			lastErr = err
-			continue // 競合 → retry
+			continue // write conflict → retry
 		}
 		return nil, err
 	}

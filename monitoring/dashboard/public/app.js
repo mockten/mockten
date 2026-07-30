@@ -1,3 +1,44 @@
+// ── API base ───────────────────────────────────────────────────────────────
+/**
+ * Where this console's own API lives.
+ *
+ * In dev the dashboard is reverse-proxied under one origin at /dashboard, and
+ * the proxy strips that prefix before the app sees it. In cloud the dashboard
+ * has a host to itself and is served at the root, where /dashboard/api/... does
+ * not exist. Hardcoding the dev shape made every request 404 in cloud, which
+ * left the capabilities probe failing and the UI falling back to its permissive
+ * DEV defaults — so a cloud console rendered as if it were DEV, with empty
+ * cards.
+ *
+ * Derived from where this page is actually served rather than from
+ * /api/capabilities: fetching capabilities is itself subject to the prefix, so
+ * using it to decide the prefix would be circular. The path we were loaded from
+ * is self-describing and available before any request.
+ */
+const API_BASE = (() => {
+  const p = window.location.pathname;
+  const i = p.indexOf('/dashboard/');
+  if (i !== -1) return p.slice(0, i) + '/dashboard';
+  if (p === '/dashboard') return '/dashboard';
+  return '';
+})();
+
+/**
+ * Where the *platform* API lives, as opposed to this console's own.
+ *
+ * These are two different services. /api/containers is the dashboard; /api/uam,
+ * /api/categories, /api/search are the gateway. In dev both answer on one
+ * origin so a bare /api/... reached the gateway via nginx. In cloud the
+ * dashboard owns its host, so that same path lands on the dashboard's own
+ * Express — the console ends up interrogating itself and gets a 404 or its own
+ * auth error.
+ *
+ * Both go through this origin: the server relays /api/gw/* to the gateway
+ * in-cluster. That keeps every request same-origin (no CORS on the gateway or
+ * on Keycloak) and keeps one code path for both deployments.
+ */
+const PLATFORM_API = `${API_BASE}/api/gw`;
+
 // ── State ──────────────────────────────────────────────────────────────────
 let allContainers = [];
 let statsCache = {};
@@ -6,6 +47,96 @@ let currentLogWs = null;
 let currentLogLines = [];
 let autoScroll = true;
 let frontendRunning = false;
+
+// What this deployment supports. In DEV (docker-compose) everything is on; when
+// deployed to Kubernetes the panels that need the Docker socket or the mounted
+// repo workspace are switched off. Defaults are permissive so the UI still works
+// if the probe fails (DEV behaviour is then unchanged).
+let CAPS = {
+  mode: 'docker',
+  devMode: true,
+  containers: { list: true, logs: true, stats: true, restart: true, startStop: true, exec: true },
+  syncTrigger: true, dbExportImport: true, frontendDev: true,
+  ci: true, tests: true, security: ['trivy', 'sca', 'sast', 'dast', 'all'],
+};
+
+async function loadCapabilities() {
+  try {
+    const res = await fetch(`${API_BASE}/api/capabilities`);
+    if (res.ok) CAPS = await res.json();
+  } catch { /* keep permissive defaults */ }
+}
+
+/** Hide the nav entries and controls this deployment cannot serve. */
+function applyCapabilities() {
+  const hideNav = key => {
+    document.querySelectorAll(`.nav-item[data-key="${key}"]`).forEach(el => { el.style.display = 'none'; });
+  };
+  if (!CAPS.ci) hideNav('ci');
+  if (!CAPS.tests) hideNav('tests');
+  if (!(CAPS.security && CAPS.security.length)) hideNav('vulnerability');
+
+  const hideEl = id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; };
+  if (!CAPS.syncTrigger) hideEl('btn-sync-trigger');
+  if (!CAPS.frontendDev) hideEl('frontend-card');
+
+  if (!CAPS.dbExportImport) {
+    ['btn-mysql-export', 'btn-mysql-import', 'mysql-import-file'].forEach(hideEl);
+  }
+
+  // Portal links. In dev everything shares one origin, so the same-origin paths
+  // baked into index.html are right. In cloud the four portals live on separate
+  // hosts under a domain that must not appear in this repo, so the server hands
+  // them to us via /api/capabilities and we rewrite the hrefs here.
+  const urls = CAPS.urls || {};
+  const setNav = (key, href) => {
+    if (!href) return;
+    document.querySelectorAll(`.nav-item[data-key="${key}"]`).forEach(el => { el.href = href; });
+  };
+  setNav('mockten', urls.storefront);
+  setNav('seller', urls.sales);
+  setNav('admin', urls.admin);
+
+  // The auth backdoor mints tokens without a password. That is a test affordance
+  // for a private stack, not something to expose on the public internet.
+  if (CAPS.deployment === 'cloud') hideNav('backdoor');
+
+  // Say which runtime this is, always and in both modes. The two dashboards look
+  // deliberately different (k8s hides Local CI / E2E / Security Scanning and the
+  // Vite card), and both are reachable on localhost — so without a label it's
+  // genuinely impossible to tell whether something is missing by design or
+  // broken. Anchored to the logo, not #view-title, because showView() rewrites
+  // that element's textContent on every navigation and would wipe the badge.
+  const logo = document.querySelector('.logo');
+  if (logo && !document.getElementById('mode-badge')) {
+    const isDev = CAPS.mode === 'docker';
+    const badge = document.createElement('span');
+    badge.id = 'mode-badge';
+    badge.textContent = isDev ? 'DEV' : 'K8S';
+    badge.title = isDev
+      ? 'Docker Compose (task build) — every panel is available'
+      : 'Kubernetes — Local CI, E2E Runner and Security Scanning are hidden by design';
+    badge.style.cssText =
+      'margin-left:8px;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;' +
+      'letter-spacing:0.5px;vertical-align:middle;color:#fff;background:' +
+      (isDev ? '#10b981' : '#6366f1') + ';';
+    logo.appendChild(badge);
+
+    // Running image version, next to the K8S badge. Only in k8s and only when CI
+    // actually baked one in (DEV builds pass no --build-arg, so appVersion is
+    // empty and no version label appears).
+    if (!isDev && CAPS.appVersion && !document.getElementById('version-badge')) {
+      const ver = document.createElement('span');
+      ver.id = 'version-badge';
+      ver.textContent = 'v' + CAPS.appVersion;
+      ver.title = 'Deployed image version (APP_VERSION)';
+      ver.style.cssText =
+        'margin-left:6px;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;' +
+        'letter-spacing:0.5px;vertical-align:middle;color:#c7d2fe;background:#312e81;';
+      logo.appendChild(ver);
+    }
+  }
+}
 
 // ── Chart State ────────────────────────────────────────────────────────────
 let cpuChart = null;
@@ -16,10 +147,13 @@ const timeLabels = [];
 
 // ── Init ───────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  await loadCapabilities();
+  applyCapabilities();
   initCharts();
   await loadMetricsHistory();
   fetchContainers();
   fetchFrontendStatus();
+  fetchReady();
   fetchTelemetry();
   autoRefreshTimer = setInterval(() => {
     const isDashboardActive = document.getElementById('view-dashboard').classList.contains('active');
@@ -29,10 +163,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       fetchContainers();
       fetchFrontendStatus();
     }
-    
+
+    if (isDashboardActive) fetchReady();
+
     if (isDashboardActive) {
       fetchTelemetry();
     }
+
+    // Access Management's live users change out of band (a sign-up, a new
+    // admin); refresh them while the panel is open so it isn't stuck on its
+    // first read until a full page reload.
+    if (document.getElementById('view-keycloak')?.classList.contains('active')) refreshKcUsers();
   }, 5000);
 });
 
@@ -42,6 +183,12 @@ window.addEventListener('load', () => {
   const validViews = ['dashboard','containers','logs','topology','db','api','keycloak','model','ci','tests','pipeline','vulnerability'];
   if (last && validViews.includes(last)) {
     const navEl = document.querySelector(`.nav-item[onclick*="'${last}'"]`);
+    // Don't restore a view this deployment hides (e.g. Local CI under k8s) —
+    // its nav entry is gone, so fall back to the dashboard.
+    if (navEl && navEl.style.display === 'none') {
+      showView('dashboard', document.querySelector('.nav-item[data-key="dashboard"]'));
+      return;
+    }
     showView(last, navEl);
   }
 });
@@ -87,13 +234,15 @@ function showView(name, el) {
 // ── Fetch Containers ───────────────────────────────────────────────────────
 async function fetchContainers() {
   try {
-    const res = await fetch('/dashboard/api/containers');
+    const res = await fetch(`${API_BASE}/api/containers`);
     if (!res.ok) throw new Error(res.statusText);
     const rawContainers = await res.json();
     
     allContainers = rawContainers.sort((a, b) => {
-      const isBotA = a.name === 'nginx' || a.name === 'mockten-dashboard';
-      const isBotB = b.name === 'nginx' || b.name === 'mockten-dashboard';
+      // Keyed on the canonical service key, not the container/pod name, so this
+      // survives renames and works the same for docker names and k8s pods.
+      const isBotA = a.key === 'nginx' || a.key === 'dashboard';
+      const isBotB = b.key === 'nginx' || b.key === 'dashboard';
       
       if (isBotA && !isBotB) return 1;
       if (!isBotA && isBotB) return -1;
@@ -114,12 +263,24 @@ async function fetchContainers() {
 async function fetchAllStats(containers) {
   let totalCpuSum = 0;
   let totalMemUsageSum = 0;
-  let totalMemLimitSum = 0;
+  // Denominator for "Total Memory Usage": what the deployment is allotted, asked
+  // of the server rather than derived from the per-container limits. Deriving it
+  // was wrong both ways — summing the limits double-counts (k8s: 21 pods each
+  // reporting the 9GB node ⇒ ~190GB ⇒ 3%), taking their max divides the stack's
+  // usage by one container's cap (DEV: 3.5GB / an 820MB container ⇒ 430%). The
+  // runtime answers it properly per environment (compose mem_limit total /
+  // namespace ResourceQuota), and server.js's aggregate uses the same endpoint.
+  let memCapacityBytes = 0;
   let numCpus = 1;
+
+  try {
+    const capRes = await fetch(`${API_BASE}/api/mem-capacity`);
+    if (capRes.ok) memCapacityBytes = (await capRes.json()).bytes || 0;
+  } catch { /* leave 0; the percentage is then suppressed rather than wrong */ }
 
   await Promise.all(containers.map(async c => {
     try {
-      const res = await fetch(`/dashboard/api/containers/${c.id}/stats`);
+      const res = await fetch(`${API_BASE}/api/containers/${c.id}/stats`);
       if (!res.ok) return;
       const stats = await res.json();
       statsCache[c.id] = stats;
@@ -127,7 +288,6 @@ async function fetchAllStats(containers) {
 
       totalCpuSum += parseFloat(stats.cpu) || 0;
       totalMemUsageSum += parseFloat(stats.memUsage) || 0;
-      totalMemLimitSum += parseFloat(stats.memLimit) || 0;
       if (stats.numCpus) {
         numCpus = stats.numCpus;
       }
@@ -135,7 +295,7 @@ async function fetchAllStats(containers) {
   }));
 
   const aggCpu = numCpus > 0 ? (totalCpuSum / numCpus) : 0;
-  const aggMemPercent = totalMemLimitSum > 0 ? ((totalMemUsageSum / totalMemLimitSum) * 100) : 0;
+  const aggMemPercent = memCapacityBytes > 0 ? ((totalMemUsageSum / memCapacityBytes) * 100) : 0;
   const aggMemMB = totalMemUsageSum / 1024 / 1024;
 
   updateCharts(aggCpu, aggMemPercent, aggMemMB);
@@ -243,7 +403,7 @@ function updateCharts(totalCpu, totalMemPercent, totalMemMB) {
 
 async function loadMetricsHistory() {
   try {
-    const res = await fetch('/dashboard/api/metrics/history');
+    const res = await fetch(`${API_BASE}/api/metrics/history`);
     if (!res.ok) return;
     const h = await res.json();
     if (!h.timestamps || h.timestamps.length === 0) return;
@@ -277,15 +437,57 @@ async function loadMetricsHistory() {
 function refresh() {
   fetchContainers();
   fetchFrontendStatus();
+  // The refresh button should refresh whatever the operator is looking at, not
+  // only the container list — Access Management's user list included.
+  if (document.getElementById('view-keycloak')?.classList.contains('active')) refreshKcUsers();
   const btn = document.querySelector('.btn-refresh svg');
   btn.style.animation = 'spin 0.5s linear';
   setTimeout(() => btn.style.animation = '', 600);
 }
 
+// ── Environment readiness ──────────────────────────────────────────────────
+/**
+ * READY only when every condition holds. When it doesn't, name the condition
+ * that is outstanding — "PENDING" alone tells you to go looking, not where.
+ */
+async function fetchReady() {
+  const card = document.getElementById('ready-card');
+  // Readiness is a cloud concern: it answers "is the public deployment usable"
+  // (model trained AND HTTPS serving). In DEV the stack is always local and
+  // HTTPS never applies, so the card is noise — hide it and don't poll.
+  if (CAPS.deployment !== 'cloud') {
+    if (card) card.style.display = 'none';
+    return;
+  }
+  const value = document.getElementById('stat-ready');
+  const detail = document.getElementById('ready-detail');
+  const icon = document.getElementById('ready-icon');
+  if (!value || !detail || !icon) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/ready`);
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    const { ready, conditions } = await res.json();
+
+    value.textContent = ready ? 'READY' : 'PENDING';
+    value.style.color = ready ? 'var(--green)' : 'var(--yellow)';
+    icon.style.background = ready ? 'var(--green-bg)' : 'var(--yellow-bg)';
+    icon.style.color = ready ? 'var(--green)' : 'var(--yellow)';
+    detail.textContent = ready
+      ? conditions.map(c => c.name).join(' · ')
+      : conditions.filter(c => !c.ok).map(c => `${c.name}: ${c.detail}`).join(' · ');
+  } catch (err) {
+    // Say it's unknown rather than claiming PENDING — we didn't measure anything.
+    value.textContent = '–';
+    value.style.color = 'var(--text-muted)';
+    detail.textContent = `readiness unavailable: ${err.message}`;
+  }
+}
+
 // ── Frontend Status ────────────────────────────────────────────────────────
 async function fetchFrontendStatus() {
   try {
-    const res = await fetch('/dashboard/api/frontend/status');
+    const res = await fetch(`${API_BASE}/api/frontend/status`);
     const data = await res.json();
     frontendRunning = data.running;
     const el = document.getElementById('stat-frontend');
@@ -326,7 +528,11 @@ function frontendAction() {
 // ── Summary ────────────────────────────────────────────────────────────────
 function updateSummary(containers) {
   const dockerRunning = containers.filter(c => c.state === 'running').length;
-  const totalRunning = dockerRunning + (frontendRunning ? 1 : 0);
+  // The +1 is only right in DEV, where Vite runs on the host and is therefore
+  // absent from the container list. In k8s the frontend is the ecfront pod,
+  // which /api/containers already returns — adding it again made Running (22)
+  // exceed Total (21), which read as though a restart had leaked a container.
+  const totalRunning = dockerRunning + (CAPS.frontendDev && frontendRunning ? 1 : 0);
   const stopped = containers.filter(c => c.state !== 'running').length;
   document.getElementById('stat-running').textContent = totalRunning;
   document.getElementById('stat-stopped').textContent = stopped;
@@ -363,9 +569,11 @@ function renderTable(containers) {
         <div class="action-btns">
           ${c.state === 'running'
             ? `<button class="btn-act btn-act-warn"  onclick="containerAction('${c.id}','restart')" title="Restart">↺</button>
-               <button class="btn-act btn-act-danger" onclick="containerAction('${c.id}','stop')"    title="Stop">■</button>
-               <button class="btn-login" onclick="openTerminal('${c.id}','${c.name.replace(/'/g, "\\'")}')" title="Terminal Login">&gt;_ ${(I18N[_currentLang]||I18N.en)['col.login']||'Login'}</button>`
-            : `<button class="btn-act btn-act-ok"    onclick="containerAction('${c.id}','start')"   title="Start">▶</button>`
+               ${CAPS.containers.startStop ? `<button class="btn-act btn-act-danger" onclick="containerAction('${c.id}','stop')"    title="Stop">■</button>` : ''}
+               ${CAPS.containers.exec ? `<button class="btn-login" onclick="openTerminal('${c.id}','${c.name.replace(/'/g, "\\'")}')" title="Terminal Login">&gt;_ ${(I18N[_currentLang]||I18N.en)['col.login']||'Login'}</button>` : ''}`
+            : (CAPS.containers.startStop
+                ? `<button class="btn-act btn-act-ok"    onclick="containerAction('${c.id}','start')"   title="Start">▶</button>`
+                : '')
           }
           <button class="btn-log" onclick="openLogs('${c.id}','${c.name.replace(/'/g, "\\'")}')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -417,7 +625,7 @@ async function containerAction(id, action) {
   if (row) row.style.opacity = '0.5';
 
   try {
-    const res = await fetch(`/dashboard/api/containers/${id}/${action}`, { method: 'POST' });
+    const res = await fetch(`${API_BASE}/api/containers/${id}/${action}`, { method: 'POST' });
     if (!res.ok) throw new Error((await res.json()).error);
     showToast(`Container ${action}ed successfully`, 'success');
   } catch (e) {
@@ -454,7 +662,7 @@ async function executeSystemRestart() {
 
   showToast('System restart in progress...', 'info');
   try {
-    const res = await fetch('/dashboard/api/system/restart', { method: 'POST' });
+    const res = await fetch(`${API_BASE}/api/system/restart`, { method: 'POST' });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     const count = data.restarted?.length || 0;
@@ -476,18 +684,21 @@ function populateLogSelect() {
 
   sel.innerHTML = '<option value="">Select a source...</option>';
 
-  // Always add the Vite frontend option first
-  const feOpt = document.createElement('option');
-  feOpt.value = '__frontend__';
-  feOpt.textContent = '⚡ Vite Frontend (npm run dev)';
-  if (current === '__frontend__') feOpt.selected = true;
-  sel.appendChild(feOpt);
+  // The Vite dev server only exists in DEV (`task build` runs it on the host), so
+  // offering it on a deployed dashboard just yields an empty log pane.
+  if (CAPS.frontendDev) {
+    const feOpt = document.createElement('option');
+    feOpt.value = '__frontend__';
+    feOpt.textContent = '⚡ Vite Frontend (npm run dev)';
+    if (current === '__frontend__') feOpt.selected = true;
+    sel.appendChild(feOpt);
 
-  // Add a visual separator
-  const sep = document.createElement('option');
-  sep.disabled = true;
-  sep.textContent = '── Docker Containers ──';
-  sel.appendChild(sep);
+    // Add a visual separator
+    const sep = document.createElement('option');
+    sep.disabled = true;
+    sep.textContent = '── Docker Containers ──';
+    sel.appendChild(sep);
+  }
 
   // Add all containers
   allContainers.forEach(c => {
@@ -523,7 +734,7 @@ function startLogStream() {
 
   // ── Vite frontend log ──
   if (id === '__frontend__') {
-    const wsUrl = `${proto}://${location.host}/dashboard/ws/frontend-logs`;
+    const wsUrl = `${proto}://${location.host}${API_BASE}/ws/frontend-logs`;
     setLogStatus(true);
     currentLogWs = new WebSocket(wsUrl);
     currentLogWs.onmessage = (e) => {
@@ -548,7 +759,7 @@ function startLogStream() {
   }
 
   // ── Docker container log ──
-  const wsUrl = `${proto}://${location.host}/dashboard/ws/logs?id=${id}&tail=${tail}`;
+  const wsUrl = `${proto}://${location.host}${API_BASE}/ws/logs?id=${id}&tail=${tail}`;
   setLogStatus(true);
   currentLogWs = new WebSocket(wsUrl);
 
@@ -647,7 +858,7 @@ const TOPO_CONTAINER_NAME = {
   geocoding:      'geocoding-service.default.svc.cluster.local',
   recommendation: 'recommendation-service.default.svc.cluster.local',
   sync:           'mockten-sync',
-  dashboard:      'mockten-dashboard',
+  dashboard:      'dashboard-service.default.svc.cluster.local',
 };
 
 const GROUP_COLOR = {
@@ -662,10 +873,10 @@ const GROUP_COLOR = {
 
 async function fetchTopology() {
   try {
-    const res = await fetch('/dashboard/api/topology');
+    const res = await fetch(`${API_BASE}/api/topology`);
     const data = await res.json();
     // Overlay frontend status
-    const feRes = await fetch('/dashboard/api/frontend/status');
+    const feRes = await fetch(`${API_BASE}/api/frontend/status`);
     const feData = await feRes.json();
     const feNode = data.nodes.find(n => n.id === 'frontend');
     if (feNode) feNode.state = feData.running ? 'running' : 'exited';
@@ -905,7 +1116,7 @@ async function initDbView() {
 async function loadMysqlTables() {
   const ul = document.getElementById('mysql-tables-ul');
   try {
-    const res = await fetch('/dashboard/api/db/mysql/tables');
+    const res = await fetch(`${API_BASE}/api/db/mysql/tables`);
     const tables = await res.json();
     if (tables.error) throw new Error(tables.error);
     ul.innerHTML = tables.map(t => `
@@ -934,7 +1145,7 @@ async function loadMysqlTable(table, offset = 0) {
 
   const params = new URLSearchParams({ limit: mysqlLimit, offset, search });
   try {
-    const res = await fetch(`/dashboard/api/db/mysql/table/${table}?${params}`);
+    const res = await fetch(`${API_BASE}/api/db/mysql/table/${table}?${params}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
@@ -998,7 +1209,7 @@ async function loadRedisKeys() {
   const ul = document.getElementById('redis-keys-ul');
   ul.innerHTML = '<div class="loading-row"><div class="spinner"></div></div>';
   try {
-    const res = await fetch(`/dashboard/api/db/redis/keys?pattern=${encodeURIComponent(pattern)}`);
+    const res = await fetch(`${API_BASE}/api/db/redis/keys?pattern=${encodeURIComponent(pattern)}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     document.getElementById('redis-total').textContent = `(${data.total} total)`;
@@ -1029,7 +1240,7 @@ async function loadRedisKey(key) {
   wrap.innerHTML = '<div class="loading-row"><div class="spinner"></div>Loading...</div>';
 
   try {
-    const res = await fetch(`/dashboard/api/db/redis/key?key=${encodeURIComponent(key)}`);
+    const res = await fetch(`${API_BASE}/api/db/redis/key?key=${encodeURIComponent(key)}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
@@ -1081,6 +1292,12 @@ function switchDbTab(tabName) {
   // Hide add buttons until a table/collection is loaded
   const mysqlAdd = document.getElementById('btn-mysql-add-row');
   if (mysqlAdd) mysqlAdd.style.display = 'none';
+
+  // Redis keys are loaded once at DB-view init. If keys were written after that
+  // (a cart, a ranking counter), the panel keeps showing the empty first read
+  // because nothing reloads it. MySQL sidesteps this — you click a table to see
+  // rows — but Redis has no such trigger, so refresh it whenever its tab opens.
+  if (tabName === 'redis') loadRedisKeys();
 }
 
 // ─── Add Row Modal & Submissions ──────────────────────────────────────────────
@@ -1272,7 +1489,7 @@ async function submitAddRow(event) {
     }
   });
 
-  let endpoint = `/dashboard/api/db/mysql/table/${modalTableOrCollection}`;
+  let endpoint = `${API_BASE}/api/db/mysql/table/${modalTableOrCollection}`;
 
   let method = 'POST';
   let bodyPayload = payload;
@@ -1320,7 +1537,7 @@ async function deleteMysqlRow(idx) {
   try {
     const params = new URLSearchParams();
     pkNames.forEach((k, i) => { params.append('pkNames[]', k); params.append('pkValues[]', pkValues[i]); });
-    const res = await fetch(`/dashboard/api/db/mysql/table/${mysqlCurrentTable}?${params}`, {
+    const res = await fetch(`${API_BASE}/api/db/mysql/table/${mysqlCurrentTable}?${params}`, {
       method: 'DELETE'
     });
     const result = await res.json();
@@ -1367,7 +1584,7 @@ function openTerminal(containerId, name) {
   termInstance.write('Connecting to container terminal...\r\n');
 
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const wsUrl = `${proto}://${location.host}/dashboard/ws/exec?id=${containerId}&cols=${cols}&rows=${rows}`;
+  const wsUrl = `${proto}://${location.host}${API_BASE}/ws/exec?id=${containerId}&cols=${cols}&rows=${rows}`;
   termWs = new WebSocket(wsUrl);
 
   termWs.onopen = () => {
@@ -1419,7 +1636,7 @@ async function triggerSync(event) {
   const tracker = startProgressBar('sync', 'sync-progress-container', 'sync-progress-bar', 'sync-progress-pct', 3);
 
   try {
-    const res = await fetch('/dashboard/api/sync/trigger', { method: 'POST' });
+    const res = await fetch(`${API_BASE}/api/sync/trigger`, { method: 'POST' });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     showToast('Database to Meilisearch sync completed', 'success');
@@ -1452,7 +1669,7 @@ async function runSql() {
   wrap.innerHTML = '<div style="padding: 20px; text-align: center;"><div class="spinner"></div>Running Query...</div>';
 
   try {
-    const res = await fetch('/dashboard/api/db/mysql/query', {
+    const res = await fetch(`${API_BASE}/api/db/mysql/query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sql })
@@ -1479,7 +1696,7 @@ async function runSql() {
 
 function exportMysqlDump() {
   showToast('Generating database export...', 'info');
-  window.location.href = '/dashboard/api/db/mysql/export';
+  window.location.href = `${API_BASE}/api/db/mysql/export`;
 }
 
 function triggerMysqlImport() {
@@ -1495,7 +1712,7 @@ async function handleMysqlImport(event) {
   showToast('Importing SQL dump...', 'info');
 
   try {
-    const res = await fetch('/dashboard/api/db/mysql/import', {
+    const res = await fetch(`${API_BASE}/api/db/mysql/import`, {
       method: 'POST',
       body: file
     });
@@ -1546,6 +1763,9 @@ const API_DESCRIPTIONS = {
 
   'GET /api/uam/roles':
     'Returns all realm-level roles defined in the Keycloak realm (e.g. <code>admin</code>, <code>user</code>). Requires an admin Bearer token forwarded by Kong. Used by the frontend to populate role assignment dropdowns.',
+
+  'GET /api/uam/groups':
+    'Lists the Keycloak realm groups (<code>Customer</code>, <code>Seller</code>, <code>admin-group</code>). The same route prefix also serves group members at <code>/api/uam/groups/{groupId}/members</code>. The Admin Portal uses this to identify administrators by <code>admin-group</code> membership — there is no "admin" realm role, so admins cannot be told apart from the plain user list. Requires an admin Bearer token.',
 
   // Storage
   'GET /api/storage':
@@ -1608,10 +1828,10 @@ const API_DESCRIPTIONS = {
     'Lists the authenticated user\'s saved payment methods (credit/debit cards) from MySQL via the <code>ecpay</code> Go service. Card details are stored encrypted; only type and masked number are returned.',
 
   'POST /api/payment-method':
-    'Registers a new payment method. The <code>ecpay</code> Go service tokenizes the card via Stripe API and stores the Stripe token reference in MySQL. Raw card numbers are never persisted.',
+    'Attaches a Stripe <strong>PaymentMethod</strong> to the user and saves the reference in MySQL. The body takes a Stripe PaymentMethod id (<code>payment_method_id</code>) — the card itself is tokenized in the browser by Stripe.js, so raw card numbers never reach mockten. For testing, Stripe\'s ready-made ids work directly: <code>pm_card_visa</code> (VISA 4242 4242 4242 4242) and <code>pm_card_mastercard</code> (5555 5555 5555 4444).',
 
   'PUT /api/payment-method':
-    'Updates metadata for an existing saved payment method (e.g. billing name). Does not re-tokenize — the Stripe token reference stays unchanged.',
+    'Marks a saved payment method as the user\'s <strong>default</strong> card (all others are unset). Served by the <code>ecpay</code> handler at <code>/api/payment-method/default</code>; Kong prefix-matches <code>/api/payment-method</code>. Body: <code>payment_method_id</code>.',
 
   'DELETE /api/payment-method':
     'Removes a saved payment method from MySQL and detaches the Stripe payment method via the Stripe API.',
@@ -1625,6 +1845,9 @@ const API_DESCRIPTIONS = {
   // Ranking
   'GET /api/ranking':
     'Returns top-ranked products ordered by total purchase count. The <code>ranking</code> Go service reads a sorted set from Redis that is updated in real-time on each purchase event. Supports optional category filter.',
+
+  'POST /api/ranking':
+    'Increments a product\'s score in the current month\'s Redis ranking sorted sets (both the per-category set and the cross-category "all" set) by <code>quantity</code>. Called on each purchase to keep best-seller rankings live. The backend handler lives at <code>/api/ranking/update</code> (Kong prefix-matches <code>/api/ranking</code>). No authentication required.',
 
   // Shipment
   'GET /api/shipment':
@@ -1701,6 +1924,30 @@ const API_DESCRIPTIONS = {
 
   'GET /api/seller/categories':
     'Returns the complete list of product categories from MySQL, ordered by name. Used by the seller portal to populate the category dropdown when creating or editing products. Requires a valid seller Bearer token.',
+
+  // Admin Portal
+  'GET /api/admin/orders':
+    'Returns the paginated list of <em>flagged</em> orders for the Admin Portal\'s Order Monitoring view. The <code>sale</code> Go service scans recent orders and flags each one with a derived reason: <code>Failed / canceled</code> (status canceled/refunded/failed), <code>Unusual location</code> (shipping destination in an EU country, resolved via the <code>Geo</code> table), <code>Multiple rapid orders</code> (≥3 orders by the same user within 15 minutes), or <code>High value</code> (amount ≥ $200). Only flagged orders are returned. Requires an admin Bearer token.',
+
+  'GET /api/admin/audit':
+    'Returns the paginated platform audit trail (most recent first) for the Admin Portal\'s Activity Logs view. Each entry records an action, the actor (email from the JWT), an optional target, a status (success/failure/warning), and a timestamp, read from the <code>AuditLog</code> MySQL table. Supports <code>page</code> / <code>limit</code> query params. Requires an admin Bearer token.',
+
+  'POST /api/admin/audit':
+    'Appends an entry to the platform audit trail (<code>AuditLog</code> table). The actor is taken from the caller\'s JWT; the body supplies the <code>action</code> (required), an optional <code>target</code>, and an optional <code>status</code> (defaults to <code>success</code>). Used across the platform to record security-relevant events such as logins, order placement, and admin operations. Requires any valid Bearer token.',
+
+  'GET /api/admin/health':
+    'Returns live system-health for the Admin Portal\'s System Health / System Alerts panels. The <code>sale</code> Go service derives each component\'s status from real signals — database reachability and table row counts (e.g. the Catalog/Inventory component reflects the out-of-stock ratio) — and emits colloquial alerts when a component is degraded, plus summary metrics. Requires an admin Bearer token.',
+
+  'GET /api/uam/users/([^/]+)':
+    'Fetches a single Keycloak user by UUID via the Admin REST API (the <code>userId</code> path segment is the Keycloak user id). Used by the Admin Portal\'s Edit User screen to prefill the form, including custom attributes such as <code>storeName</code>. Kong forwards the admin Bearer token and rewrites the URI to the Keycloak admin endpoint.',
+
+  'PUT /api/uam/users/([^/]+)':
+    'Updates a single Keycloak user by UUID via the Admin REST API. Used by the Admin Portal\'s Edit User screen to save changes to name, email, enabled state, and custom attributes (e.g. <code>storeName</code>). The <code>userId</code> path segment is the Keycloak user id. Requires an admin Bearer token forwarded by Kong.',
+
+  'GET /api/admin/seller':
+    'Returns a seller\'s store profile (store name + description) by <code>email</code>, read from the same <code>Seller</code> table the storefront and Seller Portal use. Lets the Admin Portal show the real buyer-facing store name instead of only the Keycloak attribute (which is empty for pre-seeded sellers). Requires an admin Bearer token.',
+  'PUT /api/admin/seller':
+    'Updates a seller\'s buyer-facing store name in the <code>Seller</code> table, so an admin edit actually changes what buyers see on the storefront (not just the Keycloak attribute). Body: <code>email</code> + <code>seller_name</code>. Requires an admin Bearer token.',
 };
 
 const API_DESCRIPTIONS_JA = {
@@ -1715,6 +1962,7 @@ const API_DESCRIPTIONS_JA = {
   'DELETE /api/uam/users/([^/]+)': 'Admin REST APIでKeycloakレルムのユーザーをUUID指定で削除します。<code>userId</code>パスがKeycloakユーザーIDです。管理者Bearerトークンが必要です（KongがURIをKeycloak管理エンドポイントに書き換えます）。',
   'PUT /api/uam/users/([^/]+)/execute-actions-email': '<code>userId</code>で指定したユーザーにKeycloakの「必須アクション実行」メール（パスワードリセット／メール確認など）を送信します。クエリでクライアント・リダイレクト先・リンク有効期間を指定可能。管理者Bearerトークンが必要です。',
   'GET /api/uam/roles': 'Keycloakレルムで定義されたすべてのレルムロールを返します。Kongが管理者トークンを転送します。フロントエンドのロール割り当てドロップダウンの生成に使用されます。',
+  'GET /api/uam/groups': 'Keycloakレルムのグループ（<code>Customer</code>／<code>Seller</code>／<code>admin-group</code>）を一覧します。同じパス配下の<code>/api/uam/groups/{groupId}/members</code>でメンバーも取得できます。「admin」レルムロールが存在せず、ユーザー一覧だけでは管理者を判別できないため、Admin Portalは<code>admin-group</code>所属で管理者を識別します。管理者Bearerトークンが必要です。',
   'GET /api/storage': 'MinIOオブジェクトストレージ（<code>/photos</code>バケット）へのGETリクエストをプロキシします。<code>/api/storage</code>以降のパスがMinIOのファイル名に直接マップされます。',
   'GET /api/search': 'MeiliSearchを利用した全文商品検索。キーワード、ページネーション、カテゴリ、在庫状況、価格範囲、最低評価などのフィルターをサポートします。',
   'GET /api/categories': 'MySQLから商品カテゴリの全リストを返します。フロントエンドの検索バーのカテゴリフィルタードロップダウンに使用されます。',
@@ -1735,12 +1983,13 @@ const API_DESCRIPTIONS_JA = {
   'GET /api/geo': '保存済みのジオコーディング済み住所レコードを返します。チェックアウト時の配送先選択に使用されます。',
   'PUT /api/geo': 'Google Maps APIで返された緯度経度座標とともに新しい住所を保存します。',
   'GET /api/payment-method': '認証済みユーザーの保存済み支払い方法をMySQLから一覧表示します。カード詳細は暗号化されており、種類とマスクされた番号のみ返します。',
-  'POST /api/payment-method': '新しい支払い方法を登録します。Stripe APIでカードをトークン化し、StripeトークンリファレンスのみMySQLに保存します。',
-  'PUT /api/payment-method': '既存の支払い方法のメタデータを更新します（例：請求者名）。Stripeトークンは変更されません。',
+  'POST /api/payment-method': 'Stripeの<strong>PaymentMethod</strong>をユーザーに紐付け、参照をMySQLに保存します。ボディにはStripeのPaymentMethod ID（<code>payment_method_id</code>）を渡します。カード自体はブラウザ側のStripe.jsでトークン化されるため、生のカード番号はmocktenに届きません。テストにはStripe既製のIDがそのまま使えます: <code>pm_card_visa</code>（VISA 4242 4242 4242 4242）、<code>pm_card_mastercard</code>（5555 5555 5555 4444）。',
+  'PUT /api/payment-method': '保存済みの支払い方法をユーザーの<strong>デフォルト</strong>カードに設定します（他はすべて解除）。実体は<code>ecpay</code>の<code>/api/payment-method/default</code>ハンドラで、Kongが<code>/api/payment-method</code>を前方一致します。ボディ: <code>payment_method_id</code>。',
   'DELETE /api/payment-method': 'MySQLから支払い方法を削除し、Stripe APIでも決済方法を切り離します。',
   'GET /api/payment': '認証済みユーザーの注文・支払い履歴をMySQLから返します。',
   'POST /api/payment': 'Stripe APIで支払いを実行します。注文をMySQLに記録し、配送・ランキングサービスを非同期で起動します。',
   'GET /api/ranking': '購入数順の上位商品を返します。RedisのソートセットをリアルタイムでP更新します。カテゴリフィルターをサポートします。',
+  'POST /api/ranking': '当月のRedisランキング（カテゴリ別セットと全体「all」セット）で商品スコアを<code>quantity</code>だけ加算します。購入ごとに呼ばれ、ベストセラーをリアルタイム更新します。バックエンドの実体は<code>/api/ranking/update</code>（Kongが<code>/api/ranking</code>を前方一致）。認証不要。',
   'GET /api/shipment': 'MySQLからユーザーの配送記録を返します。注文ID、受取人、住所、配送状況（準備中/輸送中/配達済み）を含みます。',
   'POST /api/shipment': 'MySQLに新しい配送記録を作成し、配送ステートマシンを開始します。「準備中」→「輸送中」→「配達済み」の順に進行します。',
   'GET /api/sale': 'MeiliSearchから現在有効なセール商品を返します。割引メタデータ付きで索引化されています。',
@@ -1768,6 +2017,16 @@ const API_DESCRIPTIONS_JA = {
   'GET /api/seller/profile': 'JWTから取得したセラーのメールアドレスをキーに<code>Seller</code>テーブルからストア名とベンダー説明を返します。未設定の場合はサインアップ時のstoreName属性をフォールバックとして返します。有効なセラーJWTが必要です。',
   'PUT /api/seller/profile': '認証済みセラーのストア名を作成または更新します（<code>INSERT … ON DUPLICATE KEY UPDATE</code>）。有効なセラーJWTが必要です。',
   'GET /api/seller/categories': 'MySQLから商品カテゴリの全リストを名前順で返します。商品作成・編集時のカテゴリドロップダウンに使用されます。有効なセラーJWTが必要です。',
+
+  // Admin Portal
+  'GET /api/admin/orders': 'Admin PortalのOrder Monitoring用に、<em>フラグ付き</em>注文のページネーションリストを返します。<code>sale</code>サービスが最近の注文を走査し、理由を付与します: <code>Failed / canceled</code>（キャンセル/返金/失敗）、<code>Unusual location</code>（EU圏への配送、<code>Geo</code>テーブルで判定）、<code>Multiple rapid orders</code>（同一ユーザーが15分以内に3件以上）、<code>High value</code>（金額200ドル以上）。フラグ付きの注文のみ返します。管理者Bearerトークンが必要です。',
+  'GET /api/admin/audit': 'Admin PortalのActivity Logs用に、プラットフォーム監査ログ（新しい順）をページネーションで返します。各エントリはaction、actor（JWTのメール）、target（任意）、status（success/failure/warning）、タイムスタンプを<code>AuditLog</code>テーブルから読み取ります。<code>page</code>/<code>limit</code>クエリに対応。管理者Bearerトークンが必要です。',
+  'POST /api/admin/audit': 'プラットフォーム監査ログ（<code>AuditLog</code>テーブル）にエントリを追加します。actorは呼び出し元のJWTから取得。ボディで<code>action</code>（必須）、<code>target</code>（任意）、<code>status</code>（省略時<code>success</code>）を指定します。ログイン・注文確定・管理操作などのセキュリティ関連イベントの記録に使用します。有効なBearerトークンが必要です。',
+  'GET /api/admin/health': 'Admin PortalのSystem Health / System Alertsパネル用に、リアルタイムのシステムヘルスを返します。<code>sale</code>サービスが各コンポーネントの状態を実シグナル（DB到達性・テーブル行数。例: Catalog/Inventoryは在庫切れ比率を反映）から算出し、劣化時には口語的なアラートとサマリメトリクスを出力します。管理者Bearerトークンが必要です。',
+  'GET /api/uam/users/([^/]+)': 'Admin REST APIでKeycloakユーザーをUUID指定で1件取得します（<code>userId</code>パスがKeycloakユーザーID）。Admin PortalのEdit User画面で、<code>storeName</code>などのカスタム属性を含むフォームの事前入力に使用します。Kongが管理者Bearerトークンを転送しURIを書き換えます。',
+  'PUT /api/uam/users/([^/]+)': 'Admin REST APIでKeycloakユーザーをUUID指定で1件更新します。Admin PortalのEdit User画面で、氏名・メール・有効状態・カスタム属性（例<code>storeName</code>）の変更保存に使用します。<code>userId</code>パスがKeycloakユーザーID。管理者Bearerトークンが必要です。',
+  'GET /api/admin/seller': '<code>email</code>でセラーのストアプロフィール（ストア名・説明）を返します。ストアフロントやSeller Portalが参照するのと同じ<code>Seller</code>テーブルから読み取り、Admin Portalが（事前投入セラーでは空になる）Keycloak属性ではなく実際の店名を表示できるようにします。管理者Bearerトークンが必要です。',
+  'PUT /api/admin/seller': '<code>Seller</code>テーブルのセラーの店名（購入者に見える店名）を更新します。管理者の編集がKeycloak属性だけでなくストアフロント表示にも反映されます。ボディ: <code>email</code> + <code>seller_name</code>。管理者Bearerトークンが必要です。',
 };
 
 const API_DESCRIPTIONS_ZH = {
@@ -1782,6 +2041,7 @@ const API_DESCRIPTIONS_ZH = {
   'DELETE /api/uam/users/([^/]+)': '通过Admin REST API按UUID删除Keycloak领域中的用户。<code>userId</code>路径段为Keycloak用户ID。需要管理员Bearer令牌（Kong会将URI重写为Keycloak管理端点）。',
   'PUT /api/uam/users/([^/]+)/execute-actions-email': '向<code>userId</code>指定的用户发送Keycloak"执行必需操作"邮件（如密码重置/邮箱验证）。可通过查询参数控制客户端、重定向URL和链接有效期。需要管理员Bearer令牌。',
   'GET /api/uam/roles': '返回Keycloak领域中定义的所有领域角色。需要管理员Bearer令牌，用于前端角色分配下拉菜单。',
+  'GET /api/uam/groups': '列出Keycloak领域的组（<code>Customer</code>／<code>Seller</code>／<code>admin-group</code>）。同一路径前缀下的<code>/api/uam/groups/{groupId}/members</code>可获取组成员。由于不存在「admin」领域角色、仅凭用户列表无法区分管理员，Admin Portal通过<code>admin-group</code>成员身份识别管理员。需要管理员Bearer令牌。',
   'GET /api/storage': '代理对MinIO对象存储（<code>/photos</code>存储桶）的GET请求。路径段直接映射到MinIO中的文件名。',
   'GET /api/search': '由MeiliSearch支持的全文商品搜索，支持关键词、分页、类别、库存状态、价格范围和最低评分等过滤器。',
   'GET /api/categories': '从MySQL返回完整的商品类别列表，用于前端搜索栏的类别过滤下拉菜单。',
@@ -1802,12 +2062,13 @@ const API_DESCRIPTIONS_ZH = {
   'GET /api/geo': '返回用户保存的地理编码地址记录，用于结账时选择配送地址。',
   'PUT /api/geo': '保存带有Google Maps API返回的经纬度坐标的新地址。',
   'GET /api/payment-method': '从MySQL列出已认证用户的保存支付方式。卡片详情已加密，仅返回类型和脱敏卡号。',
-  'POST /api/payment-method': '注册新的支付方式。通过Stripe API对卡片进行令牌化，仅将Stripe令牌引用存储在MySQL中。',
-  'PUT /api/payment-method': '更新现有支付方式的元数据（如账单姓名）。Stripe令牌保持不变。',
+  'POST /api/payment-method': '将Stripe的<strong>PaymentMethod</strong>附加到用户并将引用保存到MySQL。请求体传入Stripe PaymentMethod ID（<code>payment_method_id</code>）。卡片本身由浏览器端的Stripe.js令牌化，原始卡号不会到达mockten。测试可直接使用Stripe现成ID：<code>pm_card_visa</code>（VISA 4242 4242 4242 4242）、<code>pm_card_mastercard</code>（5555 5555 5555 4444）。',
+  'PUT /api/payment-method': '将已保存的支付方式设为用户的<strong>默认</strong>卡片（其余取消默认）。实际由<code>ecpay</code>的<code>/api/payment-method/default</code>处理，Kong前缀匹配<code>/api/payment-method</code>。请求体：<code>payment_method_id</code>。',
   'DELETE /api/payment-method': '从MySQL删除支付方式并通过Stripe API分离支付方法。',
   'GET /api/payment': '从MySQL返回已认证用户的订单/支付历史。',
   'POST /api/payment': '通过Stripe API执行支付，将订单记录到MySQL，并异步触发配送和排名服务。',
   'GET /api/ranking': '按购买量返回排名靠前的商品。Redis有序集合实时更新。支持可选的类别过滤器。',
+  'POST /api/ranking': '在当月的Redis排名有序集合（类别集合与跨类别"all"集合）中，将商品分数增加<code>quantity</code>。每次购买时调用以实时更新畅销榜。后端实体位于<code>/api/ranking/update</code>（Kong前缀匹配<code>/api/ranking</code>）。无需认证。',
   'GET /api/shipment': '从MySQL返回用户的配送记录，包含订单ID、收件人、地址和配送状态。',
   'POST /api/shipment': '在MySQL中创建新的配送记录并启动配送状态机：准备中→运输中→已送达。',
   'GET /api/sale': '从MeiliSearch返回当前有效的促销商品，带有折扣元数据。',
@@ -1835,6 +2096,16 @@ const API_DESCRIPTIONS_ZH = {
   'GET /api/seller/profile': '从<code>Seller</code>表返回已认证卖家的店铺名称和供应商描述。若尚未设置，则回退到注册时的storeName属性。需要有效的卖家Bearer令牌。',
   'PUT /api/seller/profile': '创建或更新已认证卖家的店铺名称（使用<code>INSERT … ON DUPLICATE KEY UPDATE</code>）。需要有效的卖家Bearer令牌。',
   'GET /api/seller/categories': '从MySQL按名称顺序返回商品分类完整列表，用于创建或编辑商品时的分类下拉菜单。需要有效的卖家Bearer令牌。',
+
+  // Admin Portal
+  'GET /api/admin/orders': '为Admin Portal的订单监控视图返回分页的<em>已标记</em>订单列表。<code>sale</code>服务扫描近期订单并为每个订单附加原因：<code>Failed / canceled</code>（已取消/退款/失败）、<code>Unusual location</code>（配送目的地为欧盟国家，通过<code>Geo</code>表判定）、<code>Multiple rapid orders</code>（同一用户15分钟内≥3单）、<code>High value</code>（金额≥200美元）。仅返回已标记订单。需要管理员Bearer令牌。',
+  'GET /api/admin/audit': '为Admin Portal的活动日志视图返回分页的平台审计记录（最新优先）。每条记录包含action、actor（JWT中的邮箱）、可选target、status（success/failure/warning）和时间戳，读取自<code>AuditLog</code>表。支持<code>page</code>/<code>limit</code>查询参数。需要管理员Bearer令牌。',
+  'POST /api/admin/audit': '向平台审计记录（<code>AuditLog</code>表）追加一条记录。actor取自调用方JWT；请求体提供<code>action</code>（必填）、可选<code>target</code>、可选<code>status</code>（默认<code>success</code>）。用于记录登录、下单、管理操作等安全相关事件。需要有效的Bearer令牌。',
+  'GET /api/admin/health': '为Admin Portal的系统健康/系统告警面板返回实时系统健康状态。<code>sale</code>服务根据真实信号（数据库可达性与表行数，例如Catalog/Inventory反映缺货比例）推导各组件状态，组件劣化时输出口语化告警及汇总指标。需要管理员Bearer令牌。',
+  'GET /api/uam/users/([^/]+)': '通过Admin REST API按UUID获取单个Keycloak用户（<code>userId</code>路径段为Keycloak用户ID）。用于Admin Portal的编辑用户界面预填表单，包括<code>storeName</code>等自定义属性。Kong转发管理员Bearer令牌并重写URI。',
+  'PUT /api/uam/users/([^/]+)': '通过Admin REST API按UUID更新单个Keycloak用户。用于Admin Portal的编辑用户界面保存姓名、邮箱、启用状态及自定义属性（如<code>storeName</code>）。<code>userId</code>路径段为Keycloak用户ID。需要管理员Bearer令牌。',
+  'GET /api/admin/seller': '按<code>email</code>返回卖家的店铺资料（店铺名+简介），读取自店面和卖家门户使用的同一<code>Seller</code>表，使Admin Portal显示真实的面向买家店铺名，而非（预置卖家为空的）Keycloak属性。需要管理员Bearer令牌。',
+  'PUT /api/admin/seller': '更新<code>Seller</code>表中卖家的面向买家店铺名，使管理员的修改真正改变买家在店面看到的名称（而不仅是Keycloak属性）。请求体：<code>email</code> + <code>seller_name</code>。需要管理员Bearer令牌。',
 };
 
 const API_SCHEMAS = {
@@ -1847,7 +2118,7 @@ const API_SCHEMAS = {
   ],
   'GET /api/uam/auth': [
     { name: 'response_type', location: 'query', type: 'string', desc: 'Must be "code" for authorization code flow', desc_ja: '認可コードフローには"code"を指定',          desc_zh: '授权码流程必须填"code"',          required: true,  default: 'code' },
-    { name: 'redirect_uri',  location: 'query', type: 'string', desc: 'Callback URL after login',                   desc_ja: 'ログイン後のコールバックURL',              desc_zh: '登录后的回调URL',                 required: true,  default: 'http://localhost/callback' },
+    { name: 'redirect_uri',  location: 'query', type: 'string', desc: 'Callback URL after login',                   desc_ja: 'ログイン後のコールバックURL',              desc_zh: '登录后的回调URL',                 required: true,  default: (CAPS.urls && CAPS.urls.storefront ? CAPS.urls.storefront.replace(/\/$/, '') : window.location.origin) + '/callback' },
     { name: 'scope',         location: 'query', type: 'string', desc: 'Requested scopes (space-separated)',          desc_ja: 'リクエストするスコープ（スペース区切り）', desc_zh: '请求的范围（空格分隔）',           required: false, default: 'openid profile email' },
     { name: 'state',         location: 'query', type: 'string', desc: 'Random string for CSRF protection',           desc_ja: 'CSRF対策用ランダム文字列',               desc_zh: 'CSRF防护用随机字符串',             required: false, default: '' },
     { name: 'nonce',         location: 'query', type: 'string', desc: 'Nonce embedded in ID token',                  desc_ja: 'IDトークンに埋め込まれるnonce',          desc_zh: '嵌入ID令牌的nonce值',              required: false, default: '' },
@@ -1859,6 +2130,7 @@ const API_SCHEMAS = {
     { name: 'max',   location: 'query', type: 'integer', desc: 'Max number of users to return',      desc_ja: '返す最大ユーザー数',            desc_zh: '返回的最大用户数',       required: false, default: 20 }
   ],
   'GET /api/uam/roles': ['__auth__'],
+  'GET /api/uam/groups': ['__auth__'],
   'POST /api/uam/creation/token': [
     { name: 'username', location: 'body', type: 'string', desc: 'Admin login name', desc_ja: '管理者ユーザー名', desc_zh: '管理员用户名', required: true, default: 'superadmin' },
     { name: 'password', location: 'body', type: 'string', desc: 'Admin password',   desc_ja: '管理者パスワード', desc_zh: '管理员密码',   required: true, default: 'superadmin' }
@@ -1923,14 +2195,14 @@ const API_SCHEMAS = {
   ],
   'POST /api/payment-method': [
     '__auth__',
-    { name: 'type',    location: 'body', type: 'string', desc: 'Card type (e.g. VISA, JCB)',        desc_ja: 'カード種別（例：VISA、JCB）', desc_zh: '卡类型（如VISA、JCB）',   required: true, default: 'VISA' },
-    { name: 'details', location: 'body', type: 'object', desc: 'Payment card details object',       desc_ja: 'カード詳細オブジェクト',     desc_zh: '支付卡详情对象',          required: true, default: '{"card_number":"1111222233334444","holder_name":"Liam Smith"}' }
+    { name: 'payment_method_id', location: 'body', type: 'string', desc: "Stripe PaymentMethod id to attach. Use Stripe's test id pm_card_visa (VISA 4242…); pm_card_mastercard also works.", desc_ja: 'アタッチするStripe PaymentMethod ID。Stripeのテスト用 pm_card_visa（VISA 4242…）が使えます。pm_card_mastercard も可。', desc_zh: '要附加的Stripe PaymentMethod ID。可用Stripe测试ID pm_card_visa（VISA 4242…）；也可用 pm_card_mastercard。', required: true, default: 'pm_card_visa' }
   ],
   'POST /api/shipment': [
     '__auth__',
-    { name: 'orderId',    location: 'body', type: 'string', desc: 'Associated Order UUID',       desc_ja: '関連注文UUID',       desc_zh: '关联订单UUID',   required: true, default: 'dc105f9f-501f-43b2-9916-5c1151a91e9e' },
-    { name: 'recipient',  location: 'body', type: 'string', desc: 'Full name of recipient',      desc_ja: '受取人のフルネーム', desc_zh: '收件人全名',     required: true, default: 'Liam Smith' },
-    { name: 'address',    location: 'body', type: 'string', desc: 'Shipping address details',    desc_ja: '配送先住所の詳細',   desc_zh: '配送地址详情',   required: true, default: '1-1 Chiyoda, Tokyo' }
+    { name: 'product_id',      location: 'body', type: 'string',  desc: 'Product being shipped (auto-filled with a real product)', desc_ja: '配送する商品（実在の商品で自動入力）', desc_zh: '要配送的商品（自动填充真实商品）', required: true,  default: '__first_product_id__' },
+    { name: 'geo_id',          location: 'body', type: 'string',  desc: 'Destination address id (auto-filled with a real geo_id)',  desc_ja: '配送先住所ID（実在のgeo_idで自動入力）', desc_zh: '目的地地址ID（自动填充真实geo_id）', required: true,  default: '__first_geo_id__' },
+    { name: 'quantity',        location: 'body', type: 'integer', desc: 'Units to ship',                                            desc_ja: '配送数量',        desc_zh: '配送数量',        required: true,  default: 1 },
+    { name: 'scheduled_start', location: 'body', type: 'string',  desc: 'Optional delivery start "YYYY-MM-DD HH:MM:SS". Omitted in TEST_MODE, where delivery advances immediately.', desc_ja: '任意の配送開始日時「YYYY-MM-DD HH:MM:SS」。TEST_MODEでは省略され、即時に配送が進みます。', desc_zh: '可选的配送开始时间「YYYY-MM-DD HH:MM:SS」。TEST_MODE下省略，配送立即推进。', required: false, default: '' }
   ],
   'GET /api/recommendation': [
     { name: 'user_id', location: 'query', type: 'string', desc: 'User email or ID for personalized recommendations', desc_ja: 'パーソナライズ推薦用ユーザーメールまたはID', desc_zh: '个性化推荐用用户邮箱或ID', required: true, default: 'dev_user_001@example.com' }
@@ -1986,28 +2258,35 @@ const API_SCHEMAS = {
   ],
   'PUT /api/geo': [
     '__auth__',
-    { name: 'user_id',    location: 'body', type: 'string', desc: 'User ID',        desc_ja: 'ユーザーID',  desc_zh: '用户ID',    required: true, default: '__superadmin_email__' },
-    { name: 'postalCode', location: 'body', type: 'string', desc: 'Postal code',    desc_ja: '郵便番号',    desc_zh: '邮政编码',  required: true, default: '100-0001' },
-    { name: 'address',    location: 'body', type: 'string', desc: 'Street address', desc_ja: '住所',        desc_zh: '街道地址',  required: true, default: '1-1 Chiyoda, Tokyo' },
+    { name: 'geo_id',       location: 'body', type: 'string', desc: 'Saved address id to update (auto-filled with a real geo_id)', desc_ja: '更新する保存済み住所ID（実在のgeo_idで自動入力）', desc_zh: '要更新的已保存地址ID（自动填充真实geo_id）', required: true,  default: '__first_geo_id__' },
+    { name: 'user_id',      location: 'body', type: 'string', desc: 'Owner of the address',  desc_ja: '住所の所有者',  desc_zh: '地址所有者',  required: true,  default: '__superadmin_email__' },
+    { name: 'postal_code',  location: 'body', type: 'string', desc: 'Postal code',           desc_ja: '郵便番号',      desc_zh: '邮政编码',    required: true,  default: '105-0011' },
+    { name: 'prefecture',   location: 'body', type: 'string', desc: 'Prefecture / state',    desc_ja: '都道府県',      desc_zh: '都道府县/州', required: true,  default: 'Tokyo' },
+    { name: 'city',         location: 'body', type: 'string', desc: 'City',                  desc_ja: '市区町村',      desc_zh: '城市',        required: true,  default: 'Minato City' },
+    { name: 'town',         location: 'body', type: 'string', desc: 'Town / street',         desc_ja: '町名・番地',    desc_zh: '街道',        required: true,  default: 'Shibakoen 4-2-8' },
+    { name: 'country_code', location: 'body', type: 'string', desc: 'ISO country code',      desc_ja: 'ISO国コード',   desc_zh: 'ISO国家代码', required: false, default: 'JP' },
   ],
 
   // ── Payment ─────────────────────────────────────────────────────────────────
   'GET /api/payment-method': ['__auth__'],
   'PUT /api/payment-method': [
     '__auth__',
-    { name: 'id',      location: 'body', type: 'string', desc: 'Payment method ID to update',  desc_ja: '更新する支払い方法ID',      desc_zh: '要更新的支付方式ID',     required: true, default: '' },
-    { name: 'type',    location: 'body', type: 'string', desc: 'Card type (VISA, JCB, etc.)',  desc_ja: 'カード種別（VISA、JCB等）', desc_zh: '卡类型（VISA、JCB等）',  required: true, default: 'VISA' },
-    { name: 'details', location: 'body', type: 'object', desc: 'Updated card details object',  desc_ja: '更新後のカード詳細',        desc_zh: '更新后的卡详情对象',     required: true, default: '{"card_number":"1111222233334444","holder_name":"Liam Smith"}' }
+    { name: 'payment_method_id', location: 'body', type: 'string', desc: 'Saved payment-method id to make the default (auto-filled with a real saved card)', desc_ja: 'デフォルトにする保存済み支払い方法ID（実在のカードで自動入力）', desc_zh: '设为默认的已保存支付方式ID（自动填充真实卡片）', required: true, default: '__first_payment_method_id__' }
   ],
   'DELETE /api/payment-method': [
     '__auth__',
-    { name: 'id', location: 'body', type: 'string', desc: 'Payment method ID to delete', desc_ja: '削除する支払い方法ID', desc_zh: '要删除的支付方式ID', required: true, default: '' }
+    { name: 'payment_method_id', location: 'body', type: 'string', desc: 'Saved payment-method id to delete (auto-filled with a real saved card)', desc_ja: '削除する保存済み支払い方法ID（実在のカードで自動入力）', desc_zh: '要删除的已保存支付方式ID（自动填充真实卡片）', required: true, default: '__first_payment_method_id__' }
   ],
   'GET /api/payment': ['__auth__'],
 
   // ── Ranking ─────────────────────────────────────────────────────────────────
   'GET /api/ranking': [
     { name: 'category', location: 'query', type: 'string', desc: 'Filter by category slug (optional)', desc_ja: 'カテゴリスラグでフィルター（任意）', desc_zh: '按分类标识过滤（可选）', required: false, default: '' }
+  ],
+  'POST /api/ranking': [
+    { name: 'product_id',  location: 'body', type: 'string',  desc: 'Product whose ranking score to increment', desc_ja: 'スコアを加算する商品ID', desc_zh: '要增加排名分数的商品ID', required: true, default: '__first_product_id__' },
+    { name: 'category_id', location: 'body', type: 'integer', desc: 'Numeric category id of the product',       desc_ja: '商品の数値カテゴリID',   desc_zh: '商品的数字类别ID',       required: true, default: 1 },
+    { name: 'quantity',    location: 'body', type: 'integer', desc: 'Amount to add to the score (units bought)', desc_ja: 'スコアに加算する数量（購入数）', desc_zh: '要增加的分数（购买数量）', required: true, default: 1 }
   ],
 
   // ── Shipment ────────────────────────────────────────────────────────────────
@@ -2115,6 +2394,45 @@ const API_SCHEMAS = {
   // ── Storage ─────────────────────────────────────────────────────────────────
   'GET /api/storage': [
     { name: 'path', location: 'path', type: 'string', desc: 'Photo filename (appended to URL)', desc_ja: '画像ファイル名（URLに付加）', desc_zh: '图片文件名（附加到URL）', required: true, default: '__first_product_id_png__' }
+  ],
+
+  // ── Admin Portal ────────────────────────────────────────────────────────────
+  'GET /api/admin/orders': [
+    '__auth__',
+    { name: 'page',  location: 'query', type: 'integer', desc: 'Page number (1-based)', desc_ja: 'ページ番号（1始まり）', desc_zh: '页码（从1开始）', required: false, default: 1 },
+    { name: 'limit', location: 'query', type: 'integer', desc: 'Flagged orders per page (max 100)', desc_ja: '1ページあたりのフラグ付き注文数（最大100）', desc_zh: '每页已标记订单数（最多100）', required: false, default: 10 }
+  ],
+  'GET /api/admin/audit': [
+    '__auth__',
+    { name: 'page',  location: 'query', type: 'integer', desc: 'Page number (1-based)', desc_ja: 'ページ番号（1始まり）', desc_zh: '页码（从1开始）', required: false, default: 1 },
+    { name: 'limit', location: 'query', type: 'integer', desc: 'Audit entries per page', desc_ja: '1ページあたりの監査エントリ数', desc_zh: '每页审计条数', required: false, default: 10 }
+  ],
+  'POST /api/admin/audit': [
+    '__auth__',
+    { name: 'action', location: 'body', type: 'string', desc: 'Action name to record (required)', desc_ja: '記録するアクション名（必須）', desc_zh: '要记录的操作名称（必填）', required: true,  default: 'Manual Test Event' },
+    { name: 'target', location: 'body', type: 'string', desc: 'Optional target the action applies to', desc_ja: 'アクション対象（任意）', desc_zh: '操作作用的目标（可选）', required: false, default: 'order:demo-0001' },
+    { name: 'status', location: 'body', type: 'string', desc: 'Outcome: success / failure / warning (defaults to success)', desc_ja: '結果: success / failure / warning（省略時success）', desc_zh: '结果：success / failure / warning（默认success）', required: false, default: 'success' }
+  ],
+  'GET /api/admin/health': [
+    '__auth__'
+  ],
+  'GET /api/uam/users/([^/]+)': [
+    '__auth__',
+    { name: 'userId', location: 'path', type: 'string', desc: 'Keycloak user UUID (auto-filled with a real dev_user_* id)', desc_ja: 'KeycloakユーザーUUID（実在のdev_user_*で自動入力）', desc_zh: 'Keycloak用户UUID（自动填充真实dev_user_*）', required: true, default: '__first_user_id__' }
+  ],
+  'PUT /api/uam/users/([^/]+)': [
+    '__auth__',
+    { name: 'userId',  location: 'path', type: 'string',  desc: 'Keycloak user UUID (auto-filled with a real dev_user_* id)', desc_ja: 'KeycloakユーザーUUID（実在のdev_user_*で自動入力）', desc_zh: 'Keycloak用户UUID（自动填充真实dev_user_*）', required: true, default: '__first_user_id__' },
+    { name: 'enabled', location: 'body', type: 'boolean', desc: 'Whether the account is enabled (partial update)', desc_ja: 'アカウント有効フラグ（部分更新）', desc_zh: '账号是否启用（部分更新）', required: false, default: true }
+  ],
+  'GET /api/admin/seller': [
+    '__auth__',
+    { name: 'email', location: 'query', type: 'string', desc: "Seller's email (= their Seller table id)", desc_ja: 'セラーのメール（＝Sellerテーブルのid）', desc_zh: '卖家邮箱（= Seller表的id）', required: true, default: 'auto_parts@example.com' }
+  ],
+  'PUT /api/admin/seller': [
+    '__auth__',
+    { name: 'email',       location: 'body', type: 'string', desc: "Seller's email (= their Seller table id)", desc_ja: 'セラーのメール（＝Sellerテーブルのid）', desc_zh: '卖家邮箱（= Seller表的id）', required: true, default: 'auto_parts@example.com' },
+    { name: 'seller_name', location: 'body', type: 'string', desc: 'New buyer-facing store name', desc_ja: '新しい購入者向け店名', desc_zh: '新的面向买家店铺名', required: true, default: 'Auto Parts Shop' }
   ]
 };
 
@@ -2248,6 +2566,9 @@ const API_RESPONSE_SCHEMAS = {
     { field: 'ranking[].summary',      type: 'string',  desc: 'Short product description',              desc_ja: '商品の簡単な説明',              desc_zh: '商品简短描述' },
     { field: 'ranking[].price',        type: 'integer', desc: 'Price in JPY',                           desc_ja: '価格（円）',                   desc_zh: '价格（日元）' },
     { field: 'ranking[].rating',       type: 'number',  desc: 'Average review rating (0–5)',            desc_ja: 'レビュー平均評価（0〜5）',       desc_zh: '平均评分（0–5）' },
+  ],
+  'POST /api/ranking': [
+    { field: 'message', type: 'string', desc: 'Confirmation that the ranking score was updated', desc_ja: 'ランキングスコア更新の確認メッセージ', desc_zh: '排名分数已更新的确认消息' },
   ],
   'GET /api/shipment': [
     { field: '[].transaction_id', type: 'string', desc: 'Shipment transaction identifier',           desc_ja: '配送トランザクションID',          desc_zh: '配送交易标识符' },
@@ -2432,12 +2753,79 @@ const API_RESPONSE_SCHEMAS = {
     { field: 'slowApis[].avgMs',           type: 'integer', desc: 'Average response time in milliseconds',                               desc_ja: '平均レスポンス時間（ミリ秒）',                                     desc_zh: '平均响应时间（毫秒）' },
     { field: 'slowApis[].sampleCount',     type: 'integer', desc: 'Number of samples used for the average',                              desc_ja: '平均算出に使用したサンプル数',                                     desc_zh: '用于计算平均值的样本数量' },
   ],
+
+  // ── Admin Portal ────────────────────────────────────────────────────────────
+  'GET /api/admin/orders': [
+    { field: 'orders',              type: 'array',   desc: 'Flagged orders for the current page',        desc_ja: '現在ページのフラグ付き注文',        desc_zh: '当前页的已标记订单' },
+    { field: 'orders[].order_id',   type: 'string',  desc: 'Order UUID',                                 desc_ja: '注文UUID',                          desc_zh: '订单UUID' },
+    { field: 'orders[].user_id',    type: 'string',  desc: 'Buyer identifier (email)',                   desc_ja: '購入者識別子（メール）',            desc_zh: '买家标识（邮箱）' },
+    { field: 'orders[].amount',     type: 'number',  desc: 'Order total amount',                         desc_ja: '注文合計金額',                      desc_zh: '订单总金额' },
+    { field: 'orders[].status',     type: 'string',  desc: 'Order status (paid / canceled / …)',         desc_ja: '注文ステータス（paid / canceled など）', desc_zh: '订单状态（paid / canceled 等）' },
+    { field: 'orders[].country',    type: 'string',  desc: 'Shipping destination country code (if any)', desc_ja: '配送先国コード（あれば）',          desc_zh: '配送目的地国家代码（如有）' },
+    { field: 'orders[].reason',     type: 'string',  desc: 'Why the order was flagged',                  desc_ja: 'フラグ付けの理由',                  desc_zh: '被标记的原因' },
+    { field: 'orders[].flagged',    type: 'boolean', desc: 'Always true in this list',                   desc_ja: 'このリストでは常にtrue',            desc_zh: '此列表中始终为true' },
+    { field: 'orders[].created_at', type: 'string',  desc: 'Order creation timestamp',                   desc_ja: '注文作成日時',                      desc_zh: '订单创建时间' },
+    { field: 'total',               type: 'integer', desc: 'Total number of flagged orders',             desc_ja: 'フラグ付き注文の総数',              desc_zh: '已标记订单总数' },
+    { field: 'page',                type: 'integer', desc: 'Current page number',                        desc_ja: '現在のページ番号',                  desc_zh: '当前页码' },
+    { field: 'limit',               type: 'integer', desc: 'Page size',                                  desc_ja: 'ページサイズ',                      desc_zh: '每页大小' },
+  ],
+  'GET /api/admin/audit': [
+    { field: 'logs',              type: 'array',   desc: 'Audit entries, newest first',   desc_ja: '監査エントリ（新しい順）',   desc_zh: '审计条目（最新优先）' },
+    { field: 'logs[].id',         type: 'integer', desc: 'Audit row id',                  desc_ja: '監査行ID',                   desc_zh: '审计行ID' },
+    { field: 'logs[].action',     type: 'string',  desc: 'Recorded action name',          desc_ja: '記録されたアクション名',      desc_zh: '记录的操作名称' },
+    { field: 'logs[].actor',      type: 'string',  desc: 'Who performed the action (email)', desc_ja: '実行者（メール）',          desc_zh: '执行者（邮箱）' },
+    { field: 'logs[].target',     type: 'string',  desc: 'Target the action applied to',  desc_ja: 'アクション対象',             desc_zh: '操作作用的目标' },
+    { field: 'logs[].status',     type: 'string',  desc: 'success / failure / warning',   desc_ja: 'success / failure / warning', desc_zh: 'success / failure / warning' },
+    { field: 'logs[].created_at', type: 'string',  desc: 'When the event occurred',       desc_ja: 'イベント発生日時',           desc_zh: '事件发生时间' },
+    { field: 'total',             type: 'integer', desc: 'Total audit entries',           desc_ja: '監査エントリ総数',           desc_zh: '审计条目总数' },
+    { field: 'page',              type: 'integer', desc: 'Current page number',           desc_ja: '現在のページ番号',           desc_zh: '当前页码' },
+    { field: 'limit',             type: 'integer', desc: 'Page size',                     desc_ja: 'ページサイズ',               desc_zh: '每页大小' },
+  ],
+  'POST /api/admin/audit': [
+    { field: 'success', type: 'boolean', desc: 'true when the audit entry was recorded', desc_ja: '監査エントリ記録成功時にtrue', desc_zh: '审计条目记录成功时为true' },
+  ],
+  'GET /api/admin/health': [
+    { field: 'components',          type: 'array',   desc: 'Per-component health',                       desc_ja: 'コンポーネント別ヘルス',    desc_zh: '各组件健康状态' },
+    { field: 'components[].name',   type: 'string',  desc: 'Component name (Database / API Server / Catalog-Inventory)', desc_ja: 'コンポーネント名（Database / API Server / Catalog-Inventory）', desc_zh: '组件名称（Database / API Server / Catalog-Inventory）' },
+    { field: 'components[].status', type: 'string',  desc: 'healthy / degraded / down',                  desc_ja: 'healthy / degraded / down', desc_zh: 'healthy / degraded / down' },
+    { field: 'components[].detail', type: 'string',  desc: 'Human-readable detail for the component',    desc_ja: 'コンポーネントの詳細説明',  desc_zh: '组件的可读详情' },
+    { field: 'alerts',              type: 'array',   desc: 'Colloquial alert messages for degraded components', desc_ja: '劣化コンポーネントの口語的アラート', desc_zh: '劣化组件的口语化告警' },
+    { field: 'metrics',             type: 'object',  desc: 'Summary metrics (counts / ratios)',          desc_ja: 'サマリメトリクス（件数・比率）', desc_zh: '汇总指标（数量/比例）' },
+  ],
+  'GET /api/uam/users/([^/]+)': [
+    { field: 'id',         type: 'string',  desc: 'Keycloak user UUID',                 desc_ja: 'KeycloakユーザーUUID',      desc_zh: 'Keycloak用户UUID' },
+    { field: 'username',   type: 'string',  desc: 'Login username',                     desc_ja: 'ログインユーザー名',        desc_zh: '登录用户名' },
+    { field: 'email',      type: 'string',  desc: 'User email address',                 desc_ja: 'メールアドレス',            desc_zh: '电子邮件地址' },
+    { field: 'firstName',  type: 'string',  desc: 'First name',                         desc_ja: '名',                        desc_zh: '名字' },
+    { field: 'lastName',   type: 'string',  desc: 'Last name',                          desc_ja: '姓',                        desc_zh: '姓氏' },
+    { field: 'enabled',    type: 'boolean', desc: 'Whether the account is enabled',     desc_ja: 'アカウント有効フラグ',      desc_zh: '账号是否启用' },
+    { field: 'attributes', type: 'object',  desc: 'Custom attributes (e.g. storeName, status)', desc_ja: 'カスタム属性（storeName, statusなど）', desc_zh: '自定义属性（如storeName、status）' },
+  ],
+  'PUT /api/uam/users/([^/]+)': [
+    { field: '(204)', type: 'No Content', desc: 'Keycloak returns 204 with an empty body on success', desc_ja: '成功時Keycloakは204（本文なし）を返す', desc_zh: '成功时Keycloak返回204（无正文）' },
+  ],
+  'GET /api/uam/groups': [
+    { field: '[].id',   type: 'string', desc: 'Group UUID (use for /groups/{id}/members)', desc_ja: 'グループUUID（/groups/{id}/members に使用）', desc_zh: '组UUID（用于 /groups/{id}/members）' },
+    { field: '[].name', type: 'string', desc: 'Group name (Customer / Seller / admin-group)', desc_ja: 'グループ名（Customer / Seller / admin-group）', desc_zh: '组名称（Customer / Seller / admin-group）' },
+  ],
+  'GET /api/admin/seller': [
+    { field: 'email',       type: 'string', desc: "The seller's email (echoed back)", desc_ja: 'セラーのメール（エコー）',   desc_zh: '卖家邮箱（回显）' },
+    { field: 'seller_name', type: 'string', desc: 'Buyer-facing store name',          desc_ja: '購入者向け店名',           desc_zh: '面向买家店铺名' },
+    { field: 'description', type: 'string', desc: 'About-the-vendor description',      desc_ja: 'ベンダー説明',             desc_zh: '关于卖家的描述' },
+  ],
+  'PUT /api/admin/seller': [
+    { field: 'success', type: 'boolean', desc: 'true when the store name was saved', desc_ja: '店名保存成功時にtrue', desc_zh: '店铺名保存成功时为true' },
+  ],
 };
 
 // Overrides the path used in the Test Request form when the Kong route path
 // differs from the actual service endpoint (e.g. Kong /api/sale → /api/sale/active).
 const API_TEST_PATH_OVERRIDES = {
   'GET /api/sale': '/api/sale/active',
+  // The ranking-update handler lives at /api/ranking/update (Kong prefix-matches /api/ranking).
+  'POST /api/ranking': '/api/ranking/update',
+  // "Update payment method" is really "set as default", served at /default.
+  'PUT /api/payment-method': '/api/payment-method/default',
 };
 
 function _normalizePath(path) {
@@ -2501,27 +2889,46 @@ async function initApiView() {
   const list = document.getElementById('api-list-ul');
   list.innerHTML = '<div class="loading-row"><div class="spinner"></div></div>';
   try {
-    const res = await fetch('/dashboard/api/kong/spec');
+    const res = await fetch(`${API_BASE}/api/kong/spec`);
     apiSpecs = await res.json();
     if (apiSpecs.error) throw new Error(apiSpecs.error);
 
     let html = '';
     apiSpecs.forEach((svc, sIdx) => {
       svc.routes.forEach((route, rIdx) => {
-        const method = route.methods[0] || 'ANY';
         const path = route.paths[0] || '';
-        const methodColor = method === 'GET' ? 'var(--green)' : method === 'POST' ? 'var(--blue)' : method === 'DELETE' ? 'var(--red)' : method === 'PUT' ? '#d97706' : 'var(--text-muted)';
-        const methodBg = method === 'GET' ? '#16a34a22' : method === 'POST' ? 'var(--blue-bg)' : method === 'DELETE' ? '#dc262622' : method === 'PUT' ? '#d9770622' : 'var(--bg-secondary)';
-        html += `
-          <div class="db-list-item" id="api-item-${sIdx}-${rIdx}" onclick="selectApiRoute(${sIdx}, ${rIdx})">
-            <span class="badge" style="padding:1px 6px; font-size:10px; background:${methodBg}; color:${methodColor}; flex-shrink:0;">
-              ${method}
-            </span>
-            <span class="db-item-name" style="font-family:monospace; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-              ${path}
-            </span>
-          </div>
-        `;
+        const primary = route.methods[0] || 'ANY';
+        // List the primary method, plus any other method on the same route that
+        // is documented (so e.g. POST on a GET,POST route gets its own entry).
+        // Non-primary body methods are only listed when they have an input
+        // schema, so every listed request-bearing route shows a proper form.
+        const methodsToShow = [];
+        (route.methods || []).forEach((m) => {
+          if (m === 'OPTIONS' || methodsToShow.includes(m)) return;
+          const documented = !!findApiDescription(m, path);
+          const bodySafe = m === 'GET' || m === 'DELETE' || !!findApiSchema(m, path);
+          if (m === primary || (documented && bodySafe)) methodsToShow.push(m);
+        });
+        // Never fall back to OPTIONS (it has no schema and would render a raw
+        // JSON body); prefer the first real method on the route.
+        if (methodsToShow.length === 0) {
+          const firstReal = (route.methods || []).find((m) => m !== 'OPTIONS');
+          methodsToShow.push(firstReal || primary);
+        }
+        methodsToShow.forEach((method) => {
+          const methodColor = method === 'GET' ? 'var(--green)' : method === 'POST' ? 'var(--blue)' : method === 'DELETE' ? 'var(--red)' : method === 'PUT' ? '#d97706' : 'var(--text-muted)';
+          const methodBg = method === 'GET' ? '#16a34a22' : method === 'POST' ? 'var(--blue-bg)' : method === 'DELETE' ? '#dc262622' : method === 'PUT' ? '#d9770622' : 'var(--bg-secondary)';
+          html += `
+            <div class="db-list-item" id="api-item-${sIdx}-${rIdx}-${method}" onclick="selectApiRoute(${sIdx}, ${rIdx}, '${method}')">
+              <span class="badge" style="padding:1px 6px; font-size:10px; background:${methodBg}; color:${methodColor}; flex-shrink:0;">
+                ${method}
+              </span>
+              <span class="db-item-name" style="font-family:monospace; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                ${path}
+              </span>
+            </div>
+          `;
+        });
       });
     });
     list.innerHTML = html || '<div class="db-error">No routes defined</div>';
@@ -2530,17 +2937,19 @@ async function initApiView() {
   }
 }
 
-let selectedSIdx = null, selectedRIdx = null;
+let selectedSIdx = null, selectedRIdx = null, selectedMethod = null;
 let _currentApiRoute = null; // {method, path} for language-switch re-render
-function selectApiRoute(sIdx, rIdx) {
+function selectApiRoute(sIdx, rIdx, methodOverride) {
   selectedSIdx = sIdx;
   selectedRIdx = rIdx;
-  document.querySelectorAll('#api-list-ul .db-list-item').forEach(el => el.classList.remove('active'));
-  document.getElementById(`api-item-${sIdx}-${rIdx}`).classList.add('active');
-
   const svc = apiSpecs[sIdx];
   const route = svc.routes[rIdx];
-  const method = route.methods[0] || 'GET';
+  const method = methodOverride || route.methods[0] || 'GET';
+  selectedMethod = method;
+  document.querySelectorAll('#api-list-ul .db-list-item').forEach(el => el.classList.remove('active'));
+  const activeItem = document.getElementById(`api-item-${sIdx}-${rIdx}-${method}`);
+  if (activeItem) activeItem.classList.add('active');
+
   const path = route.paths[0];
 
   document.getElementById('api-placeholder').style.display = 'none';
@@ -2597,13 +3006,13 @@ function selectApiRoute(sIdx, rIdx) {
         <label style="font-weight:500; margin-bottom:4px; display:block; font-size:12px; color:var(--text-secondary);">
           ${f.name} ${f.required ? '<span style="color:var(--red); font-size:10px;">*</span>' : ''} <span style="font-size:10px; color:var(--text-muted);">(${f.location}, ${f.type})</span>
         </label>
-        <input type="text" class="form-control api-gui-input" data-name="${f.name}" data-location="${f.location}" data-type="${f.type}" style="width:100%; font-family:monospace; background:var(--bg-surface); color:#e2e8f0; border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px; font-size:13px;" data-sentinel="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__', '__first_seller_product_id__', '__seller_token__', '__first_user_id__'].includes(f.default) ? f.default : ''}" value="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__', '__first_seller_product_id__', '__seller_token__', '__first_user_id__'].includes(f.default) ? 'Loading...' : (f.default ?? '')}" placeholder="${fd}" />
+        <input type="text" class="form-control api-gui-input" data-name="${f.name}" data-location="${f.location}" data-type="${f.type}" style="width:100%; font-family:monospace; background:var(--bg-surface); color:#e2e8f0; border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px; font-size:13px;" data-sentinel="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__', '__first_seller_product_id__', '__seller_token__', '__first_user_id__', '__first_payment_method_id__'].includes(f.default) ? f.default : ''}" value="${['__superadmin_token__', '__first_product_id__', '__first_product_name__', '__first_product_id_png__', '__superadmin_email__', '__first_geo_id__', '__first_seller_product_id__', '__seller_token__', '__first_user_id__', '__first_payment_method_id__'].includes(f.default) ? 'Loading...' : (f.default ?? '')}" placeholder="${fd}" />
       </div>`;
     }).join('');
 
     // Async-fill __superadmin_token__ — only targets Authorization inputs
     if (schema.some(f => f.default === '__superadmin_token__')) {
-      fetch('/dashboard/api/superadmin-token').then(r => r.json()).then(d => {
+      fetch(`${API_BASE}/api/superadmin-token`).then(r => r.json()).then(d => {
         document.querySelectorAll('.api-gui-input[data-sentinel="__superadmin_token__"]').forEach(el => {
           el.value = `Bearer ${d.token}`;
         });
@@ -2671,6 +3080,15 @@ function selectApiRoute(sIdx, rIdx) {
         }
       });
     }
+
+    // Async-fill __first_payment_method_id__ — a real saved card id
+    if (schema.some(f => f.default === '__first_payment_method_id__')) {
+      _fetchFirstPaymentMethodId().then(() => {
+        document.querySelectorAll('.api-gui-input[data-sentinel="__first_payment_method_id__"]').forEach(el => {
+          el.value = _firstPaymentMethodIdCache || '';
+        });
+      });
+    }
   } else if (schema !== null && schema.length === 0) {
     // Explicit empty schema — no params, Bearer token is auto-attached
     specContainer.style.display = 'none';
@@ -2712,7 +3130,7 @@ function selectApiRoute(sIdx, rIdx) {
 async function sendTestRequest() {
   const svc = apiSpecs[selectedSIdx];
   const route = svc.routes[selectedRIdx];
-  const method = route.methods[0] || 'GET';
+  const method = selectedMethod || route.methods[0] || 'GET';
   let path = route.paths[0];
   // Use override path when Kong route differs from actual service endpoint
   const overrideKey = `${method} ${_normalizePath(path)}`;
@@ -2813,14 +3231,30 @@ async function sendTestRequest() {
       }
     }
 
-    let url = path;
+    // These paths come from kong.yaml, so they are gateway routes and must go
+    // through the platform proxy — not to this console, which is what a bare
+    // /api/... resolves to once the dashboard has a host of its own.
+    //
+    // Except when the gateway's upstream is this console: routing
+    // browser → dashboard → Kong → dashboard just to come back here costs a
+    // round trip and loses the session, because the relay deliberately does not
+    // forward the console's cookie to the gateway. Call ourselves directly.
+    const upstreamIsSelf = /\/\/dashboard-service\b/.test(svc.url || '');
+    let url;
+    if (!path.startsWith('/api/')) {
+      url = path;
+    } else if (upstreamIsSelf) {
+      url = `${API_BASE}${path}`;
+    } else {
+      url = `${PLATFORM_API}${path.slice('/api'.length)}`;
+    }
     const qStr = queryParams.toString();
     if (qStr) {
       url += (url.includes('?') ? '&' : '?') + qStr;
     }
 
     // Endpoints that require form-urlencoded (OAuth2 token endpoints)
-    const isFormEncoded = url === '/api/uam/token';
+    const isFormEncoded = url === `${PLATFORM_API}/uam/token`;
     // Skip auto-auth if the schema provides an explicit Authorization header, or it's the auth endpoint itself
     const skipAutoAuth = isFormEncoded || 'Authorization' in explicitHeaders;
 
@@ -2828,7 +3262,7 @@ async function sendTestRequest() {
     let authToken = null;
     if (!skipAutoAuth) {
       try {
-        const tr = await fetch('/dashboard/api/superadmin-token');
+        const tr = await fetch(`${API_BASE}/api/superadmin-token`);
         if (tr.ok) { const td = await tr.json(); authToken = td.token; }
       } catch {}
     }
@@ -2889,19 +3323,45 @@ async function sendTestRequest() {
 // ── Keycloak info ───────────────────────────────────────────────────────────────
 let kcData = null;
 async function initKeycloakView() {
-  if (kcData) return;
   try {
-    const [res, liveRes] = await Promise.all([
-      fetch('/dashboard/api/keycloak/info'),
-      fetch('/dashboard/api/keycloak/users/live').catch(() => null),
-    ]);
-    kcData = await res.json();
-    if (kcData.error) throw new Error(kcData.error);
+    // The realm export (clients/roles/groups) is immutable, so load it once.
+    // The live users are not — a sign-up or a new admin changes them — so they
+    // are refreshed separately, below and on every timer tick. Loading the whole
+    // panel once was why a new user only appeared after a full page reload.
+    if (!kcData) {
+      const res = await fetch(`${API_BASE}/api/keycloak/info`);
+      kcData = await res.json();
+      // Losing the file (it isn't mounted outside DEV) used to throw here and
+      // blank the whole panel. Degrade to whatever is available instead.
+      if (!kcData || kcData.error) {
+        console.warn('[keycloak] realm export unavailable:', kcData && kcData.error);
+        kcData = { users: [], clients: [], roles: [], groups: [] };
+      }
+      // Keep the file-defined users apart from the live ones so a refresh can
+      // rebuild the list without doubling them.
+      kcData.staticUsers = [...(kcData.users || [])];
+      renderKcClients(kcData.clients);
+      renderKcRolesAndGroups(kcData.roles, kcData.groups);
+    }
+    await refreshKcUsers();
+  } catch (e) {
+    showToast('Keycloak config error: ' + e.message, 'error');
+  }
+}
 
-    // Merge live Keycloak users (includes Google SSO) into kcData.users
+/**
+ * Re-fetch the live Keycloak users and rebuild the table. Called when the panel
+ * opens, on the auto-refresh tick while it's visible, and from the refresh
+ * button — so the list reflects sign-ups without a full page reload.
+ */
+async function refreshKcUsers() {
+  if (!kcData) return;
+  let users = [...(kcData.staticUsers || [])];
+  try {
+    const liveRes = await fetch(`${API_BASE}/api/keycloak/users/live`).catch(() => null);
     if (liveRes && liveRes.ok) {
       const liveUsers = await liveRes.json();
-      const staticUsernames = new Set((kcData.users || []).map(u => u.username));
+      const staticUsernames = new Set(users.map(u => u.username));
       const extra = liveUsers
         .filter(u => u.username && !staticUsernames.has(u.username) && !u.username.startsWith('service-account-'))
         .map(u => ({
@@ -2914,15 +3374,11 @@ async function initKeycloakView() {
           realmRoles: [],
           attributes: {},
         }));
-      kcData.users = [...(kcData.users || []), ...extra];
+      users = [...users, ...extra];
     }
-
-    renderKcUsers(kcData.users);
-    renderKcClients(kcData.clients);
-    renderKcRolesAndGroups(kcData.roles, kcData.groups);
-  } catch (e) {
-    showToast('Keycloak config error: ' + e.message, 'error');
-  }
+  } catch { /* keep the static users if the live fetch fails */ }
+  kcData.users = users;
+  renderKcUsers(kcData.users);
 }
 
 function renderKcUsers(users) {
@@ -3013,8 +3469,8 @@ async function initModelView() {
 async function _loadModelUsers() {
   try {
     const [kcRes, liveRes] = await Promise.all([
-      fetch('/dashboard/api/keycloak/info'),
-      fetch('/dashboard/api/keycloak/users/live').catch(() => null),
+      fetch(`${API_BASE}/api/keycloak/info`),
+      fetch(`${API_BASE}/api/keycloak/users/live`).catch(() => null),
     ]);
     const kcData = kcRes.ok ? await kcRes.json() : { users: [] };
     const liveUsers = (liveRes && liveRes.ok) ? await liveRes.json() : [];
@@ -3147,7 +3603,7 @@ async function fetchModelMetrics() {
   const updatedEl = document.getElementById('model-metrics-updated');
   if (!grid) return;
   try {
-    const res = await fetch('/dashboard/api/recommendation/metrics');
+    const res = await fetch(`${API_BASE}/api/recommendation/metrics`);
     if (!res.ok) throw new Error('No metrics');
     const m = await res.json();
     if (updatedEl && m.trained_at) {
@@ -3189,7 +3645,7 @@ async function fetchModelStatus() {
   const statusVal = document.getElementById('model-status-val');
   const trainedVal = document.getElementById('model-trained-val');
   try {
-    const res = await fetch('/dashboard/api/recommendation/status');
+    const res = await fetch(`${API_BASE}/api/recommendation/status`);
     const data = await res.json();
     if (data.is_training_in_progress) {
       statusVal.textContent = 'Training...';
@@ -3214,7 +3670,7 @@ async function trainModel() {
   const tracker = startProgressBar('model', 'model-progress-container', 'model-progress-bar', 'model-progress-pct', 5);
 
   try {
-    const res = await fetch('/dashboard/api/recommendation/train', { method: 'POST' });
+    const res = await fetch(`${API_BASE}/api/recommendation/train`, { method: 'POST' });
     const data = await res.json();
     showToast(data.message || 'Model training started!', 'success');
     
@@ -3222,7 +3678,7 @@ async function trainModel() {
     const interval = setInterval(async () => {
       attempts++;
       try {
-        const sRes = await fetch('/dashboard/api/recommendation/status');
+        const sRes = await fetch(`${API_BASE}/api/recommendation/status`);
         const sData = await sRes.json();
         fetchModelStatus(); // update UI display
         if (!sData.is_training_in_progress || attempts > 20) {
@@ -3255,7 +3711,7 @@ let _categoryMapCache = null;
 async function _fetchCategoryMap() {
   if (_categoryMapCache) return _categoryMapCache;
   try {
-    const r = await fetch('/api/categories');
+    const r = await fetch(`${PLATFORM_API}/categories`);
     const d = await r.json();
     _categoryMapCache = {};
     (Array.isArray(d) ? d : []).forEach(c => {
@@ -3272,7 +3728,7 @@ async function fetchModelRecommendations() {
 
   try {
     const [res, catMap] = await Promise.all([
-      fetch(`/dashboard/api/recommend?user_id=${userId}&limit=10`),
+      fetch(`${API_BASE}/api/recommend?user_id=${userId}&limit=10`),
       _fetchCategoryMap(),
     ]);
     const data = await res.json();
@@ -3613,7 +4069,7 @@ function runCIPipeline() {
   document.getElementById('ci-status').innerHTML = '<div class="dot-streaming"></div><span style="color:var(--blue);">Running</span>';
 
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  ciWs = new WebSocket(`${proto}://${location.host}/dashboard/ws/ci`);
+  ciWs = new WebSocket(`${proto}://${location.host}${API_BASE}/ws/ci`);
   ciProgressTimer = setInterval(() => { if (ciWs) updateCIProgress(); }, 1000);
 
   let _lineBuf = '';
@@ -3886,7 +4342,7 @@ function startTestRunner(spec) {
   renderTestScenarioList();
 
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  testsWs = new WebSocket(`${proto}://${location.host}/dashboard/ws/tests?spec=${encodeURIComponent(spec)}`);
+  testsWs = new WebSocket(`${proto}://${location.host}${API_BASE}/ws/tests?spec=${encodeURIComponent(spec)}`);
   testProgressTimer = setInterval(() => { if (testsWs) updateTestProgress(); }, 1000);
 
   let _lineBuf = '';
@@ -4388,7 +4844,7 @@ function _setVulnScanBtn(activeType) {
 function _runSingleScanWs(type) {
   return new Promise((resolve) => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${proto}://${location.host}/dashboard/ws/vulnerability?type=${type}`);
+    const ws = new WebSocket(`${proto}://${location.host}${API_BASE}/ws/vulnerability?type=${type}`);
     vulnWs = ws;
     let _lineBuf = '';
     let _passed = false;
@@ -4574,7 +5030,7 @@ const telemetryHistory = { mysql: [], redis: [], kong: [], timestamps: [] };
 
 async function fetchTelemetry() {
   try {
-    const res = await fetch('/dashboard/api/telemetry');
+    const res = await fetch(`${API_BASE}/api/telemetry`);
     const data = await res.json();
 
     const dbEl = document.getElementById('tel-kong-db');
@@ -4824,7 +5280,7 @@ function initPipelineView() {
 
 async function loadPipelineStatus() {
   try {
-    const r = await fetch('/dashboard/api/pipeline/status');
+    const r = await fetch(`${API_BASE}/api/pipeline/status`);
     const data = await r.json();
     const el = document.getElementById('pipeline-dag-status');
     if (el) {
@@ -4843,7 +5299,7 @@ async function loadPipelineRuns() {
   container.innerHTML = '<div style="color:var(--text-secondary);font-size:13px;text-align:center;padding:24px;">Loading...</div>';
 
   try {
-    const r = await fetch('/dashboard/api/pipeline/runs?limit=15');
+    const r = await fetch(`${API_BASE}/api/pipeline/runs?limit=15`);
     const data = await r.json();
     const runs = data.dag_runs || [];
 
@@ -4920,7 +5376,7 @@ async function fetchTaskInstances(runId) {
   table.innerHTML = '<tr><td colspan="5" style="color:var(--text-secondary);text-align:center;padding:16px;">Loading...</td></tr>';
 
   try {
-    const r = await fetch(`/dashboard/api/pipeline/runs/${encodeURIComponent(runId)}/tasks`);
+    const r = await fetch(`${API_BASE}/api/pipeline/runs/${encodeURIComponent(runId)}/tasks`);
     const data = await r.json();
     const tasks = (data.task_instances || []).sort((a, b) =>
       TASK_ORDER.indexOf(a.task_id) - TASK_ORDER.indexOf(b.task_id));
@@ -5002,7 +5458,7 @@ function fmtDuration(ms) {
 
 async function triggerPipeline() {
   try {
-    const r = await fetch('/dashboard/api/pipeline/trigger', { method: 'POST' });
+    const r = await fetch(`${API_BASE}/api/pipeline/trigger`, { method: 'POST' });
     const data = await r.json();
     if (r.ok) {
       showToast('Pipeline triggered: ' + (data.dag_run_id || ''), 'success');
@@ -5029,7 +5485,7 @@ async function showTaskLog(runId, taskId, tryNumber) {
 
   try {
     const r = await fetch(
-      `/dashboard/api/pipeline/task-logs?runId=${encodeURIComponent(runId)}&taskId=${encodeURIComponent(taskId)}&try=${tryNumber}`
+      `${API_BASE}/api/pipeline/task-logs?runId=${encodeURIComponent(runId)}&taskId=${encodeURIComponent(taskId)}&try=${tryNumber}`
     );
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || data.error);
@@ -5087,7 +5543,7 @@ async function openLayerModal(layer) {
   setLayerDataState('empty');
 
   try {
-    const r = await fetch(`/dashboard/api/pipeline/layer/${layer}/files`);
+    const r = await fetch(`${API_BASE}/api/pipeline/layer/${layer}/files`);
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || data.error);
     document.getElementById('layer-modal-bucket').textContent = data.bucket || '';
@@ -5141,7 +5597,7 @@ function renderLayerFileList(layer, files) {
 async function loadLayerData(layer, file) {
   setLayerDataState('loading');
   try {
-    const r = await fetch(`/dashboard/api/pipeline/layer/${layer}/data?file=${encodeURIComponent(file)}`);
+    const r = await fetch(`${API_BASE}/api/pipeline/layer/${layer}/data?file=${encodeURIComponent(file)}`);
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || data.error);
     renderLayerDataTable(data.schema || [], data.rows || []);
@@ -5188,7 +5644,7 @@ const I18N = {
     'nav.keycloak': 'Access Management', 'nav.model': 'Model Performance',
     'nav.ci': 'Local CI Pipelines', 'nav.tests': 'E2E Test Runner',
     'nav.pipeline': 'Data Pipeline', 'nav.vulnerability': 'Security Scanning',
-    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(Backdoor)', 'nav.seller': 'Seller page',
+    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(Backdoor)', 'nav.seller': 'Seller page', 'nav.admin': 'Admin page',
     // Header
     'header.autoRefresh': 'AUTO REFRESH', 'header.systemRestart': 'System Restart',
     // Page titles
@@ -5221,7 +5677,7 @@ const I18N = {
     'col.ended': 'Ended', 'col.duration': 'Total Duration',
     'col.task': 'Task', 'col.retries': 'Retries',
     // Dashboard cards
-    'dash.running': 'Running', 'dash.stopped': 'Stopped / Exited', 'dash.totalContainers': 'Total Containers',
+    'dash.running': 'Running', 'dash.stopped': 'Stopped / Exited', 'dash.totalContainers': 'Total Containers', 'dash.ready': 'Environment',
     'dash.totalCpu': 'Total CPU Usage', 'dash.totalMemory': 'Total Memory Usage',
     'dash.kong': 'API Gateway (Kong)', 'dash.mysql': 'MySQL Database',
     'dash.redis': 'Redis Cache', 'dash.mongo': 'MongoDB Document DB',
@@ -5290,7 +5746,7 @@ const I18N = {
     'nav.keycloak': 'アクセス管理', 'nav.model': 'モデル性能',
     'nav.ci': 'ローカルCIパイプライン', 'nav.tests': 'E2Eテスト',
     'nav.pipeline': 'データパイプライン', 'nav.vulnerability': 'セキュリティスキャン',
-    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(裏口)', 'nav.seller': 'Sellerページ',
+    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(裏口)', 'nav.seller': 'Sellerページ', 'nav.admin': 'Adminページ',
     'header.autoRefresh': '自動更新', 'header.systemRestart': 'システム再起動',
     'title.dashboard': 'ダッシュボード', 'title.containers': 'コンテナ一覧',
     'title.logs': 'ログビューア', 'title.topology': 'サービストポロジー',
@@ -5314,7 +5770,7 @@ const I18N = {
     'pipeline.runHistory': '実行履歴', 'pipeline.stageTiming': 'ステージタイミング',
     'col.state': '状態', 'col.runId': '実行ID', 'col.started': '開始', 'col.ended': '終了',
     'col.duration': '所要時間', 'col.task': 'タスク', 'col.retries': 'リトライ',
-    'dash.running': '実行中', 'dash.stopped': '停止 / 終了', 'dash.totalContainers': 'コンテナ合計',
+    'dash.running': '実行中', 'dash.stopped': '停止 / 終了', 'dash.totalContainers': 'コンテナ合計', 'dash.ready': '環境',
     'dash.totalCpu': 'CPU使用率合計', 'dash.totalMemory': 'メモリ使用量合計',
     'dash.kong': 'APIゲートウェイ (Kong)', 'dash.mysql': 'MySQLデータベース',
     'dash.redis': 'Redisキャッシュ', 'dash.mongo': 'MongoDBドキュメントDB',
@@ -5375,7 +5831,7 @@ const I18N = {
     'nav.keycloak': '访问管理', 'nav.model': '模型性能',
     'nav.ci': '本地CI流水线', 'nav.tests': 'E2E测试',
     'nav.pipeline': '数据管道', 'nav.vulnerability': '安全扫描',
-    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(后门)', 'nav.seller': 'Seller页面',
+    'nav.mockten': 'Mockten', 'nav.backdoor': 'Mockten(后门)', 'nav.seller': 'Seller页面', 'nav.admin': 'Admin页面',
     'header.autoRefresh': '自动刷新', 'header.systemRestart': '重启系统',
     'title.dashboard': '仪表盘', 'title.containers': '容器列表',
     'title.logs': '日志查看器', 'title.topology': '服务拓扑',
@@ -5399,7 +5855,7 @@ const I18N = {
     'pipeline.runHistory': '运行历史', 'pipeline.stageTiming': '阶段耗时',
     'col.state': '状态', 'col.runId': '运行ID', 'col.started': '开始时间', 'col.ended': '结束时间',
     'col.duration': '总耗时', 'col.task': '任务', 'col.retries': '重试次数',
-    'dash.running': '运行中', 'dash.stopped': '已停止 / 已退出', 'dash.totalContainers': '容器总数',
+    'dash.running': '运行中', 'dash.stopped': '已停止 / 已退出', 'dash.totalContainers': '容器总数', 'dash.ready': '环境',
     'dash.totalCpu': 'CPU总使用率', 'dash.totalMemory': '内存总使用量',
     'dash.kong': 'API网关 (Kong)', 'dash.mysql': 'MySQL数据库',
     'dash.redis': 'Redis缓存', 'dash.mongo': 'MongoDB文档数据库',
@@ -5460,7 +5916,7 @@ let _firstProductNameCache = null;
 async function _fetchFirstProduct() {
   if (_firstProductIdCache) return;
   try {
-    const r = await fetch('/api/search');
+    const r = await fetch(`${PLATFORM_API}/search`);
     const d = await r.json();
     const item = d.items?.[0];
     if (item) {
@@ -5483,10 +5939,10 @@ let _superadminEmailCache = null;
 async function _fetchSuperadminEmail() {
   if (_superadminEmailCache) return;
   try {
-    const tr = await fetch('/dashboard/api/superadmin-token');
+    const tr = await fetch(`${API_BASE}/api/superadmin-token`);
     if (!tr.ok) return;
     const td = await tr.json();
-    const r = await fetch('/api/uam/userinfo', { headers: { Authorization: `Bearer ${td.token}` } });
+    const r = await fetch(`${PLATFORM_API}/uam/userinfo`, { headers: { Authorization: `Bearer ${td.token}` } });
     if (!r.ok) return;
     const d = await r.json();
     _superadminEmailCache = d.email || d.preferred_username || '';
@@ -5500,16 +5956,33 @@ async function _fetchFirstGeoId() {
   await _fetchSuperadminEmail();
   if (!_superadminEmailCache) return;
   try {
-    const tr = await fetch('/dashboard/api/superadmin-token');
+    const tr = await fetch(`${API_BASE}/api/superadmin-token`);
     if (!tr.ok) return;
     const td = await tr.json();
-    const r = await fetch(`/api/geo?user_id=${encodeURIComponent(_superadminEmailCache)}`, {
+    const r = await fetch(`${PLATFORM_API}/geo?user_id=${encodeURIComponent(_superadminEmailCache)}`, {
       headers: { Authorization: `Bearer ${td.token}` }
     });
     if (!r.ok) return;
     const d = await r.json();
     const first = Array.isArray(d) ? d[0] : null;
     if (first) _firstGeoIdCache = first.geo_id || '';
+  } catch {}
+}
+
+// Resolves a real saved payment-method id so the PUT/DELETE /api/payment-method
+// test requests operate on an existing card instead of an empty id.
+let _firstPaymentMethodIdCache = null;
+async function _fetchFirstPaymentMethodId() {
+  if (_firstPaymentMethodIdCache) return;
+  try {
+    const tr = await fetch(`${API_BASE}/api/superadmin-token`);
+    if (!tr.ok) return;
+    const td = await tr.json();
+    const r = await fetch(`${PLATFORM_API}/payment-method`, { headers: { Authorization: `Bearer ${td.token}` } });
+    if (!r.ok) return;
+    const d = await r.json();
+    const first = Array.isArray(d) ? d[0] : null;
+    if (first) _firstPaymentMethodIdCache = first.id || '';
   } catch {}
 }
 
@@ -5520,7 +5993,7 @@ async function _fetchSellerToken() {
   try {
     // Use the dashboard's server-side token proxy (reliable, no browser Origin
     // check) instead of calling Keycloak directly from the browser.
-    const r = await fetch('/dashboard/api/seller-token');
+    const r = await fetch(`${API_BASE}/api/seller-token`);
     if (!r.ok) return;
     const d = await r.json();
     _sellerTokenCache = d.token || '';
@@ -5532,7 +6005,7 @@ let _firstUserIdCache = null;
 async function _fetchFirstUserId() {
   if (_firstUserIdCache) return;
   try {
-    const r = await fetch('/dashboard/api/first-user-id');
+    const r = await fetch(`${API_BASE}/api/first-user-id`);
     if (!r.ok) return;
     const d = await r.json();
     _firstUserIdCache = d.id || '';
@@ -5546,7 +6019,7 @@ async function _fetchFirstSellerProductId() {
   try {
     await _fetchSellerToken();
     if (!_sellerTokenCache) return;
-    const r = await fetch('/api/seller/products?limit=1', { headers: { Authorization: `Bearer ${_sellerTokenCache}` } });
+    const r = await fetch(`${PLATFORM_API}/seller/products?limit=1`, { headers: { Authorization: `Bearer ${_sellerTokenCache}` } });
     if (!r.ok) return;
     const d = await r.json();
     const first = d.products?.[0];
@@ -5672,7 +6145,7 @@ function applyLang() {
 
   // Re-render API spec panel with current language
   if (selectedSIdx !== null && selectedRIdx !== null) {
-    selectApiRoute(selectedSIdx, selectedRIdx);
+    selectApiRoute(selectedSIdx, selectedRIdx, selectedMethod);
   }
 }
 

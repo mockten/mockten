@@ -37,6 +37,12 @@ type Item struct {
 	ReviewCount  int     `json:"review_count"`
 	Condition    string  `json:"condition"`
 	CategoryName string  `json:"category_name"`
+	// The sale service indexes these into MeiliSearch (see sale ProductItem), but
+	// this struct used to drop them, so the search listing never showed a discount
+	// even though the detail page did. Surface them so the storefront can mark the
+	// sale price on search results too.
+	SaleFlag     bool    `json:"sale_flag"`
+	DiscountRate float64 `json:"discount_rate"`
 }
 
 var (
@@ -202,53 +208,6 @@ func searchHandler(c *gin.Context) {
 		"total": searchRes.EstimatedTotalHits,
 		"page":  page,
 	})
-}
-
-type ProductDetail struct {
-	ProductID    string    `json:"product_id"`
-	ProductName  string    `json:"product_name"`
-	Price        int       `json:"price"`
-	CategoryID   string    `json:"category_id"`
-	CategoryName string    `json:"category_name"`
-	Summary      string    `json:"summary"`
-	RegistDay    time.Time `json:"regist_day"`
-	LastUpdate   time.Time `json:"last_update"`
-	SellerName   string    `json:"seller_name"`
-	Stocks       int       `json:"stocks"`
-	AvgReview    float64   `json:"avg_review"`
-	ReviewCount  int       `json:"review_count"`
-}
-
-type ProductDetailResponse struct {
-	ProductID    string    `json:"product_id"`
-	ProductName  string    `json:"product_name"`
-	Price        int       `json:"price"`
-	CategoryName string    `json:"category"`
-	CategoryID   string    `json:"category_id"`
-	Summary      string    `json:"summary"`
-	RegistDay    time.Time `json:"regist_day"`
-	LastUpdate   time.Time `json:"last_update"`
-	SellerName   string    `json:"seller_name"`
-	Stocks       int       `json:"stocks"`
-	AvgReview    float64   `json:"avg_review"`
-	ReviewCount  int       `json:"review_count"`
-}
-
-func ConvertToResponse(detail *ProductDetail) ProductDetailResponse {
-	return ProductDetailResponse{
-		ProductID:    detail.ProductID,
-		ProductName:  detail.ProductName,
-		Price:        detail.Price,
-		CategoryName: detail.CategoryName,
-		CategoryID:   detail.CategoryID,
-		Summary:      detail.Summary,
-		RegistDay:    detail.RegistDay,
-		LastUpdate:   detail.LastUpdate,
-		SellerName:   detail.SellerName,
-		Stocks:       detail.Stocks,
-		AvgReview:    detail.AvgReview,
-		ReviewCount:  detail.ReviewCount,
-	}
 }
 
 type Category struct {

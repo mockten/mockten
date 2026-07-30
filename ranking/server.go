@@ -100,20 +100,22 @@ func main() {
 	}
 }
 
+// rankingZSetKey builds the Redis sorted-set key for a given month and category
+// query value, and returns the numeric category id used in the response.
+// The special value "all" selects the cross-category ranking (category id 99).
+func rankingZSetKey(month, category string) (string, int) {
+	if category == "all" {
+		return fmt.Sprintf("ranking:%s:all", month), 99
+	}
+	id, _ := strconv.Atoi(category)
+	return fmt.Sprintf("ranking:%s:%s", month, category), id
+}
+
 func handleGetRanking(c *gin.Context) {
 	categoryStr := c.DefaultQuery("category", "all")
 	month := time.Now().Format("2006-01")
 
-	var zsetKey string
-	var categoryID int
-	if categoryStr == "all" {
-		zsetKey = fmt.Sprintf("ranking:%s:all", month)
-		categoryID = 99
-	} else {
-		zsetKey = fmt.Sprintf("ranking:%s:%s", month, categoryStr)
-		id, _ := strconv.Atoi(categoryStr)
-		categoryID = id
-	}
+	zsetKey, categoryID := rankingZSetKey(month, categoryStr)
 
 	// Get top 10 products from Redis
 	res, err := rdb.ZRevRangeWithScores(ctx, zsetKey, 0, 9).Result()
