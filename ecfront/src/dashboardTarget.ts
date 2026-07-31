@@ -30,7 +30,14 @@ export function resolveDashboardTarget(
     try {
       const u = new URL(base);
       const host = u.hostname;
-      const isLocal = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local');
+      // `nginx` is the compose reverse proxy the in-Docker suite (task ie2e) runs
+      // against — the dev shape, same as localhost. Without it the host-split
+      // below invents `dashboard.nginx`, which resolves nowhere and fails every
+      // dashboard spec. A real cloud deployment always has a dotted public
+      // domain, so a single-label host can never be the split case anyway.
+      const isLocal =
+        host === 'localhost' || host === '127.0.0.1' || host === 'nginx' ||
+        host.endsWith('.local') || !host.includes('.');
       if (!isLocal) {
         const bare = host.startsWith('mockten.') ? host.slice('mockten.'.length) : host;
         return { origin: `${u.protocol}//dashboard.${bare}`, prefix: '' };

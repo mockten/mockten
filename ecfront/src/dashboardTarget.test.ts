@@ -12,7 +12,10 @@ describe('dev', () => {
   });
 
   it('keeps the dev shape for every local base URL', () => {
-    for (const base of ['http://localhost', 'http://localhost:3000', 'http://127.0.0.1']) {
+    // `nginx` is the compose proxy the in-Docker (ie2e) suite targets; a single-
+    // label host is never a real cloud deployment, so it must stay the dev shape
+    // rather than becoming dashboard.nginx.
+    for (const base of ['http://localhost', 'http://localhost:3000', 'http://127.0.0.1', 'http://nginx']) {
       expect(url('/api/telemetry', { PLAYWRIGHT_BASE_URL: base }))
         .toBe('/dashboard/api/telemetry');
     }
