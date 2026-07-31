@@ -28,25 +28,26 @@ mysql --skip-ssl -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" -D "$MYSQL_DB
 SELECT
   p.product_id,
   p.product_name,
-  ue.USERNAME AS seller_name,
+  COALESCE(ue.USERNAME, '') AS seller_name,
   p.price,
-  c.category_name,
+  COALESCE(c.category_name, '') AS category_name,
   p.product_condition,
-  t.stocks,
+  COALESCE(t.stocks, 0) AS stocks,
   p.avg_review,
   p.review_count,
   p.sale_flag,
   COALESCE(p.sale_id, '') AS sale_id,
   COALESCE(ts.discount_rate, 0.0) AS discount_rate
 FROM Product p
-JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
-JOIN USER_GROUP_MEMBERSHIP ugm ON ue.ID = ugm.USER_ID
-JOIN KEYCLOAK_GROUP kg ON ugm.GROUP_ID = kg.ID
-JOIN Category c ON p.category_id = c.category_id
-JOIN Stock t ON p.product_id = t.product_id
+-- LEFT joins so a product is never dropped for a missing lookup row. This used to
+-- INNER JOIN the seller's Keycloak user/group and filter WHERE kg.NAME='Seller',
+-- which on a fresh cloud realm indexed only the ~58 products whose seller was a
+-- Seller-group member — the rest of the catalog was invisible to search/browse.
+LEFT JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
+LEFT JOIN Category c ON p.category_id = c.category_id
+LEFT JOIN Stock t ON p.product_id = t.product_id
 LEFT JOIN TimeSale ts ON p.sale_id = ts.id
-WHERE kg.NAME = 'Seller'
-  AND p.is_active = 1
+WHERE p.is_active = 1
 " > /tmp/products.tsv
 
 total_lines=$(wc -l < /tmp/products.tsv | tr -d ' ')

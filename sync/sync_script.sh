@@ -20,11 +20,11 @@ mysql --ssl-mode=DISABLED -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" -D "
 SELECT
   p.product_id,
   p.product_name,
-  ue.USERNAME AS seller_name,
+  COALESCE(ue.USERNAME, '') AS seller_name,
   p.price,
-  c.category_name,
+  COALESCE(c.category_name, '') AS category_name,
   p.product_condition,
-  t.stocks,
+  COALESCE(t.stocks, 0) AS stocks,
   p.avg_review,
   p.review_count,
   p.sale_flag,
@@ -37,13 +37,17 @@ SELECT
     IFNULL(t.last_update, '1970-01-01 00:00:00')
   ) AS row_last_update
 FROM Product p
-JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
-JOIN USER_GROUP_MEMBERSHIP ugm ON ue.ID = ugm.USER_ID
-JOIN KEYCLOAK_GROUP kg ON ugm.GROUP_ID = kg.ID
-JOIN Category c ON p.category_id = c.category_id
-JOIN Stock t ON p.product_id = t.product_id
+-- All of these are LEFT joins on purpose: the index must carry every product,
+-- and a product must never drop out because a lookup row is missing. It used to
+-- INNER JOIN the seller's Keycloak user + group and filter WHERE kg.NAME='Seller',
+-- which quietly indexed only products whose seller happened to be a Seller-group
+-- member in the *current* realm — on a fresh cloud realm that was ~58 of ~500,
+-- so search/category browse showed a fraction of the catalog. Seller name is the
+-- only thing we needed from USER_ENTITY; group membership is not a listing gate.
+LEFT JOIN USER_ENTITY ue ON p.seller_id = ue.EMAIL
+LEFT JOIN Category c ON p.category_id = c.category_id
+LEFT JOIN Stock t ON p.product_id = t.product_id
 LEFT JOIN TimeSale ts ON p.sale_id = ts.id
-WHERE kg.NAME = 'Seller'
 HAVING row_last_update > '$LAST_SYNC' AND row_last_update <= '$WATERMARK'
 " > /tmp/updated_products.tsv
 
@@ -87,7 +91,11 @@ if [ -s /tmp/updated_products.tsv ]; then
   # Delete inactive products from MeiliSearch
   if [ -s /tmp/inactive_products.tsv ]; then
     awk -F'\t' '{print $1}' /tmp/inactive_products.tsv | jq -R -s 'split("\n")[:-1]' > /tmp/delete_ids.json
-    http_code=$(curl -s -o /tmp/meili_del_resp.txt -w "%{http_code}" -X DELETE "$MEILI_URL/indexes/products/documents/delete-batch" \
+    # MeiliSearch's batch delete is POST, not DELETE — DELETE returns 405, which
+    # under `set -e` aborted the whole sync before the watermark advanced, so every
+    # cycle re-processed the same window and never made progress once a product was
+    # deactivated.
+    http_code=$(curl -s -o /tmp/meili_del_resp.txt -w "%{http_code}" -X POST "$MEILI_URL/indexes/products/documents/delete-batch" \
       -H 'Content-Type: application/json' \
       --data-binary @/tmp/delete_ids.json)
 
