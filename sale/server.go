@@ -403,12 +403,20 @@ func handleSellerOrders(c *gin.Context) {
 	}
 	defer rows.Close()
 
+	type OrderItem struct {
+		ProductName string `json:"product_name"`
+		Quantity    int    `json:"quantity"`
+	}
 	type OrderRow struct {
-		OrderID   string  `json:"order_id"`
-		UserID    string  `json:"user_id"`
-		Amount    float64 `json:"amount"`
-		Status    string  `json:"status"`
-		CreatedAt string  `json:"created_at"`
+		OrderID   string      `json:"order_id"`
+		UserID    string      `json:"user_id"`
+		Amount    float64     `json:"amount"`
+		Status    string      `json:"status"`
+		CreatedAt string      `json:"created_at"`
+		// What this seller sold in the order and how many — the portal is the
+		// seller's own view, so "which of my products, and the quantity" belongs
+		// in the row, not just the order id and total.
+		Items []OrderItem `json:"items"`
 	}
 
 	// Map derived status rank to a status string the frontend already understands.
@@ -435,10 +443,47 @@ func handleSellerOrders(c *gin.Context) {
 		}
 		o.Status = rankToStatus(statusRank)
 		o.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
+		o.Items = []OrderItem{}
 		orders = append(orders, o)
 	}
 	if orders == nil {
 		orders = []OrderRow{}
+	}
+
+	// Attach this seller's line items to each order on the page. A product ships in
+	// legs, so the same product_id repeats across Transaction rows with the same
+	// quantity — group by product and take one quantity (MAX), not the sum.
+	if len(orders) > 0 {
+		placeholders := make([]string, len(orders))
+		itemArgs := make([]interface{}, 0, len(orders)+1)
+		itemArgs = append(itemArgs, sellerID)
+		idxByOrder := make(map[string]int, len(orders))
+		for i, o := range orders {
+			placeholders[i] = "?"
+			itemArgs = append(itemArgs, o.OrderID)
+			idxByOrder[o.OrderID] = i
+		}
+		itemQuery := "SELECT o.order_id, p.product_name, MAX(t.quantity) AS qty " +
+			"FROM `Order` o " +
+			"JOIN `Transaction` t ON JSON_CONTAINS(o.transactions_json, JSON_QUOTE(t.transaction_id)) " +
+			"JOIN Product p ON t.product_id = p.product_id " +
+			"WHERE p.seller_id = ? AND o.order_id IN (" + strings.Join(placeholders, ",") + ") " +
+			"GROUP BY o.order_id, p.product_id, p.product_name ORDER BY p.product_name"
+		if itemRows, ierr := db.Query(itemQuery, itemArgs...); ierr != nil {
+			log.Printf("failed to query order items: %v", ierr)
+		} else {
+			defer itemRows.Close()
+			for itemRows.Next() {
+				var oid string
+				var it OrderItem
+				if err := itemRows.Scan(&oid, &it.ProductName, &it.Quantity); err != nil {
+					continue
+				}
+				if i, ok := idxByOrder[oid]; ok {
+					orders[i].Items = append(orders[i].Items, it)
+				}
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

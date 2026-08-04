@@ -69,6 +69,7 @@ export function SellerPortal() {
   // Orders
   const [orders, setOrders] = useState<Array<{
     order_id: string; user_id: string; amount: number; status: string; created_at: string;
+    items?: Array<{ product_name: string; quantity: number }>;
   }>>([]);
   const [ordersTotal, setOrdersTotal] = useState(0);
   const [ordersPage, setOrdersPage] = useState(1);
@@ -763,6 +764,7 @@ export function SellerPortal() {
                       <TableRow>
                         <TableHead>Order ID</TableHead>
                         <TableHead>Customer</TableHead>
+                        <TableHead>Items</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Date</TableHead>
@@ -773,6 +775,19 @@ export function SellerPortal() {
                         <TableRow key={order.order_id}>
                           <TableCell>{order.order_id}</TableCell>
                           <TableCell>{order.user_id}</TableCell>
+                          <TableCell>
+                            {order.items && order.items.length > 0 ? (
+                              <div className="flex flex-col gap-0.5">
+                                {order.items.map((it, i) => (
+                                  <span key={i} className="text-sm text-slate-700 whitespace-nowrap">
+                                    {it.product_name} <span className="text-slate-400">×{it.quantity}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </TableCell>
                           <TableCell>${order.amount.toFixed(2)}</TableCell>
                           <TableCell>
                             <Badge variant="secondary" className={getStatusColor(order.status)}>
@@ -784,14 +799,14 @@ export function SellerPortal() {
                       ))}
                       {loadingOrders && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                          <TableCell colSpan={6} className="text-center text-slate-500 py-8">
                             <span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span>
                           </TableCell>
                         </TableRow>
                       )}
                       {!loadingOrders && filteredOrders.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                          <TableCell colSpan={6} className="text-center text-slate-500 py-8">
                             No orders found
                           </TableCell>
                         </TableRow>
@@ -942,14 +957,14 @@ export function SellerPortal() {
                       ))}
                       {loadingProducts && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                          <TableCell colSpan={6} className="text-center text-slate-500 py-8">
                             <span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span>
                           </TableCell>
                         </TableRow>
                       )}
                       {!loadingProducts && filteredProducts.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                          <TableCell colSpan={6} className="text-center text-slate-500 py-8">
                             No products found
                           </TableCell>
                         </TableRow>
@@ -1039,6 +1054,7 @@ export function SellerPortal() {
                       <TableRow>
                         <TableHead>Order ID</TableHead>
                         <TableHead>Customer</TableHead>
+                        <TableHead>Items</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Date</TableHead>
@@ -1049,6 +1065,19 @@ export function SellerPortal() {
                         <TableRow key={order.order_id}>
                           <TableCell>{order.order_id}</TableCell>
                           <TableCell>{order.user_id}</TableCell>
+                          <TableCell>
+                            {order.items && order.items.length > 0 ? (
+                              <div className="flex flex-col gap-0.5">
+                                {order.items.map((it, i) => (
+                                  <span key={i} className="text-sm text-slate-700 whitespace-nowrap">
+                                    {it.product_name} <span className="text-slate-400">×{it.quantity}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </TableCell>
                           <TableCell>${order.amount.toFixed(2)}</TableCell>
                           <TableCell>
                             <Badge variant="secondary" className={getStatusColor(order.status)}>
@@ -1060,14 +1089,14 @@ export function SellerPortal() {
                       ))}
                       {loadingOrders && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                          <TableCell colSpan={6} className="text-center text-slate-500 py-8">
                             <span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...</span>
                           </TableCell>
                         </TableRow>
                       )}
                       {!loadingOrders && filteredOrders.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                          <TableCell colSpan={6} className="text-center text-slate-500 py-8">
                             No orders found
                           </TableCell>
                         </TableRow>
