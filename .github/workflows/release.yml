@@ -22,11 +22,13 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/ecfront"
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/ecfront"
         # No keys at build time: the image is environment-agnostic and reads its
         # config from the environment at container start (docker-entrypoint.sh).
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-ecpay:
     runs-on: ubuntu-22.04
@@ -45,9 +47,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/ecpay"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/ecpay"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-ranking:
     runs-on: ubuntu-22.04
@@ -66,9 +70,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/ranking"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/ranking"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-sale:
     runs-on: ubuntu-22.04
@@ -87,9 +93,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/sale"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/sale"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-shipment:
     runs-on: ubuntu-22.04
@@ -108,9 +116,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/shipment"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/shipment"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
 
   release-searchitem:
@@ -130,9 +140,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/searchitem"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/searchitem"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-product:
     runs-on: ubuntu-22.04
@@ -151,9 +163,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/product"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/product"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-uam:
     runs-on: ubuntu-22.04
@@ -173,9 +187,11 @@ jobs:
     - name: Push the docker image
       run: |
         #export SNAPSHOT_VERSION=$(curl -s https://ghcr.io/v2/${{ github.repository_owner }}/uam/tags/list | jq -r '.tags[]' | grep 'snapshot' | cut -d'-' -f2- | sort -Vr | head -n 1)
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/uam"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/uam"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-apigw:
     runs-on: ubuntu-22.04
@@ -194,9 +210,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/apigw"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/apigw"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-minio:
     runs-on: ubuntu-22.04
@@ -215,9 +233,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/minio"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/minio"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-meilisearch:
     runs-on: ubuntu-22.04
@@ -236,9 +256,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/meilisearch"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/meilisearch"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-mysql:
     runs-on: ubuntu-22.04
@@ -257,9 +279,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/mysql"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/mysql"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-sync:
     runs-on: ubuntu-22.04
@@ -278,9 +302,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/sync"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/sync"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-redis:
     runs-on: ubuntu-22.04
@@ -299,9 +325,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/redis"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/redis"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
   release-geocoding:
     runs-on: ubuntu-22.04
     defaults:
@@ -319,9 +347,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/geocoding"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/geocoding"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-cart:
     runs-on: ubuntu-22.04
@@ -337,9 +367,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/cart"
-        docker build -f cart/Dockerfile -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/cart"
+        docker build -f cart/Dockerfile -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-recommendation:
     runs-on: ubuntu-22.04
@@ -358,9 +390,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/recommendation"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/recommendation"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-airflow:
     runs-on: ubuntu-22.04
@@ -379,9 +413,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/airflow"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/airflow"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   release-dashboard:
     runs-on: ubuntu-22.04
@@ -426,9 +462,11 @@ jobs:
 
     - name: Push the docker image
       run: |
-        export IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/seeder"
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        VERSION="1.${{ github.run_number }}"
+        BASE="ghcr.io/${{ github.repository_owner }}/seeder"
+        docker build -t "$BASE:latest" -t "$BASE:$VERSION" .
+        docker push "$BASE:latest"
+        docker push "$BASE:$VERSION"
 
   # Cut a GitHub Release for whatever ref this workflow was dispatched on (any
   # branch — this is workflow_dispatch, so no main required). The tag is the same
