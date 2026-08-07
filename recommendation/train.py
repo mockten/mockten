@@ -150,6 +150,17 @@ def train_model_logic() -> bool:
         if conn:
             conn.close()
 
+    # A training fired before the behavior seeder has inserted any orders would see
+    # zero interactions. model.train() then no-ops (leaves the model untrained) but
+    # the surrounding code would still persist that empty model and report success —
+    # so the store stays PENDING with no retry. Treat "no data yet" as a failure so
+    # the caller keeps retrying until the seed data lands, and never save a useless
+    # untrained model over a good one.
+    if not interactions:
+        logger.warning("No interactions in the database yet — skipping training. "
+                       "Will retry once behavior data has been seeded.")
+        return False
+
     try:
         logger.info("Initializing new RecommendationModel and starting training...")
         new_model = RecommendationModel()

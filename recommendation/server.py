@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from db import get_db_connection, fetch_interactions, fetch_item_features, fetch_product_details
 from model import RecommendationModel
-from storage import load_model, save_model, get_minio_client, MODEL_BUCKET, MODEL_KEY
+from storage import load_model, save_model, get_minio_client, ensure_bucket_exists, MODEL_BUCKET, MODEL_KEY
 from minio.error import S3Error
 from train import train_model_logic
 from util import product_image_url, category_image_url
@@ -103,16 +103,46 @@ async def poll_model_updates_loop():
         await asyncio.sleep(30)
         await reload_model_if_needed()
 
+async def ensure_trained_loop():
+    """Self-heal: keep retrying training until the model is actually trained.
+
+    A single startup shot races the behavior seeder — on a fresh cluster the orders
+    aren't in MySQL yet, so that first attempt trains on nothing and (with train.py
+    now refusing to persist an empty model) leaves the store PENDING with no retry.
+    This loop converges no matter how late the seed data lands, on every cloud, so
+    the model no longer depends on an external CI re-trigger firing at the right time.
+    """
+    global model
+    delay = 15
+    attempts = 0
+    while not model.is_trained:
+        attempts += 1
+        logger.info(f"Model not trained yet — training attempt #{attempts}.")
+        await train_model_task()
+        if model.is_trained:
+            break
+        await asyncio.sleep(delay)
+        delay = min(delay * 2, 120)
+    logger.info(f"Recommendation model is trained (at {model.trained_at}); self-heal loop done.")
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("Performing initial model load/check...")
+    # Create the model bucket up front. On a fresh cluster it doesn't exist yet,
+    # which otherwise makes every reload poll log NoSuchBucket and would let the
+    # first save race a missing bucket.
+    try:
+        await asyncio.to_thread(ensure_bucket_exists, get_minio_client())
+    except Exception as e:
+        logger.warning(f"Could not pre-create the model bucket at startup: {e}")
+
     await reload_model_if_needed()
-    
+
     global model
     if not model.is_trained:
-        logger.info("No model found in storage. Starting initial training in background...")
-        asyncio.create_task(train_model_task())
-    
+        logger.info("No trained model in storage. Starting self-healing training loop...")
+        asyncio.create_task(ensure_trained_loop())
+
     # Start the background polling loop to watch for model updates from CronJobs
     asyncio.create_task(poll_model_updates_loop())
 
